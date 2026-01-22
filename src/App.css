@@ -1,0 +1,400 @@
+:root {
+  /* Light Mode Defaults */
+  --navy-blue: #001f3f;
+  --body-bg: #efefef;
+  --section-bg: #ffffff;
+  --text-main: #333333;
+}
+
+[data-bs-theme="dark"] {
+  /* Dark Mode Overrides */
+  --navy-blue: #003366; /* Slightly lighter navy for contrast on dark */
+  --body-bg: #121212;   /* Very dark grey for background */
+  --section-bg: #1e1e1e; /* Dark grey for "white" sections */
+  --text-main: #f8f9fa;
+}
+
+body {
+  background-color: var(--body-bg);
+  color: var(--text-main);
+  transition: background-color 0.3s, color 0.3s; /* Smooth transition */
+}
+
+/* Update utilities to use variables */
+.bg-navy {
+  background-color: var(--navy-blue) !important;
+  color: #fff;
+}
+
+.text-navy {
+  color: var(--navy-blue) !important;
+}
+
+/* Ensure sections like "About" switch backgrounds properly */
+section.bg-white {
+  background-color: var(--section-bg) !important;
+  color: var(--text-main);
+}
+
+.card-custom {
+  /* Bootstrap handles card backgrounds automatically in dark mode, 
+     but we add a transition for smoothness */
+  transition: transform 0.2s, background-color 0.3s;
+}
+
+/* --- HERO SECTION --- */
+.hero-section {
+  min-height: 100vh; /* Takes up full viewport height */
+  display: flex;
+  align-items: center;
+  position: relative;
+  background: linear-gradient(135deg, var(--navy-blue) 0%, #000c1a 100%); /* Navy Gradient */
+  color: white;
+  padding-top: 80px; /* Offset for the content so it doesn't hit the navbar */
+}
+
+/* --- NAVBAR TRANSITIONS --- */
+.navbar-custom {
+  transition: all 0.4s ease-in-out;
+  padding: 1.5rem 0; /* Taller padding at the top */
+}
+
+/* State 1: At the top (Transparent) */
+.navbar-transparent {
+  background-color: transparent !important;
+  box-shadow: none;
+}
+
+/* State 2: Scrolled (Solid) */
+.navbar-scrolled {
+  background-color: var(--navy-blue) !important; /* Solid Navy */
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  padding: 0.8rem 0; /* Shrink padding slightly when scrolled */
+}
+
+/* --- TYPOGRAPHY ANIMATIONS --- */
+.animate-fade-up {
+  animation: fadeUp 1s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.delay-100 { animation-delay: 0.2s; }
+.delay-200 { animation-delay: 0.4s; }
+.delay-300 { animation-delay: 0.6s; }
+
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Social Icon Hover Effect */
+.hover-warning {
+  transition: color 0.3s ease;
+}
+.hover-warning:hover {
+  color: #FFD700 !important; /* Gold/Yellow */
+}
+
+/* Fix for dark mode text on icons/buttons */
+[data-bs-theme="dark"] .text-dark {
+  color: #f8f9fa !important; /* Turn dark text white in dark mode */
+}
+[data-bs-theme="dark"] .btn-outline-dark {
+  color: #f8f9fa;
+  border-color: #f8f9fa;
+}
+[data-bs-theme="dark"] .btn-outline-dark:hover {
+  color: #000;
+  background-color: #f8f9fa;
+}
+
+/* Filter Button Active State */
+.btn.bg-navy {
+  background-color: var(--navy-blue) !important;
+  color: white !important;
+}
+.btn-outline-navy {
+  color: var(--navy-blue);
+  border-color: var(--navy-blue);
+}
+.btn-outline-navy:hover {
+  background-color: var(--navy-blue);
+  color: white;
+}
+
+/* Service Card Hover Effect */
+.hover-scale {
+  transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: translateY(-5px);
+  background-color: rgba(255, 255, 255, 0.15) !important; /* Slightly lighter on hover */
+}
+
+/* Form Input Focus Color */
+.form-control:focus {
+  box-shadow: none;
+  border: 1px solid var(--navy-blue) !important;
+}
+
+/* Specific hover color for Substack */
+.hover-warning:hover .si-substack {
+    color: #FF6719 !important; /* Substack Orange */
+}
+
+/* Substack Button Hover */
+.newsletter-btn:hover {
+  background-color: #e55b14 !important; /* Slightly darker orange */
+  border-color: #e55b14 !important;
+  transform: translateY(-2px); /* Subtle lift */
+  transition: all 0.2s ease-in-out;
+}
+
+/* --- CHATBOT STYLES --- */
+
+/* 1. Floating Action Button */
+.chatbot-fab {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: var(--navy-blue) !important;
+  border: 2px solid #FFD700 !important; /* Gold border */
+  z-index: 9999;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.chatbot-fab:hover {
+  transform: scale(1.1);
+}
+
+/* 2. Chat Window Container */
+.chatbot-window {
+  position: fixed;
+  bottom: 100px; /* Sits above the button */
+  right: 30px;
+  width: 350px;
+  height: 450px;
+  z-index: 9999;
+  
+  /* Animation State: Hidden */
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  pointer-events: none; /* Click through when hidden */
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+/* Animation State: Open */
+.chatbot-window.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+/* 3. Message Bubbles Helper */
+.rounded-bottom-right-0 {
+  border-bottom-right-radius: 0 !important;
+}
+.rounded-bottom-left-0 {
+  border-bottom-left-radius: 0 !important;
+}
+
+/* 4. Mobile Responsiveness */
+@media (max-width: 576px) {
+  .chatbot-window {
+    width: 90%; /* Almost full width on mobile */
+    right: 5%;
+    bottom: 100px;
+  }
+}
+
+/* src/App.css */
+
+/* FIX: In Dark Mode, make 'bg-light' elements dark gray */
+[data-bs-theme="dark"] .bg-light {
+  background-color: #112240 !important; /* A nice dark navy/gray */
+  color: #e6f1ff !important;
+}
+
+/* FIX: In Dark Mode, make 'outline-dark' buttons visible (light border/text) */
+[data-bs-theme="dark"] .btn-outline-dark {
+  color: #f8f9fa;
+  border-color: #f8f9fa;
+}
+[data-bs-theme="dark"] .btn-outline-dark:hover {
+  background-color: #f8f9fa;
+  color: #000;
+}
+
+/* FIX: Form Inputs in Dark Mode */
+[data-bs-theme="dark"] .form-control {
+  background-color: #112240; /* Match the section background */
+  border-color: #233554;
+  color: white;
+}
+[data-bs-theme="dark"] .form-control::placeholder {
+  color: #8892b0;
+}
+
+/* Custom Theme Switch Styling */
+.theme-switch-custom .form-check-input {
+  width: 3em; /* Make it slightly wider */
+  height: 1.5em;
+  background-color: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e"); /* White knob default */
+  cursor: pointer;
+}
+
+/* When checked (Light Mode) - Make knob Gold */
+.theme-switch-custom .form-check-input:checked {
+  background-color: var(--navy-blue);
+  border-color: #FFD700;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23FFD700'/%3e%3c/svg%3e");
+}
+
+/* When unchecked (Dark Mode) - Make knob White/Gray */
+.theme-switch-custom .form-check-input:focus {
+  box-shadow: none; /* Remove blue glow */
+  border-color: #FFD700;
+}
+
+/* --- CHATBOT DARK MODE FIXES --- */
+
+/* 1. Main Chat Window Background */
+[data-bs-theme="dark"] .chatbot-window .card {
+  background-color: var(--navy-blue);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 2. Chat History Area (The scrollable part) */
+[data-bs-theme="dark"] .chat-body {
+  background-color: #0b1a2e !important; /* Very dark navy (almost black) */
+}
+
+/* 3. The BOT'S Message Bubble */
+/* We override 'bg-white' only inside the chatbot when in dark mode */
+[data-bs-theme="dark"] .chatbot-window .bg-white {
+  background-color: #1e3a5f !important; /* Lighter Navy for contrast */
+  color: #ffffff !important;             /* White text */
+  border-color: #2c4a7c !important;      /* Subtle border */
+}
+
+/* 4. The Footer (Input Area) */
+[data-bs-theme="dark"] .chatbot-window .card-footer {
+  background-color: var(--navy-blue) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 5. The Input Field itself */
+[data-bs-theme="dark"] .chatbot-window .form-control {
+  background-color: #0b1a2e !important;
+  color: white !important;
+}
+
+/* --- ANIMATED METRIC CIRCLES --- */
+
+/* 1. The Container holding SVG and Text together */
+.metric-circle-container {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 2. The Text Content centered absolutely */
+.metric-content {
+  position: absolute;
+  z-index: 2;
+  /* Ensure text colors match theme */
+  color: var(--navy-blue);
+}
+
+/* 3. The SVG Canvas */
+.metric-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg); /* Start animation at the top center */
+}
+
+/* 4. The Static Background Ring (Gray track) */
+.metric-track {
+  fill: none;
+  stroke: #e9ecef; /* Light gray in light mode */
+  stroke-width: 4;
+}
+
+/* 5. The Animated "Spinning" Ring (Gold) */
+.metric-spinner {
+  fill: none;
+  stroke: #FFD700; /* Gold */
+  stroke-width: 4;
+  stroke-linecap: round; /* Makes the ends of the line rounded */
+  /* Mathematics of the dasharray:
+     Circumference C = 2 * pi * r. Here r=54, so C ≈ 339px.
+     We create a dash of 100px, followed by a gap of 240px.
+  */
+  stroke-dasharray: 100 240;
+  transform-origin: center;
+  animation: spinMetric 3s linear infinite; /* Continuous rotation */
+}
+
+/* --- DARK MODE ADAPTATIONS --- */
+[data-bs-theme="dark"] .metric-track {
+  stroke: rgba(255, 255, 255, 0.08); /* Very subtle track in dark mode */
+  fill: var(--navy-blue); /* Fills the center of the circle with Navy */
+}
+
+[data-bs-theme="dark"] .metric-content h3 {
+  color: #FFD700 !important; /* Gold numbers in dark mode */
+}
+
+[data-bs-theme="dark"] .metric-content small {
+  color: rgba(255, 255, 255, 0.7) !important; /* Lighter text labels */
+}
+
+
+/* --- KEYFRAME ANIMATION --- */
+@keyframes spinMetric {
+  from {
+    stroke-dashoffset: 0;
+    transform: rotate(0deg);
+  }
+  to {
+     /* We rotate the whole circle 360deg to create the spin */
+    stroke-dashoffset: -340; /* Shifts the dash pattern for flow effect */
+    transform: rotate(360deg);
+  }
+}
+
+/* --- LOGO STYLES --- */
+
+/* Light Mode Defaults */
+.brand-logo {
+  color: var(--navy-blue); /* The lines and text will be Navy */
+}
+
+/* Dark Mode Adaptations */
+[data-bs-theme="dark"] .brand-logo {
+  color: #ffffff; /* The lines and text turn White */
+}
+
+/* Optional: subtle pulse animation on the gold nodes */
+.logo-node {
+    animation: pulseGold 3s infinite ease-in-out;
+}
+
+@keyframes pulseGold {
+    0%, 100% { opacity: 1; r: 5; }
+    50% { opacity: 0.8; r: 6; } /* Subtle grow effect */
+}
