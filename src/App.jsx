@@ -12,9 +12,9 @@ import { SiMedium, SiSubstack } from 'react-icons/si';
 
 import { FaLinkedin, FaTwitter, FaGithub } from 'react-icons/fa';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import ParticlesBackground from './components/backgrounds/ParticlesBackground';
-import Chatbot from './components/chatbot/Chatbot';
-import AIPlayground from './components/ai_playground/AIPlayground';
+import ParticlesBackground from './components/ParticlesBackground';
+import Chatbot from './components/Chatbot';
+import AIPlayground from './components/AIPlayground';
 import Logo from './components/Logo';
 import './App.css';
 
