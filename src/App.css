@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&display=swap');
+
 :root {
   /* Light Mode Defaults */
   --navy-blue: #001f3f;
@@ -450,4 +452,23 @@ section.bg-white {
 }
 [data-bs-theme="light"] .brand-logo {
   color: var(--navy-blue);
+}
+
+/* Hero rotating title */
+.hero-rotating-title {
+  font-family: 'Fira Code', 'SFMono-Regular', Menlo, Consolas, monospace;
+  min-height: 1.8em; /* reserve space to avoid layout shift */
+  letter-spacing: 0.02em;
+}
+
+.title-slide {
+  display: inline-block;
+  animation: slideFade 1s ease-in-out;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes slideFade {
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(6px); }
+  45% { opacity: 1; transform: translateY(0) scale(1.02); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
