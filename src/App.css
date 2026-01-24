@@ -16,6 +16,11 @@
   --text-main: #f8f9fa;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   background-color: var(--body-bg);
   color: var(--text-main);
@@ -42,6 +47,12 @@ section.bg-white {
   /* Bootstrap handles card backgrounds automatically in dark mode, 
      but we add a transition for smoothness */
   transition: transform 0.2s, background-color 0.3s;
+  overflow-x: hidden;
+}
+
+/* Global section overflow safety */
+section {
+  overflow-x: hidden;
 }
 
 /* --- HERO SECTION --- */
@@ -162,7 +173,7 @@ section.bg-white {
 .chatbot-fab {
   position: fixed;
   bottom: 30px;
-  right: 30px;
+  right: 20px;
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -180,10 +191,11 @@ section.bg-white {
 .chatbot-window {
   position: fixed;
   bottom: 100px; /* Sits above the button */
-  right: 30px;
+  right: 15px;
   width: 350px;
   height: 450px;
   z-index: 9999;
+  max-width: calc(100vw - 30px);
   
   /* Animation State: Hidden */
   opacity: 0;
@@ -209,10 +221,15 @@ section.bg-white {
 
 /* 4. Mobile Responsiveness */
 @media (max-width: 576px) {
+  .chatbot-fab {
+    right: 15px;
+    bottom: 25px;
+  }
+  
   .chatbot-window {
-    width: 90%; /* Almost full width on mobile */
-    right: 5%;
-    bottom: 100px;
+    width: calc(100vw - 40px);
+    right: 20px;
+    bottom: 95px;
   }
 }
 
