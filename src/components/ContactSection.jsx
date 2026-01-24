@@ -34,6 +34,10 @@ const ContactSection = () => (
                     </Form.Group>
                   </Col>
                 </Row>
+                <Form.Group className="mb-3" controlId="contact-subject">
+                  <Form.Label className="fw-bold small text-muted">SUBJECT</Form.Label>
+                    <Form.Control type="text" placeholder="Subject" className="bg-light border-0 py-2" />
+                </Form.Group>
 
                 <Form.Group className="mb-4" controlId="contact-message">
                   <Form.Label className="fw-bold small text-muted">MESSAGE</Form.Label>
