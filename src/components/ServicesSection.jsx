@@ -3,10 +3,10 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 
 const ServicesSection = () => (
-  <section id="services" className="m-5 section-padding bg-navy text-white position-relative">
-    <Container className="p-5">
+  <section id="services" className="section-padding bg-navy text-white position-relative">
+    <Container className="pt-3 pb-3">
       <div className="text-center mb-3">
-        <h2 className="fw-bold display-6">Engineering Intelligence</h2>
+        <h2 className="fw-bold display-6">My Services</h2>
       </div>
 
       <Row className="g-4">

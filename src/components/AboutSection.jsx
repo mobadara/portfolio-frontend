@@ -75,7 +75,7 @@ const AboutSection = () => (
             </li>
           </ul>
 
-          <div className="d-flex align-items-center gap-3">
+          <div className="justify-content-center d-flex align-items-center gap-3">
             <Button
               variant="primary"
               className="bg-navy border-navy px-4 fw-bold"
