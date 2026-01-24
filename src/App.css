@@ -529,3 +529,15 @@ section {
     margin: 0 auto 2rem;
   }
 }
+
+/* --- GITHUB CALENDAR FIXES --- */
+[data-bs-theme="dark"] .react-activity-calendar {
+    /* Ensures the text labels (Mon, Tue, Jan, Feb) turn white */
+    color: #ffffff !important; 
+}
+
+/* Change the container background in dark mode */
+[data-bs-theme="dark"] .bg-white {
+    background-color: #112240 !important; /* Navy */
+    border-color: #233554 !important;     /* Lighter border */
+}
