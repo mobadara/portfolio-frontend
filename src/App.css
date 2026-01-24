@@ -489,3 +489,43 @@ section {
   45% { opacity: 1; transform: translateY(0) scale(1.02); filter: blur(0); }
   100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
+/* Hero Buttons Responsive */
+.hero-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.hero-buttons .btn {
+  flex: 1;
+  min-width: 150px;
+  max-width: 250px;
+}
+
+@media (max-width: 576px) {
+  .hero-buttons {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .hero-buttons .btn {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* About Section Image Centering */
+.profile-img-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .profile-img-container {
+    max-width: 90%;
+    margin: 0 auto 2rem;
+  }
+}

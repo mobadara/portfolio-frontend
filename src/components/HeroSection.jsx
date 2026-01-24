@@ -37,8 +37,8 @@ const HeroSection = () => {
               Turning complex data into intelligent action. Grounded in <strong>Mathematics</strong> and <strong>Linear Algebra</strong>,
               I specialize in Data Science, Machine Learning, and AI Engineering—building robust models and scalable backends for any domain.
             </p>
-            <div className="animate-fade-up delay-300">
-              <Button variant="light" size="lg" className="me-3 fw-bold text-navy px-4 py-2" href="#portfolio">
+            <div className="animate-fade-up delay-300 hero-buttons">
+              <Button variant="light" size="lg" className="fw-bold text-navy px-4 py-2" href="#portfolio">
                 View My Work
               </Button>
               <Button variant="outline-light" size="lg" className="px-4 py-2" href="#contact">
