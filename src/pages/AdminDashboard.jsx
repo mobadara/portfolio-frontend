@@ -1,4 +1,4 @@
-import AdminChatPage from './components/AdminChatPage';
+import AdminChatPage from '../components/AdminChatPage';
 
 /**
  * AdminDashboard - Simple demo page for admin chat

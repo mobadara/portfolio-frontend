@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import AIPlayground from './components/AIPlayground';
 import AboutSection from './components/AboutSection';
@@ -11,6 +12,7 @@ import NewsletterSection from './components/NewsletterSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
 import LoadingAnimation from './components/LoadingAnimation';
+import AdminDashboard from './pages/AdminDashboard';
 import projects from './data/projects';
 import './App.css';
 
@@ -48,7 +50,7 @@ function App() {
    */
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
-  return (
+  const homeContent = (
     <>
       <LoadingAnimation isLoading={isLoading} />
       <NavigationBar theme={theme} onToggleTheme={toggleTheme} />
@@ -62,6 +64,14 @@ function App() {
       <FooterSection />
       <Chatbot />
     </>
+  );
+
+  return (
+    <Routes>
+      <Route path="/" element={homeContent} />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
