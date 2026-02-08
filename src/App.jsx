@@ -10,6 +10,7 @@ import NavigationBar from './components/NavigationBar';
 import NewsletterSection from './components/NewsletterSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
+import LoadingAnimation from './components/LoadingAnimation';
 import projects from './data/projects';
 import './App.css';
 
@@ -21,6 +22,7 @@ import './App.css';
  */
 function App() {
   const [theme, setTheme] = useState('light');
+  const [isLoading, setIsLoading] = useState(true);
 
   /**
    * Sync theme state with document theme attribute
@@ -31,12 +33,24 @@ function App() {
   }, [theme]);
 
   /**
+   * Hide loading animation after initial page load
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2500); // Show loading for 2.5 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  /**
    * Toggle between light and dark theme modes
    */
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
   return (
     <>
+      <LoadingAnimation isLoading={isLoading} />
       <NavigationBar theme={theme} onToggleTheme={toggleTheme} />
       <HeroSection />
       <AboutSection theme={theme} />

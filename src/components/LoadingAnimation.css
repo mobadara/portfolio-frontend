@@ -1,0 +1,463 @@
+/* LoadingAnimation Styles */
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.6s ease-out;
+}
+
+.loading-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Dark mode support */
+[data-bs-theme="dark"] .loading-overlay {
+  background: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 100%);
+}
+
+/* Animated Grid Background */
+.loading-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  opacity: 0.1;
+  z-index: 1;
+}
+
+.grid-item {
+  border: 1px solid #001f3f;
+  animation: grid-pulse 3s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes grid-pulse {
+  0%, 100% {
+    opacity: 0.1;
+    background-color: transparent;
+  }
+  50% {
+    opacity: 0.3;
+    background-color: rgba(0, 31, 63, 0.1);
+  }
+}
+
+[data-bs-theme="dark"] .grid-item {
+  border-color: #0d6efd;
+}
+
+/* Loading Container */
+.loading-container {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+/* Orb Wrapper */
+.loading-orb-wrapper {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Central Orb */
+.loading-orb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #0d6efd, #001f3f);
+  box-shadow: 0 0 30px rgba(13, 110, 253, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.1);
+  animation: orb-rotate 4s linear infinite;
+}
+
+@keyframes orb-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.orb-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #0d6efd;
+  transform: translate(-50%, -50%);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
+}
+
+.orb-inner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #fff, #0d6efd);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 15px rgba(13, 110, 253, 0.8);
+}
+
+/* Neural Orbit */
+.neural-orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: orbit-rotate 8s linear infinite reverse;
+}
+
+@keyframes orbit-rotate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.neural-particle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  top: 50%;
+  left: 50%;
+  transform-origin: 80px 0;
+  animation: particle-orbit 8s linear infinite;
+  animation-delay: calc((var(--index) / var(--total)) * -8s);
+}
+
+@keyframes particle-orbit {
+  0% {
+    transform: rotate(0deg) translateX(80px);
+  }
+  100% {
+    transform: rotate(360deg) translateX(80px);
+  }
+}
+
+.particle-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #0d6efd;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 10px #0d6efd;
+  animation: particle-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes particle-pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 1;
+  }
+}
+
+/* Neural Lines */
+.neural-lines {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  transform: translate(-50%, -50%);
+  animation: lines-rotate 8s linear infinite reverse;
+}
+
+@keyframes lines-rotate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.neural-line {
+  stroke: url(#line-gradient);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 5px rgba(13, 110, 253, 0.5));
+  animation: line-dash 2s ease-in-out infinite;
+  animation-delay: calc(var(--index) * 0.1s);
+}
+
+@keyframes line-dash {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  50% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 100;
+  }
+}
+
+/* Loading Text */
+.loading-text-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.loading-text {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #001f3f;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  letter-spacing: 1px;
+}
+
+[data-bs-theme="dark"] .loading-text {
+  color: #0d6efd;
+}
+
+.loading-word {
+  animation: text-glow 2s ease-in-out infinite;
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 0 0 5px rgba(13, 110, 253, 0);
+  }
+  50% {
+    text-shadow: 0 0 15px rgba(13, 110, 253, 0.5);
+  }
+}
+
+.dots span {
+  display: inline-block;
+  animation: dot-bounce 1.4s infinite;
+  margin: 0 2px;
+}
+
+.dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes dot-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  30% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+.loading-subtext {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+  animation: fade-in-out 2s ease-in-out infinite;
+}
+
+[data-bs-theme="dark"] .loading-subtext {
+  color: #999;
+}
+
+@keyframes fade-in-out {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Progress Bar */
+.loading-progress-bar {
+  width: 200px;
+  height: 4px;
+  background: rgba(0, 31, 63, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+[data-bs-theme="dark"] .loading-progress-bar {
+  background: rgba(13, 110, 253, 0.2);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0d6efd, #001f3f);
+  border-radius: 2px;
+  animation: progress-animate 2s ease-in-out infinite;
+}
+
+@keyframes progress-animate {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 100%;
+  }
+  100% {
+    width: 0%;
+  }
+}
+
+/* Floating Particles */
+.particles-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.floating-particle {
+  position: absolute;
+  font-size: 2rem;
+  opacity: 0;
+  animation: float-in-out 8s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes float-in-out {
+  0% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) translateY(100px) scale(0.5);
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) translateY(-100px) scale(1);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .loading-orb-wrapper {
+    width: 120px;
+    height: 120px;
+  }
+
+  .loading-orb {
+    width: 60px;
+    height: 60px;
+  }
+
+  .neural-orbit {
+    width: 120px;
+    height: 120px;
+  }
+
+  .neural-particle {
+    width: 10px;
+    height: 10px;
+  }
+
+  .loading-text {
+    font-size: 1.2rem;
+  }
+
+  .loading-progress-bar {
+    width: 150px;
+  }
+
+  .neural-lines {
+    width: 150px;
+    height: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .loading-container {
+    gap: 1rem;
+  }
+
+  .loading-orb-wrapper {
+    width: 100px;
+    height: 100px;
+  }
+
+  .loading-orb {
+    width: 50px;
+    height: 50px;
+  }
+
+  .neural-orbit {
+    width: 100px;
+    height: 100px;
+  }
+
+  .loading-text {
+    font-size: 1rem;
+  }
+
+  .loading-subtext {
+    font-size: 0.8rem;
+  }
+}
