@@ -18,6 +18,7 @@ const Chatbot = () => {
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
+  const messageIdRef = useRef(2);
 
   const predefinedQuestions = [
     "What are Muyiwa's main skills?",
@@ -25,6 +26,35 @@ const Chatbot = () => {
     "What's his availability?",
     "How can I contact him?"
   ];
+
+  const getNextMessageId = () => {
+    const nextId = messageIdRef.current;
+    messageIdRef.current += 1;
+    return nextId;
+  };
+
+  const playMessageSound = () => {
+    // Create a simple beep sound using Web Audio API
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (error) {
+      console.log('Could not play sound:', error);
+    }
+  };
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -58,7 +88,7 @@ const Chatbot = () => {
         ws.onmessage = (event) => {
           console.log('Message received from server:', event.data);
           const botMsg = {
-            id: Date.now(),
+            id: getNextMessageId(),
             text: event.data,
             sender: 'bot'
           };
@@ -70,7 +100,7 @@ const Chatbot = () => {
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
           const errorMsg = {
-            id: Date.now(),
+            id: getNextMessageId(),
             text: "Sorry, I encountered a connection error. Please try again.",
             sender: 'bot'
           };
@@ -86,7 +116,7 @@ const Chatbot = () => {
       } catch (error) {
         console.error('Failed to establish WebSocket connection:', error);
         const errorMsg = {
-          id: Date.now(),
+          id: getNextMessageId(),
           text: "Unable to connect to the chat service. Please refresh and try again.",
           sender: 'bot'
         };
@@ -112,7 +142,7 @@ const Chatbot = () => {
     if (!input.trim()) return;
 
     // 1. Add User Message
-    const userMsg = { id: Date.now(), text: input, sender: 'user' };
+    const userMsg = { id: getNextMessageId(), text: input, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
 
@@ -122,7 +152,7 @@ const Chatbot = () => {
       setIsLoading(true);
     } else {
       const errorMsg = { 
-        id: Date.now() + 1, 
+        id: getNextMessageId(), 
         text: "Connection not established. Please refresh and try again.", 
         sender: 'bot' 
       };
@@ -132,7 +162,7 @@ const Chatbot = () => {
 
   const handlePredefinedQuestion = (question) => {
     // 1. Add User Message
-    const userMsg = { id: Date.now(), text: question, sender: 'user' };
+    const userMsg = { id: getNextMessageId(), text: question, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
 
     // 2. Send to WebSocket
@@ -141,34 +171,11 @@ const Chatbot = () => {
       setIsLoading(true);
     } else {
       const errorMsg = { 
-        id: Date.now() + 1, 
+        id: getNextMessageId(), 
         text: "Connection not established. Please refresh and try again.", 
         sender: 'bot' 
       };
       setMessages(prev => [...prev, errorMsg]);
-    }
-  };
-
-  const playMessageSound = () => {
-    // Create a simple beep sound using Web Audio API
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.1);
-    } catch (error) {
-      console.log('Could not play sound:', error);
     }
   };
 
