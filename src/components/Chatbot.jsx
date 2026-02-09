@@ -17,6 +17,8 @@ const Chatbot = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -65,9 +67,9 @@ const Chatbot = () => {
 
   useEffect(scrollToBottom, [messages, isOpen]);
 
-  // Initialize WebSocket connection when chatbot opens
+  // Initialize WebSocket connection on component mount
   useEffect(() => {
-    if (isOpen && !webSocketRef.current) {
+    if (!webSocketRef.current) {
       // Generate or retrieve session ID
       let sessionId = localStorage.getItem('chatSessionId');
       if (!sessionId) {
@@ -85,6 +87,7 @@ const Chatbot = () => {
 
         ws.onopen = () => {
           console.log('WebSocket connected');
+          setIsConnected(true);
         };
 
         ws.onmessage = (event) => {
@@ -101,6 +104,7 @@ const Chatbot = () => {
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
+          setIsConnected(false);
           const errorMsg = {
             id: getNextMessageId(),
             text: "Sorry, I encountered a connection error. Please try again.",
@@ -111,12 +115,14 @@ const Chatbot = () => {
 
         ws.onclose = () => {
           console.log('WebSocket disconnected');
+          setIsConnected(false);
           webSocketRef.current = null;
         };
 
         webSocketRef.current = ws;
       } catch (error) {
         console.error('Failed to establish WebSocket connection:', error);
+        setIsConnected(false);
         const errorMsg = {
           id: getNextMessageId(),
           text: "Unable to connect to the chat service. Please refresh and try again.",
@@ -127,17 +133,26 @@ const Chatbot = () => {
     }
 
     return () => {
-      // Don't close WebSocket when component unmounts, only when chatbot closes
+      // Clean up WebSocket on component unmount
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+        webSocketRef.current = null;
+      }
     };
-  }, [isOpen]);
+  }, []);
 
-  // Close WebSocket when chatbot window closes
+  // Auto-trigger chatbot after 30 seconds
   useEffect(() => {
-    if (!isOpen && webSocketRef.current) {
-      webSocketRef.current.close();
-      webSocketRef.current = null;
-    }
-  }, [isOpen]);
+    const autoTriggerTimer = setTimeout(() => {
+      if (!hasAutoTriggered && !isOpen) {
+        setHasAutoTriggered(true);
+        setIsOpen(true);
+        playMessageSound();
+      }
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(autoTriggerTimer);
+  }, [hasAutoTriggered, isOpen]);
 
   const handleSend = (e) => {
     e.preventDefault();
@@ -197,14 +212,20 @@ const Chatbot = () => {
         <Card className="h-100 border-0 overflow-hidden">
           
           {/* Header */}
-          <div className="card-header bg-navy text-white d-flex align-items-center justify-content-between p-3">
-            <div className="d-flex align-items-center gap-2">
-                <div className="bg-white text-navy rounded-circle p-1 d-flex">
-                    <BiBot size={20} />
+          <div className="chatbot-header d-flex align-items-center justify-content-between p-3">
+            <div className="d-flex align-items-center gap-3">
+                <div className="chatbot-avatar-wrapper">
+                    <div className="chatbot-avatar">
+                        <BiBot size={22} />
+                    </div>
+                    <div className={`chatbot-status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></div>
                 </div>
-                <h6 className="mb-0 fw-bold">Assistant</h6>
+                <div>
+                    <h6 className="mb-0 fw-bold chatbot-header-title">AI Assistant</h6>
+                    <small className="chatbot-header-subtitle">{isConnected ? 'Online • Ready to help' : 'Connecting...'}</small>
+                </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="btn btn-sm text-white-50 p-0">
+            <button onClick={() => setIsOpen(false)} className="btn btn-sm text-white p-0 chatbot-close-btn">
                 <BiX size={24} />
             </button>
           </div>

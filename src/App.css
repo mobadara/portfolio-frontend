@@ -211,7 +211,105 @@ section {
   pointer-events: all;
 }
 
-/* 3. Message Bubbles Helper */
+/* 3. Enhanced Header Styles */
+.chatbot-header {
+  background: linear-gradient(135deg, var(--navy-blue) 0%, #001a70 50%, #001a4d 100%);
+  color: white;
+  border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.chatbot-header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
+  animation: headerGlow 3s ease-in-out infinite;
+}
+
+@keyframes headerGlow {
+  0%, 100% { transform: translate(0, 0); opacity: 0.3; }
+  50% { transform: translate(10px, 10px); opacity: 0.6; }
+}
+
+.chatbot-avatar-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.chatbot-avatar {
+  width: 45px;
+  height: 45px;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--navy-blue);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); }
+  50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(255, 215, 0, 0.6); }
+}
+
+.chatbot-status-indicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--navy-blue);
+}
+
+.chatbot-status-indicator.connected {
+  background-color: #00ff00;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.chatbot-status-indicator.disconnected {
+  background-color: #ff6b6b;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.chatbot-header-title {
+  font-size: 1.1rem;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.5px;
+}
+
+.chatbot-header-subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+  display: block;
+  margin-top: 2px;
+}
+
+.chatbot-close-btn {
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.chatbot-close-btn:hover {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* 4. Message Bubbles Helper */
 .rounded-bottom-right-0 {
   border-bottom-right-radius: 0 !important;
 }
@@ -219,7 +317,7 @@ section {
   border-bottom-left-radius: 0 !important;
 }
 
-/* 4. Mobile Responsiveness */
+/* 5. Mobile Responsiveness */
 @media (max-width: 576px) {
   .chatbot-fab {
     right: 15px;
@@ -290,6 +388,12 @@ section {
 [data-bs-theme="dark"] .chatbot-window .card {
   background-color: var(--navy-blue);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Enhanced Header Dark Mode */
+[data-bs-theme="dark"] .chatbot-header {
+  background: linear-gradient(135deg, #0a1628 0%, #0f2744 50%, #142d4c 100%);
+  border-bottom: 2px solid rgba(255, 215, 0, 0.4);
 }
 
 /* 2. Chat History Area (The scrollable part) */
