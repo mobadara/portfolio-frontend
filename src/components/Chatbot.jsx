@@ -5,6 +5,7 @@ import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
 import { BiBot, BiSend, BiX } from 'react-icons/bi';
 import { BsChatDotsFill } from 'react-icons/bs';
+import ReactMarkdown from 'react-markdown';
 
 const CHAT_API_BASE = 'https://portfolio-backend-tjq3.onrender.com'
 // const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
@@ -223,7 +224,32 @@ const Chatbot = () => {
                   <small className="d-block mb-1 opacity-75" style={{ fontSize: '0.7rem' }}>
                     {msg.sender === 'user' ? 'You' : 'AI'}
                   </small>
-                  {msg.text}
+                  {msg.sender === 'bot' ? (
+                    <ReactMarkdown 
+                      className="markdown-content"
+                      components={{
+                        p: ({node, ...props}) => <p style={{marginBottom: '0.5rem'}} {...props} />,
+                        code: ({node, inline, ...props}) => 
+                          inline ? 
+                            <code style={{backgroundColor: '#f0f0f0', padding: '0.2rem 0.4rem', borderRadius: '3px', fontSize: '0.9em'}} {...props} /> :
+                            <code style={{display: 'block', backgroundColor: '#f0f0f0', padding: '0.5rem', borderRadius: '5px', overflowX: 'auto', fontSize: '0.85em'}} {...props} />,
+                        ul: ({node, ...props}) => <ul style={{marginLeft: '1rem', marginBottom: '0.5rem'}} {...props} />,
+                        ol: ({node, ...props}) => <ol style={{marginLeft: '1rem', marginBottom: '0.5rem'}} {...props} />,
+                        li: ({node, ...props}) => <li style={{marginBottom: '0.25rem'}} {...props} />,
+                        a: ({node, ...props}) => <a style={{color: '#0066cc', textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props} />,
+                        h1: ({node, ...props}) => <h5 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}} {...props} />,
+                        h2: ({node, ...props}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}} {...props} />,
+                        h3: ({node, ...props}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem'}} {...props} />,
+                        blockquote: ({node, ...props}) => <blockquote style={{borderLeft: '3px solid #ccc', paddingLeft: '0.5rem', marginLeft: '0', color: '#666'}} {...props} />,
+                        strong: ({node, ...props}) => <strong {...props} />,
+                        em: ({node, ...props}) => <em {...props} />
+                      }}
+                    >
+                      {msg.text}
+                    </ReactMarkdown>
+                  ) : (
+                    msg.text
+                  )}
                 </div>
               </div>
             ))}
