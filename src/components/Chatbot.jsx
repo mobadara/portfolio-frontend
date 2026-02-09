@@ -69,6 +69,8 @@ const Chatbot = () => {
 
   // Initialize WebSocket connection on component mount
   useEffect(() => {
+    let isMounted = true;
+
     if (!webSocketRef.current) {
       // Generate or retrieve session ID
       let sessionId = localStorage.getItem('chatSessionId');
@@ -87,52 +89,49 @@ const Chatbot = () => {
 
         ws.onopen = () => {
           console.log('WebSocket connected');
-          setIsConnected(true);
+          if (isMounted) {
+            setIsConnected(true);
+          }
         };
 
         ws.onmessage = (event) => {
           console.log('Message received from server:', event.data);
-          const botMsg = {
-            id: getNextMessageId(),
-            text: event.data,
-            sender: 'bot'
-          };
-          setMessages(prev => [...prev, botMsg]);
-          setIsLoading(false);
-          playMessageSound();
+          if (isMounted) {
+            const botMsg = {
+              id: getNextMessageId(),
+              text: event.data,
+              sender: 'bot'
+            };
+            setMessages(prev => [...prev, botMsg]);
+            setIsLoading(false);
+            playMessageSound();
+          }
         };
 
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
-          setIsConnected(false);
-          const errorMsg = {
-            id: getNextMessageId(),
-            text: "Sorry, I encountered a connection error. Please try again.",
-            sender: 'bot'
-          };
-          setMessages(prev => [...prev, errorMsg]);
+          if (isMounted) {
+            setIsConnected(false);
+          }
         };
 
         ws.onclose = () => {
           console.log('WebSocket disconnected');
-          setIsConnected(false);
+          if (isMounted) {
+            setIsConnected(false);
+          }
           webSocketRef.current = null;
         };
 
         webSocketRef.current = ws;
       } catch (error) {
         console.error('Failed to establish WebSocket connection:', error);
-        setIsConnected(false);
-        const errorMsg = {
-          id: getNextMessageId(),
-          text: "Unable to connect to the chat service. Please refresh and try again.",
-          sender: 'bot'
-        };
-        setMessages(prev => [...prev, errorMsg]);
+        // Connection state remains false by default, no need to set it
       }
     }
 
     return () => {
+      isMounted = false;
       // Clean up WebSocket on component unmount
       if (webSocketRef.current) {
         webSocketRef.current.close();
@@ -168,9 +167,10 @@ const Chatbot = () => {
       webSocketRef.current.send(input);
       setIsLoading(true);
     } else {
+      setIsLoading(false);
       const errorMsg = { 
         id: getNextMessageId(), 
-        text: "Connection not established. Please refresh and try again.", 
+        text: isConnected ? "Connection is being established. Please try again in a moment." : "Unable to connect to the chat service. Please check your connection and try again.", 
         sender: 'bot' 
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -189,7 +189,7 @@ const Chatbot = () => {
     } else {
       const errorMsg = { 
         id: getNextMessageId(), 
-        text: "Connection not established. Please refresh and try again.", 
+        text: isConnected ? "Connection is being established. Please try again in a moment." : "Unable to connect to the chat service. Please check your connection and try again.", 
         sender: 'bot' 
       };
       setMessages(prev => [...prev, errorMsg]);
