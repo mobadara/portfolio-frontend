@@ -3,7 +3,7 @@
  * Helper functions for managing chat sessions and WebSocket connections
  */
 
-const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'http://localhost:8000').replace(/\/$/, '');
+const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 
 /**
  * Fetch active chat sessions for the admin

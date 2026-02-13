@@ -7,7 +7,7 @@ import Alert from 'react-bootstrap/Alert';
 import { BiSend, BiX } from 'react-icons/bi';
 import { MdAdminPanelSettings } from 'react-icons/md';
 
-const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'http://localhost:8000').replace(/\/$/, '');
+const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 
 /**
  * AdminChat Component - Handles admin-to-user chat interface

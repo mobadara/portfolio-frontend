@@ -8,8 +8,7 @@ import { BiBot, BiSend, BiX } from 'react-icons/bi';
 import { BsChatDotsFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 
-const CHAT_API_BASE = 'https://portfolio-backend-tjq3.onrender.com'
-// const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'http://127.0.0.1:8000').replace(/\/$/, '');
+const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);

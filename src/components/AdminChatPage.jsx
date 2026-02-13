@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, Badge, Alert, Spinner } from 'react-bootstra
 import AdminChat from './AdminChat';
 import './AdminChatPage.css';
 
-const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'http://localhost:8000').replace(/\/$/, '');
+const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 
 /**
  * AdminChatPage - Admin Chat interface
