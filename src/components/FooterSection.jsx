@@ -1,6 +1,6 @@
 import Container from 'react-bootstrap/Container';
 import { FaLinkedin, FaTwitter, FaGithub } from 'react-icons/fa';
-import { SiMedium, SiSubstack } from 'react-icons/si';
+import { SiMedium } from 'react-icons/si';
 
 const FooterSection = () => (
   <footer id="blog" className="bg-navy text-white text-center py-5 border-top border-secondary">
@@ -24,11 +24,8 @@ const FooterSection = () => (
           <div className="vr bg-secondary opacity-50 mx-2 d-none d-md-block" style={{ height: '30px' }}></div>
 
           <div className="d-flex gap-4">
-            <a href="#" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="Medium Blog">
+            <a href="https://mobadara.medium.com" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="Medium Blog">
               <SiMedium />
-            </a>
-            <a href="#" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="Substack Newsletter">
-              <SiSubstack />
             </a>
           </div>
         </div>

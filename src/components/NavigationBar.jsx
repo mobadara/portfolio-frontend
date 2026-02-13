@@ -43,7 +43,7 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
             <Nav.Link href="#home" onClick={closeMenu} className="fs-5 mx-2 text-white">Home</Nav.Link>
             <Nav.Link href="#about" onClick={closeMenu} className="fs-5 mx-2 text-white">About</Nav.Link>
             <Nav.Link href="#portfolio" onClick={closeMenu} className="fs-5 mx-2 text-white">Portfolio</Nav.Link>
-            <Nav.Link href="https://medium.com/@mobadara" onClick={closeMenu} className="fs-5 mx-2 text-white">Blog</Nav.Link>
+            <Nav.Link href="#blog" onClick={closeMenu} className="fs-5 mx-2 text-white">Blog</Nav.Link>
             <Nav.Link href="#services" onClick={closeMenu} className="fs-5 mx-2 text-white">Services</Nav.Link>
             <Nav.Link href="#contact" onClick={closeMenu} className="fs-5 mx-2 text-white">Contact</Nav.Link>
           </Nav>

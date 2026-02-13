@@ -8,7 +8,7 @@ import ContactSection from './components/ContactSection';
 import FooterSection from './components/FooterSection';
 import HeroSection from './components/HeroSection';
 import NavigationBar from './components/NavigationBar';
-import NewsletterSection from './components/NewsletterSection';
+import BlogSection from './components/BlogSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
 import LoadingAnimation from './components/LoadingAnimation';
@@ -60,7 +60,7 @@ function App() {
       <PortfolioSection projects={projects} />
       <AIPlayground />
       <ServicesSection />
-      <NewsletterSection />
+      <BlogSection />
       <ContactSection />
       <FooterSection />
       <Chatbot />
