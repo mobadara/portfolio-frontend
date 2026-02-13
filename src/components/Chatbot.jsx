@@ -20,6 +20,8 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
+  const [humanMode, setHumanMode] = useState(false);
+  const [requestingHuman, setRequestingHuman] = useState(false);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -98,14 +100,41 @@ const Chatbot = () => {
         ws.onmessage = (event) => {
           console.log('Message received from server:', event.data);
           if (isMounted) {
-            const botMsg = {
-              id: getNextMessageId(),
-              text: event.data,
-              sender: 'bot'
-            };
-            setMessages(prev => [...prev, botMsg]);
-            setIsLoading(false);
-            playMessageSound();
+            try {
+              // Try to parse as JSON first (for system messages)
+              const data = JSON.parse(event.data);
+              
+              if (data.type === 'human_mode_activated') {
+                setHumanMode(true);
+                setRequestingHuman(false);
+                const botMsg = {
+                  id: getNextMessageId(),
+                  text: data.message || "You've been connected to a human! Muyiwa will respond shortly.",
+                  sender: 'bot'
+                };
+                setMessages(prev => [...prev, botMsg]);
+                playMessageSound();
+              } else if (data.type === 'message') {
+                const botMsg = {
+                  id: getNextMessageId(),
+                  text: data.content || data.message,
+                  sender: data.role === 'admin' ? 'admin' : 'bot'
+                };
+                setMessages(prev => [...prev, botMsg]);
+                setIsLoading(false);
+                playMessageSound();
+              }
+            } catch (e) {
+              // If not JSON, treat as regular text message
+              const botMsg = {
+                id: getNextMessageId(),
+                text: event.data,
+                sender: 'bot'
+              };
+              setMessages(prev => [...prev, botMsg]);
+              setIsLoading(false);
+              playMessageSound();
+            }
           }
         };
 
@@ -197,6 +226,61 @@ const Chatbot = () => {
     }
   };
 
+  const requestHumanSupport = async () => {
+    if (requestingHuman || humanMode) return;
+    
+    setRequestingHuman(true);
+    
+    // Add user message indicating they want human support
+    const userMsg = { 
+      id: getNextMessageId(), 
+      text: "I'd like to talk to a human", 
+      sender: 'user' 
+    };
+    setMessages(prev => [...prev, userMsg]);
+
+    try {
+      // Send WebSocket message to request human mode
+      if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
+        webSocketRef.current.send(JSON.stringify({
+          type: 'request_human',
+          message: "User requesting human support"
+        }));
+      }
+
+      // Also make HTTP request as backup
+      const response = await fetch(
+        `${CHAT_API_BASE}/chat/${sessionIdRef.current}/request-human`,
+        { method: 'POST' }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setHumanMode(true);
+        
+        const botMsg = {
+          id: getNextMessageId(),
+          text: data.message || "You've been connected to a human! Muyiwa will respond shortly.",
+          sender: 'bot'
+        };
+        setMessages(prev => [...prev, botMsg]);
+        playMessageSound();
+      } else {
+        throw new Error('Failed to request human support');
+      }
+    } catch (error) {
+      console.error('Error requesting human support:', error);
+      const errorMsg = {
+        id: getNextMessageId(),
+        text: "I'm having trouble connecting you to Muyiwa right now. Please try using the contact form or email directly.",
+        sender: 'bot'
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setRequestingHuman(false);
+    }
+  };
+
   return (
     <>
       {/* 1. THE FLOATING BUTTON (FAB) */}
@@ -222,8 +306,16 @@ const Chatbot = () => {
                     <div className={`chatbot-status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></div>
                 </div>
                 <div>
-                    <h6 className="mb-0 fw-bold chatbot-header-title">AI Assistant</h6>
-                    <small className="chatbot-header-subtitle">{isConnected ? 'Online • Ready to help' : 'Connecting...'}</small>
+                    <h6 className="mb-0 fw-bold chatbot-header-title">
+                      {humanMode ? 'Muyiwa' : 'AI Assistant'}
+                    </h6>
+                    <small className="chatbot-header-subtitle">
+                      {humanMode 
+                        ? '👤 Human Support' 
+                        : isConnected 
+                        ? 'Online • Ready to help' 
+                        : 'Connecting...'}
+                    </small>
                 </div>
             </div>
             <button onClick={() => setIsOpen(false)} className="btn btn-sm text-white p-0 chatbot-close-btn">
@@ -239,30 +331,32 @@ const Chatbot = () => {
                   className={`p-2 px-3 rounded-3 ${
                     msg.sender === 'user' 
                       ? 'bg-navy text-white rounded-bottom-right-0' // User Style
+                      : msg.sender === 'admin'
+                      ? 'bg-success text-white rounded-bottom-left-0' // Admin Style
                       : 'bg-white text-dark border rounded-bottom-left-0' // Bot Style
                   }`}
                   style={{ maxWidth: '80%' }}
                 >
                   <small className="d-block mb-1 opacity-75" style={{ fontSize: '0.7rem' }}>
-                    {msg.sender === 'user' ? 'You' : 'AI'}
+                    {msg.sender === 'user' ? 'You' : msg.sender === 'admin' ? '👤 Muyiwa' : 'AI'}
                   </small>
-                  {msg.sender === 'bot' ? (
+                  {msg.sender !== 'user' ? (
                     <ReactMarkdown 
                       className="markdown-content"
                       components={{
                         p: ({node, ...props}) => <p style={{marginBottom: '0.5rem'}} {...props} />,
                         code: ({node, inline, ...props}) => 
                           inline ? 
-                            <code style={{backgroundColor: '#f0f0f0', padding: '0.2rem 0.4rem', borderRadius: '3px', fontSize: '0.9em'}} {...props} /> :
-                            <code style={{display: 'block', backgroundColor: '#f0f0f0', padding: '0.5rem', borderRadius: '5px', overflowX: 'auto', fontSize: '0.85em'}} {...props} />,
+                            <code style={{backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.2rem 0.4rem', borderRadius: '3px', fontSize: '0.9em'}} {...props} /> :
+                            <code style={{display: 'block', backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.5rem', borderRadius: '5px', overflowX: 'auto', fontSize: '0.85em'}} {...props} />,
                         ul: ({node, ...props}) => <ul style={{marginLeft: '1rem', marginBottom: '0.5rem'}} {...props} />,
                         ol: ({node, ...props}) => <ol style={{marginLeft: '1rem', marginBottom: '0.5rem'}} {...props} />,
                         li: ({node, ...props}) => <li style={{marginBottom: '0.25rem'}} {...props} />,
-                        a: ({node, ...props}) => <a style={{color: '#0066cc', textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props} />,
+                        a: ({node, ...props}) => <a style={{color: msg.sender === 'admin' ? '#fff' : '#0066cc', textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props} />,
                         h1: ({node, ...props}) => <h5 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}} {...props} />,
                         h2: ({node, ...props}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}} {...props} />,
                         h3: ({node, ...props}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem'}} {...props} />,
-                        blockquote: ({node, ...props}) => <blockquote style={{borderLeft: '3px solid #ccc', paddingLeft: '0.5rem', marginLeft: '0', color: '#666'}} {...props} />,
+                        blockquote: ({node, ...props}) => <blockquote style={{borderLeft: '3px solid #ccc', paddingLeft: '0.5rem', marginLeft: '0', color: msg.sender === 'admin' ? '#fff' : '#666'}} {...props} />,
                         strong: ({node, ...props}) => <strong {...props} />,
                         em: ({node, ...props}) => <em {...props} />
                       }}
@@ -309,6 +403,31 @@ const Chatbot = () => {
                     </Button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Talk to Human Button */}
+            {!humanMode && messages.length > 1 && (
+              <div className="text-center my-3">
+                <Button
+                  variant="outline-success"
+                  size="sm"
+                  onClick={requestHumanSupport}
+                  disabled={requestingHuman}
+                  className="d-flex align-items-center gap-2 mx-auto"
+                >
+                  {requestingHuman ? (
+                    <>
+                      <Spinner animation="border" size="sm" />
+                      <span>Connecting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-person-fill"></i>
+                      <span>Talk to Muyiwa</span>
+                    </>
+                  )}
+                </Button>
               </div>
             )}
             
