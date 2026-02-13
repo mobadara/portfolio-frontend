@@ -1,0 +1,374 @@
+/* 404 Page Styles */
+.not-found-page {
+  position: relative;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  overflow: hidden;
+}
+
+[data-bs-theme="dark"] .not-found-page {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+}
+
+.not-found-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Floating Icons Animation */
+.floating-icons {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.floating-icon {
+  position: absolute;
+  opacity: 0.15;
+  animation: float-up linear infinite;
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(100vh) rotate(0deg);
+  }
+  100% {
+    transform: translateY(-100px) rotate(360deg);
+  }
+}
+
+/* Error Code */
+.error-code-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.error-code {
+  font-size: 10rem;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  margin: 0;
+  line-height: 1;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3),
+                 0 0 50px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    text-shadow: 0 10px 40px rgba(0, 0, 0, 0.4),
+                 0 0 80px rgba(255, 255, 255, 0.4);
+  }
+}
+
+/* Neural Network Animation */
+.error-animation {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+}
+
+.neural-network {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.node {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: node-pulse 2s ease-in-out infinite;
+}
+
+.node:nth-child(1) {
+  top: 20%;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.node:nth-child(2) {
+  top: 50%;
+  right: 10%;
+  animation-delay: 0.5s;
+}
+
+.node:nth-child(3) {
+  bottom: 20%;
+  left: 50%;
+  animation-delay: 1s;
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+}
+
+.connection {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: connection-flow 3s linear infinite;
+}
+
+.connection:nth-child(4) {
+  top: 25%;
+  left: 15%;
+  width: 70%;
+  transform: rotate(10deg);
+}
+
+.connection:nth-child(5) {
+  top: 50%;
+  left: 15%;
+  width: 60%;
+  transform: rotate(-20deg);
+  animation-delay: 1s;
+}
+
+.connection:nth-child(6) {
+  top: 70%;
+  left: 20%;
+  width: 50%;
+  transform: rotate(30deg);
+  animation-delay: 2s;
+}
+
+@keyframes connection-flow {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.2;
+  }
+}
+
+/* Error Text */
+.error-title {
+  color: #fff;
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.error-message {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Game Section */
+.game-intro h3 {
+  color: #fff;
+  font-weight: 600;
+}
+
+.game-intro p {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Quiz Game */
+.quiz-game {
+  margin-top: 2rem;
+}
+
+.quiz-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 2.5rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slide-up 0.5s ease-out;
+}
+
+[data-bs-theme="dark"] .quiz-card {
+  background: rgba(30, 30, 46, 0.95);
+  color: #fff;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quiz-header .badge {
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+}
+
+.quiz-question {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+[data-bs-theme="dark"] .quiz-question {
+  color: #fff;
+}
+
+.quiz-options {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.quiz-option-btn {
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-width: 2px;
+}
+
+.quiz-option-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.quiz-option-btn:disabled {
+  cursor: not-allowed;
+}
+
+/* Quiz Complete */
+.quiz-complete {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 3rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: fade-scale-in 0.6s ease-out;
+}
+
+[data-bs-theme="dark"] .quiz-complete {
+  background: rgba(30, 30, 46, 0.95);
+  color: #fff;
+}
+
+@keyframes fade-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.quiz-complete h3 {
+  color: #667eea;
+  font-weight: 700;
+}
+
+[data-bs-theme="dark"] .quiz-complete h3 {
+  color: #a8b3ff;
+}
+
+.score-display {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #764ba2;
+  margin: 1rem 0;
+}
+
+[data-bs-theme="dark"] .score-display {
+  color: #b88dd4;
+}
+
+.quiz-complete p {
+  font-size: 1.2rem;
+  color: #555;
+}
+
+[data-bs-theme="dark"] .quiz-complete p {
+  color: #ccc;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .error-code {
+    font-size: 6rem;
+  }
+
+  .error-title {
+    font-size: 1.8rem;
+  }
+
+  .error-message {
+    font-size: 1rem;
+  }
+
+  .quiz-card,
+  .quiz-complete {
+    padding: 1.5rem;
+  }
+
+  .quiz-question {
+    font-size: 1.2rem;
+  }
+
+  .quiz-option-btn {
+    font-size: 1rem;
+    padding: 0.8rem;
+  }
+
+  .score-display {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .error-code {
+    font-size: 4rem;
+  }
+
+  .error-title {
+    font-size: 1.5rem;
+  }
+
+  .floating-icon {
+    opacity: 0.1;
+  }
+}
+
+/* Button Animations */
+.btn {
+  transition: all 0.3s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
