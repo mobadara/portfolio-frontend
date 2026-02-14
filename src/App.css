@@ -318,7 +318,15 @@ section {
     right: 20px;
     bottom: 95px;
   }
-}
+
+  .chatbot-header {
+    width: 100%;
+  }
+
+  .chatbot-close-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
 
 /* src/App.css */
 
