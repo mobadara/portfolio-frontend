@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import { useState, useRef, useEffect } from 'react';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
@@ -18,6 +17,7 @@ const Chatbot = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(true);
   const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
   const [humanMode, setHumanMode] = useState(false);
   const [requestingHuman, setRequestingHuman] = useState(false);
@@ -73,7 +73,7 @@ const Chatbot = () => {
   useEffect(() => {
     let isMounted = true;
 
-    if (!webSocketRef.current) {
+    const initializeWebSocket = () => {
       // Generate or retrieve session ID
       let sessionId = localStorage.getItem('chatSessionId');
       if (!sessionId) {
@@ -93,6 +93,7 @@ const Chatbot = () => {
           console.log('WebSocket connected');
           if (isMounted) {
             setIsConnected(true);
+            setIsConnecting(false);
           }
         };
 
@@ -123,7 +124,7 @@ const Chatbot = () => {
                 setIsLoading(false);
                 playMessageSound();
               }
-            } catch (e) {
+            } catch {
               // If not JSON, treat as regular text message
               const botMsg = {
                 id: getNextMessageId(),
@@ -141,6 +142,7 @@ const Chatbot = () => {
           console.error('WebSocket error:', error);
           if (isMounted) {
             setIsConnected(false);
+            setIsConnecting(false);
           }
         };
 
@@ -148,6 +150,7 @@ const Chatbot = () => {
           console.log('WebSocket disconnected');
           if (isMounted) {
             setIsConnected(false);
+            setIsConnecting(false);
           }
           webSocketRef.current = null;
         };
@@ -155,9 +158,13 @@ const Chatbot = () => {
         webSocketRef.current = ws;
       } catch (error) {
         console.error('Failed to establish WebSocket connection:', error);
-        // Connection state remains false by default, no need to set it
+        if (isMounted) {
+          setIsConnecting(false);
+        }
       }
-    }
+    };
+
+    initializeWebSocket();
 
     return () => {
       isMounted = false;
@@ -184,7 +191,7 @@ const Chatbot = () => {
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !isConnected) return;
 
     // 1. Add User Message
     const userMsg = { id: getNextMessageId(), text: input, sender: 'user' };
@@ -195,18 +202,12 @@ const Chatbot = () => {
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       webSocketRef.current.send(input);
       setIsLoading(true);
-    } else {
-      setIsLoading(false);
-      const errorMsg = { 
-        id: getNextMessageId(), 
-        text: isConnected ? "Connection is being established. Please try again in a moment." : "Unable to connect to the chat service. Please check your connection and try again.", 
-        sender: 'bot' 
-      };
-      setMessages(prev => [...prev, errorMsg]);
     }
   };
 
   const handlePredefinedQuestion = (question) => {
+    if (!isConnected) return;
+
     // 1. Add User Message
     const userMsg = { id: getNextMessageId(), text: question, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
@@ -215,13 +216,6 @@ const Chatbot = () => {
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       webSocketRef.current.send(question);
       setIsLoading(true);
-    } else {
-      const errorMsg = { 
-        id: getNextMessageId(), 
-        text: isConnected ? "Connection is being established. Please try again in a moment." : "Unable to connect to the chat service. Please check your connection and try again.", 
-        sender: 'bot' 
-      };
-      setMessages(prev => [...prev, errorMsg]);
     }
   };
 
@@ -309,11 +303,13 @@ const Chatbot = () => {
                       {humanMode ? 'Muyiwa' : 'AI Assistant'}
                     </h6>
                     <small className="chatbot-header-subtitle">
-                      {humanMode 
+                      {isConnecting 
+                        ? 'Connecting...'
+                        : humanMode 
                         ? '👤 Human Support' 
                         : isConnected 
                         ? 'Online • Ready to help' 
-                        : 'Connecting...'}
+                        : 'Connection lost'}
                     </small>
                 </div>
             </div>
@@ -343,21 +339,21 @@ const Chatbot = () => {
                     <ReactMarkdown 
                       className="markdown-content"
                       components={{
-                        p: ({node, ...props}) => <p style={{marginBottom: '0.5rem'}} {...props} />,
-                        code: ({node, inline, ...props}) => 
+                        p: ({children}) => <p style={{marginBottom: '0.5rem'}}>{children}</p>,
+                        code: ({inline, children}) => 
                           inline ? 
-                            <code style={{backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.2rem 0.4rem', borderRadius: '3px', fontSize: '0.9em'}} {...props} /> :
-                            <code style={{display: 'block', backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.5rem', borderRadius: '5px', overflowX: 'auto', fontSize: '0.85em'}} {...props} />,
-                        ul: ({node, ...props}) => <ul style={{marginLeft: '1rem', marginBottom: '0.5rem'}} {...props} />,
-                        ol: ({node, ...props}) => <ol style={{marginLeft: '1rem', marginBottom: '0.5rem'}} {...props} />,
-                        li: ({node, ...props}) => <li style={{marginBottom: '0.25rem'}} {...props} />,
-                        a: ({node, ...props}) => <a style={{color: msg.sender === 'admin' ? '#fff' : '#0066cc', textDecoration: 'underline'}} target="_blank" rel="noopener noreferrer" {...props} />,
-                        h1: ({node, ...props}) => <h5 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}} {...props} />,
-                        h2: ({node, ...props}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}} {...props} />,
-                        h3: ({node, ...props}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem'}} {...props} />,
-                        blockquote: ({node, ...props}) => <blockquote style={{borderLeft: '3px solid #ccc', paddingLeft: '0.5rem', marginLeft: '0', color: msg.sender === 'admin' ? '#fff' : '#666'}} {...props} />,
-                        strong: ({node, ...props}) => <strong {...props} />,
-                        em: ({node, ...props}) => <em {...props} />
+                            <code style={{backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.2rem 0.4rem', borderRadius: '3px', fontSize: '0.9em'}}>{children}</code> :
+                            <code style={{display: 'block', backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.5rem', borderRadius: '5px', overflowX: 'auto', fontSize: '0.85em'}}>{children}</code>,
+                        ul: ({children}) => <ul style={{marginLeft: '1rem', marginBottom: '0.5rem'}}>{children}</ul>,
+                        ol: ({children}) => <ol style={{marginLeft: '1rem', marginBottom: '0.5rem'}}>{children}</ol>,
+                        li: ({children}) => <li style={{marginBottom: '0.25rem'}}>{children}</li>,
+                        a: ({href, children}) => <a style={{color: msg.sender === 'admin' ? '#fff' : '#0066cc', textDecoration: 'underline'}} href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+                        h1: ({children}) => <h5 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}}>{children}</h5>,
+                        h2: ({children}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}}>{children}</h6>,
+                        h3: ({children}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>{children}</h6>,
+                        blockquote: ({children}) => <blockquote style={{borderLeft: '3px solid #ccc', paddingLeft: '0.5rem', marginLeft: '0', color: msg.sender === 'admin' ? '#fff' : '#666'}}>{children}</blockquote>,
+                        strong: ({children}) => <strong>{children}</strong>,
+                        em: ({children}) => <em>{children}</em>
                       }}
                     >
                       {msg.text}
@@ -390,6 +386,7 @@ const Chatbot = () => {
                       variant="outline-navy"
                       size="sm"
                       onClick={() => handlePredefinedQuestion(question)}
+                      disabled={!isConnected}
                       className="text-start"
                       style={{ 
                         borderColor: '#001a4d',
@@ -438,13 +435,19 @@ const Chatbot = () => {
             <Form onSubmit={handleSend} className="d-flex gap-2">
               <Form.Control 
                 type="text" 
-                placeholder="Type a message..." 
+                placeholder={isConnected ? "Type a message..." : isConnecting ? "Connecting..." : "Disconnected..."} 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
+                disabled={!isConnected}
                 className="border-0 bg-light shadow-none"
                 style={{ fontSize: '0.9rem' }}
               />
-              <Button type="submit" variant="primary" className="bg-navy border-navy d-flex align-items-center justify-content-center px-3">
+              <Button 
+                type="submit" 
+                variant="primary" 
+                disabled={!isConnected || !input.trim()}
+                className="bg-navy border-navy d-flex align-items-center justify-content-center px-3"
+              >
                 <BiSend />
               </Button>
             </Form>

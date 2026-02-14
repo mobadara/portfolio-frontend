@@ -27,7 +27,6 @@ const AdminChat = ({ sessionId, onClose }) => {
   
   const webSocketRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const authTokenRef = useRef(null);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -38,13 +37,16 @@ const AdminChat = ({ sessionId, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
-  // Fetch initial chat session data
+  // Fetch initial chat session data and establish WebSocket connection
   useEffect(() => {
-    const fetchSessionData = async () => {
+    let isMounted = true;
+
+    const initializeChat = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
+        // Step 1: Fetch session data
         const response = await fetch(
           `${API_BASE}/admin/chat_sessions/${sessionId}`
         );
@@ -55,7 +57,7 @@ const AdminChat = ({ sessionId, onClose }) => {
 
         const data = await response.json();
 
-        if (data.status === 'ok') {
+        if (data.status === 'ok' && isMounted) {
           setSessionInfo(data);
           
           // Convert API messages format to display format
@@ -69,27 +71,24 @@ const AdminChat = ({ sessionId, onClose }) => {
           
           setMessages(formattedMessages);
           
-          // Get auth token from environment
-          // Use import.meta.env for Vite instead of process.env
-          const tokenEnvVar = data.admin_websocket.token_env;
-          const token = import.meta.env[tokenEnvVar] || '';
-          authTokenRef.current = token;
-          
-          // Connect to WebSocket
+          // Step 2: Connect to WebSocket after session data is loaded
           connectWebSocket(data.admin_websocket);
         } else {
           throw new Error('Invalid response from server');
         }
       } catch (err) {
         console.error('Error fetching session data:', err);
-        setError(err.message || 'Failed to load chat session');
-        setIsLoading(false);
+        if (isMounted) {
+          setError(err.message || 'Failed to load chat session');
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchSessionData();
+    initializeChat();
 
     return () => {
+      isMounted = false;
       // Cleanup on unmount
       if (webSocketRef.current) {
         webSocketRef.current.close();
