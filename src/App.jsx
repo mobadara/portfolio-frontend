@@ -11,6 +11,7 @@ import NavigationBar from './components/NavigationBar';
 import BlogSection from './components/BlogSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
+import SkillsSection from './components/SkillsSection';
 import LoadingAnimation from './components/LoadingAnimation';
 import AdminDashboard from './pages/AdminDashboard';
 import NotFoundPage from './pages/NotFoundPage';
@@ -57,9 +58,10 @@ function App() {
       <NavigationBar theme={theme} onToggleTheme={toggleTheme} />
       <HeroSection />
       <AboutSection theme={theme} />
+      <SkillsSection />
       <PortfolioSection projects={projects} />
-      <AIPlayground />
       <ServicesSection />
+      <AIPlayground />
       <BlogSection />
       <ContactSection />
       <FooterSection />

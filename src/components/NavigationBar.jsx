@@ -42,6 +42,7 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
           <Nav className="ms-auto text-center custom-nav-items">
             <Nav.Link href="#home" onClick={closeMenu} className="fs-5 mx-2 text-white">Home</Nav.Link>
             <Nav.Link href="#about" onClick={closeMenu} className="fs-5 mx-2 text-white">About</Nav.Link>
+            <Nav.Link href="#skills" onClick={closeMenu} className="fs-5 mx-2 text-white">Skills</Nav.Link>
             <Nav.Link href="#portfolio" onClick={closeMenu} className="fs-5 mx-2 text-white">Portfolio</Nav.Link>
             <Nav.Link href="#blog" onClick={closeMenu} className="fs-5 mx-2 text-white">Blog</Nav.Link>
             <Nav.Link href="#services" onClick={closeMenu} className="fs-5 mx-2 text-white">Services</Nav.Link>
