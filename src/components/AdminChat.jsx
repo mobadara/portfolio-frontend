@@ -99,7 +99,14 @@ const AdminChat = ({ sessionId, onClose }) => {
 
   const connectWebSocket = (wsConfig) => {
     try {
-      const wsUrl = wsConfig.url;
+      let wsUrl = wsConfig.url;
+      
+      // Add ADMIN_AUTH_TOKEN as query parameter
+      const token = import.meta.env.VITE_ADMIN_AUTH_TOKEN;
+      if (token) {
+        const separator = wsUrl.includes('?') ? '&' : '?';
+        wsUrl += `${separator}token=${encodeURIComponent(token)}`;
+      }
       
       const ws = new WebSocket(wsUrl);
 
@@ -107,14 +114,6 @@ const AdminChat = ({ sessionId, onClose }) => {
         console.log('WebSocket connected for admin');
         setIsConnected(true);
         setIsLoading(false);
-        
-        // Send auth token if required
-        if (wsConfig.token_required && authTokenRef.current) {
-          ws.send(JSON.stringify({
-            type: 'auth',
-            token: authTokenRef.current
-          }));
-        }
       };
 
       ws.onmessage = (event) => {
