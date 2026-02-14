@@ -1,0 +1,340 @@
+/* About Section Styles */
+
+/* Animations */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.8s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.8s ease-out;
+}
+
+/* Profile Card */
+.profile-card {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-image-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 3/4;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.profile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.6s ease;
+}
+
+.profile-image-wrapper:hover .profile-image {
+  transform: scale(1.05);
+}
+
+.profile-image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  pointer-events: none;
+}
+
+/* About Content */
+.about-content {
+  padding: 2rem;
+}
+
+.badge-label {
+  display: inline-block;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 0.5rem 1.2rem;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+  animation: slideInRight 0.8s ease-out 0.2s both;
+}
+
+.about-title {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+  color: var(--navy-blue);
+  animation: slideInRight 0.8s ease-out 0.3s both;
+}
+
+.about-title strong {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.about-description {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  color: var(--text-color);
+  margin-bottom: 1.5rem;
+  opacity: 0.9;
+  animation: slideInRight 0.8s ease-out 0.4s both;
+}
+
+/* Social Links */
+.social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  animation: slideInRight 0.8s ease-out 0.5s both;
+}
+
+.social-link {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  border: 2px solid transparent;
+}
+
+.github-link {
+  color: #333;
+  background: rgba(51, 51, 51, 0.1);
+}
+
+.github-link:hover {
+  background: #333;
+  color: white;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(51, 51, 51, 0.3);
+}
+
+.linkedin-link {
+  color: #0077b5;
+  background: rgba(0, 119, 181, 0.1);
+}
+
+.linkedin-link:hover {
+  background: #0077b5;
+  color: white;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 119, 181, 0.3);
+}
+
+.twitter-link {
+  color: #1DA1F2;
+  background: rgba(29, 161, 242, 0.1);
+}
+
+.twitter-link:hover {
+  background: #1DA1F2;
+  color: white;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(29, 161, 242, 0.3);
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  flex-wrap: wrap;
+  animation: slideInRight 0.8s ease-out 0.6s both;
+}
+
+.btn-download {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 0.85rem 2rem;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.btn-download:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+  color: white;
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.btn-github-activity {
+  padding: 0.85rem 2rem;
+  font-weight: 700;
+  font-size: 1rem;
+  border: 2px solid;
+  border-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%) 1;
+  color: #667eea;
+  background: transparent;
+  transition: all 0.3s ease;
+}
+
+.btn-github-activity:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+}
+
+/* GitHub Modal */
+.github-modal .modal-content {
+  border-radius: 15px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.github-modal .modal-header {
+  padding: 2rem 2rem 1rem 2rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.github-modal .modal-title {
+  font-size: 1.3rem;
+  color: var(--navy-blue);
+}
+
+.github-modal .modal-body {
+  padding: 2rem;
+}
+
+.github-modal .btn-close {
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.github-modal .btn-close:hover {
+  opacity: 1;
+  transform: rotate(90deg);
+}
+
+/* Responsive Design */
+@media (max-width: 992px) {
+  .about-title {
+    font-size: 2.2rem;
+  }
+
+  .about-content {
+    padding: 1rem;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .btn-download,
+  .btn-github-activity {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .about-title {
+    font-size: 1.8rem;
+  }
+
+  .about-description {
+    font-size: 1rem;
+  }
+
+  .badge-label {
+    font-size: 0.75rem;
+    padding: 0.4rem 1rem;
+  }
+
+  .social-links {
+    gap: 0.8rem;
+  }
+
+  .social-link {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+
+  .profile-image-wrapper {
+    max-width: 300px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .about-content {
+    padding: 0.5rem;
+  }
+
+  .about-title {
+    font-size: 1.5rem;
+  }
+
+  .about-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .action-buttons {
+    margin-top: 1.5rem;
+    gap: 0.8rem;
+  }
+
+  .btn-download,
+  .btn-github-activity {
+    padding: 0.7rem 1.5rem;
+    font-size: 0.9rem;
+  }
+
+  .social-links {
+    margin-top: 1.5rem;
+  }
+}
