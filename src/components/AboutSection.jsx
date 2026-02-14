@@ -87,7 +87,15 @@ const AboutSection = ({ theme }) => (
 
           <div className="mb-4">
             <Row className="g-4">
-              {Object.entries(skillsData).map(([category, skills]) => (
+              {Array.from(
+                skillsData.reduce((map, skill) => {
+                  if (!map.has(skill.category)) {
+                    map.set(skill.category, []);
+                  }
+                  map.get(skill.category).push(skill);
+                  return map;
+                }, new Map())
+              ).map(([category, skills]) => (
                 <Col key={category} md={6}>
                   <div className="h-100">
                     <p className="text-muted fw-bold mb-3">{category}</p>
