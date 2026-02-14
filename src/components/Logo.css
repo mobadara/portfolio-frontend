@@ -1,0 +1,202 @@
+/* Logo Component Styles */
+
+/* Animations for data nodes - Pulsing effect */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.8;
+    r: 4px;
+  }
+  50% {
+    opacity: 1;
+    r: 6px;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes orbit {
+  0% {
+    opacity: 0.3;
+    stroke-dashoffset: 300;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0.3;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(102, 126, 234, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.6));
+  }
+}
+
+@keyframes wave {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes rotate-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Brand Logo Base */
+.brand-logo {
+  filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.15));
+  transition: filter 0.3s ease;
+}
+
+.brand-logo:hover {
+  filter: drop-shadow(0 6px 20px rgba(102, 126, 234, 0.25));
+}
+
+/* Outer and Inner Rings */
+.logo-outer-ring {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.logo-inner-ring {
+  animation: pulse 3s ease-in-out infinite 0.5s;
+}
+
+/* Data Nodes - Individual animations */
+.data-node {
+  animation: pulse 2s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+
+.data-node:hover {
+  filter: drop-shadow(0 0 12px rgba(102, 126, 234, 0.8));
+}
+
+.node-1 {
+  animation-delay: 0s;
+}
+
+.node-2 {
+  animation-delay: 0.3s;
+}
+
+.node-3 {
+  animation-delay: 0.6s;
+}
+
+.node-4 {
+  animation-delay: 0.9s;
+}
+
+.node-5 {
+  animation-delay: 1.2s;
+}
+
+.node-6 {
+  animation-delay: 1.5s;
+}
+
+/* Connection Lines */
+.connection-line {
+  animation: wave 2s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+
+.line-1 {
+  animation-delay: 0s;
+}
+
+.line-2 {
+  animation-delay: 0.5s;
+}
+
+.line-3 {
+  animation-delay: 1s;
+}
+
+/* Center Circle */
+.center-circle {
+  animation: pulse 3.5s ease-in-out infinite;
+  stroke-dasharray: 220;
+  stroke-dashoffset: 0;
+}
+
+/* Moon Symbol - Cancer emotion/intuition indicator */
+.moon-symbol {
+  animation: float 2s ease-in-out infinite;
+}
+
+/* Logo Text (MO Initials) */
+.logo-text {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-weight: 800;
+  letter-spacing: -2px;
+  animation: float 3s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+
+.brand-logo:hover .logo-text {
+  filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.4));
+}
+
+/* Pulse Dot - Accent element */
+.pulse-dot {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .brand-logo {
+    filter: drop-shadow(0 2px 8px rgba(102, 126, 234, 0.1));
+  }
+  
+  .brand-logo:hover {
+    filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.2));
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .brand-logo {
+    filter: drop-shadow(0 4px 12px rgba(102, 126, 234, 0.25));
+  }
+  
+  .brand-logo:hover {
+    filter: drop-shadow(0 6px 20px rgba(102, 126, 234, 0.4));
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo,
+  .logo-outer-ring,
+  .logo-inner-ring,
+  .data-node,
+  .connection-line,
+  .center-circle,
+  .moon-symbol,
+  .logo-text,
+  .pulse-dot {
+    animation: none;
+    opacity: 1;
+  }
+}
