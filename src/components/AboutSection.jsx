@@ -48,7 +48,7 @@ const AboutSection = ({ theme }) => {
               </p>
 
               {/* Social Links */}
-              <div className="social-links mb-4">
+              <div className="social-links mb-4 text-center text-lg-start">
                 <a 
                   href="https://github.com/mobadara" 
                   target="_blank" 
