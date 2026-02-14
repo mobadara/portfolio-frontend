@@ -12,7 +12,7 @@ const FooterSection = () => (
       {/* Main Footer Content */}
       <Row className="mb-5 g-4">
         {/* Brand Section */}
-        <Col lg={3} md={6} className="mb-4 mb-md-0">
+        <Col lg={3} md={6} className="mb-4 mb-md-0 text-center text-lg-start">
           <div className="footer-brand mb-4">
             <Logo height="50" className="mb-3" />
             <h5 className="fw-bold mb-3">Muyiwa J. Obadara</h5>
@@ -23,7 +23,7 @@ const FooterSection = () => (
         </Col>
 
         {/* Navigation Links */}
-        <Col lg={3} md={6} className="mb-4 mb-md-0">
+        <Col lg={3} md={6} className="mb-4 mb-md-0 text-center text-lg-start">
           <h6 className="text-warning fw-bold small text-uppercase mb-3">Navigation</h6>
           <ul className="list-unstyled footer-links">
             <li><a href="#home" className="text-light text-decoration-none small opacity-75 hover-link">Home</a></li>
@@ -36,7 +36,7 @@ const FooterSection = () => (
         </Col>
 
         {/* Resources */}
-        <Col lg={3} md={6} className="mb-4 mb-md-0">
+        <Col lg={3} md={6} className="mb-4 mb-md-0 text-center text-lg-start">
           <h6 className="text-warning fw-bold small text-uppercase mb-3">Resources</h6>
           <ul className="list-unstyled footer-links">
             <li><a href="/resume.pdf" className="text-light text-decoration-none small opacity-75 hover-link" download>Download Resume</a></li>
@@ -48,12 +48,12 @@ const FooterSection = () => (
         </Col>
 
         {/* Connect */}
-        <Col lg={3} md={6} className="mb-4 mb-md-0">
+        <Col lg={3} md={6} className="mb-4 mb-md-0 text-center text-lg-start">
           <h6 className="text-warning fw-bold small text-uppercase mb-3">Connect</h6>
           <p className="small opacity-75 mb-3">
             Let's collaborate on exciting projects.
           </p>
-          <div className="d-flex gap-3 justify-content-start justify-content-md-start">
+          <div className="d-flex gap-3 justify-content-center justify-content-lg-start">
             <a 
               href="https://linkedin.com/in/muyiwa-obadara" 
               target="_blank" 
@@ -103,12 +103,12 @@ const FooterSection = () => (
 
       {/* Bottom Section */}
       <Row className="align-items-center">
-        <Col md={6} className="text-center text-md-start mb-3 mb-md-0">
+        <Col md={6} className="text-center mb-3 mb-md-0">
           <p className="small opacity-50 mb-0">
             &copy; {new Date().getFullYear()} Muyiwa J. Obadara. All rights reserved.
           </p>
         </Col>
-        <Col md={6} className="text-center text-md-end">
+        <Col md={6} className="text-center">
           <p className="small opacity-50 mb-0">
             Built with <span className="text-danger">❤️</span> using React, FastAPI & Python
           </p>

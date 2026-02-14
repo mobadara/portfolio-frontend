@@ -74,19 +74,15 @@
 @keyframes rotateTitle {
   0% {
     opacity: 0;
-    transform: translateY(20px) rotateX(90deg);
   }
   10% {
     opacity: 1;
-    transform: translateY(0) rotateX(0deg);
   }
   85% {
     opacity: 1;
-    transform: translateY(0) rotateX(0deg);
   }
   100% {
     opacity: 0;
-    transform: translateY(-20px) rotateX(-90deg);
   }
 }
 
@@ -235,28 +231,44 @@
 /* Greeting */
 .hero-greeting {
   opacity: 0;
-  transform: translateY(-40px);
 }
 
 .hero-greeting.visible {
-  animation: fadeInDown 0.8s ease-out 0.2s both;
+  animation: fadeSimple 0.8s ease-out 0.2s both;
+}
+
+@keyframes fadeSimple {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .greeting-icon {
   display: inline-block;
   margin-right: 0.5rem;
-  animation: float 3s ease-in-out infinite;
+  animation: simpleFloat 2s ease-in-out infinite;
+}
+
+@keyframes simpleFloat {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 /* Name */
 .hero-name-container {
   opacity: 0;
-  transform: translateY(40px);
   margin-bottom: 1.5rem;
 }
 
 .hero-name-container.visible {
-  animation: fadeInUp 0.8s ease-out 0.4s both;
+  animation: fade 0.8s ease-out 0.4s both;
 }
 
 .hero-title {
@@ -285,13 +297,21 @@
 /* Subtitle */
 .hero-subtitle-container {
   opacity: 0;
-  transform: translateY(40px);
   margin-bottom: 2rem;
   min-height: 120px;
 }
 
 .hero-subtitle-container.visible {
-  animation: fadeInUp 0.8s ease-out 0.6s both;
+  animation: fade 0.8s ease-out 0.6s both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .hero-subtitle {
@@ -315,6 +335,7 @@
   background-clip: text;
   animation: rotateTitle 4s ease-in-out infinite;
   min-width: 250px;
+  transform: none;
 }
 
 .title-text {
@@ -326,7 +347,6 @@
 /* Description */
 .hero-description {
   opacity: 0;
-  transform: translateY(40px);
   margin-bottom: 3rem;
   max-width: 800px;
   margin-left: auto;
@@ -334,7 +354,7 @@
 }
 
 .hero-description.visible {
-  animation: fadeInUp 0.8s ease-out 0.8s both;
+  animation: fade 0.8s ease-out 0.8s both;
 }
 
 .hero-text {
@@ -355,7 +375,6 @@
 /* Buttons */
 .hero-buttons-container {
   opacity: 0;
-  transform: translateY(40px);
   display: flex;
   gap: 1.5rem;
   justify-content: center;
@@ -363,7 +382,7 @@
 }
 
 .hero-buttons-container.visible {
-  animation: fadeInUp 0.8s ease-out 1s both;
+  animation: fade 0.8s ease-out 1s both;
 }
 
 .btn-hero {
@@ -420,7 +439,6 @@
 }
 
 .btn-primary-hero:hover {
-  transform: translateY(-3px);
   box-shadow: 0 20px 50px rgba(102, 126, 234, 0.5);
   background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
   color: white;
@@ -437,22 +455,21 @@
   background: rgba(102, 126, 234, 0.1);
   border-color: #667eea;
   color: white;
-  transform: translateY(-3px);
   box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
 }
 
 /* Scroll Indicator */
 .scroll-indicator {
   opacity: 0;
-  animation: fadeInUp 0.8s ease-out 1.5s both;
+  animation: fade 0.8s ease-out 1.5s both;
   position: absolute;
   bottom: 30px;
   left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
+  margin-left: -20px;
 }
 
 .scroll-dot {
