@@ -38,11 +38,12 @@ const HeroSection = () => {
       </div>
 
       {/* Content */}
-      <Container className="hero-content position-relative" style={{ zIndex: 2 }}>
-        <Row className="justify-content-center text-center align-items-center" style={{ minHeight: '90vh' }}>
-          <Col md={11} lg={9}>
-            {/* Greeting */}
-            <div className={`hero-greeting ${showContent ? 'visible' : ''}`}>
+      <Container fluid className="hero-content position-relative d-flex align-items-center" style={{ zIndex: 2, height: '100%', minHeight: 'calc(100vh - 80px)' }}>
+        <div className="w-100">
+          <Row className="justify-content-center text-center">
+            <Col md={11} lg={9}>
+              {/* Greeting */}
+              <div className={`hero-greeting ${showContent ? 'visible' : ''}`}>
               <h5 className="text-warning fw-bold mb-3">
                 <span className="greeting-icon">👋</span> HELLO, WORLD.
               </h5>
@@ -103,6 +104,7 @@ const HeroSection = () => {
             </div>
           </Col>
         </Row>
+        </div>
       </Container>
     </section>
   );

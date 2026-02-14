@@ -158,7 +158,7 @@
   position: relative;
   background: linear-gradient(135deg, var(--navy-blue) 0%, #000c1a 100%);
   color: white;
-  padding-top: 80px;
+  padding-top: 0;
   overflow: hidden;
 }
 
@@ -213,6 +213,11 @@
 .hero-content {
   position: relative;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 1rem;
 }
 
 /* Greeting */
