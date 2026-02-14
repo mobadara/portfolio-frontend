@@ -7,6 +7,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  padding: 0 1rem;
+  box-sizing: border-box;
 }
 
 .wordcloud-content {
@@ -17,8 +20,10 @@
   gap: 2rem;
   padding: 3rem;
   max-width: 1000px;
+  width: 100%;
   margin: 0 auto;
   align-content: center;
+  box-sizing: border-box;
 }
 
 .skill-word {
@@ -139,6 +144,10 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
+  .wordcloud-container {
+    min-height: 400px;
+  }
+
   .wordcloud-content {
     gap: 1rem;
     padding: 1.5rem;
@@ -146,6 +155,7 @@
 
   .skill-word {
     padding: 0.4rem 0.8rem;
+    font-size: 0.85rem !important;
   }
 
   .category-filter .btn {
@@ -155,24 +165,40 @@
   }
 
   .skill-word:hover {
-    transform: scale(1.1) translateY(-3px);
+    transform: scale(1.05) translateY(-2px);
   }
 }
 
 @media (max-width: 480px) {
+  .wordcloud-container {
+    min-height: 350px;
+    padding: 0 0.5rem;
+  }
+
   .wordcloud-content {
-    gap: 0.8rem;
-    padding: 1rem;
+    gap: 0.6rem;
+    padding: 1rem 0.75rem;
+    max-width: 100%;
   }
 
   .skill-word {
-    padding: 0.3rem 0.6rem;
-    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.7rem !important;
+  }
+
+  .skill-word:hover {
+    transform: scale(1.02) translateY(-1px);
   }
 
   .category-filter .btn {
-    font-size: 0.85rem;
-    padding: 0.3rem 0.7rem;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    margin: 0.2rem;
+  }
+
+  .skill-tooltip {
+    bottom: 1rem;
   }
 }
 

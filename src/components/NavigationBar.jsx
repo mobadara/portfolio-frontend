@@ -41,7 +41,6 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
 
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="ms-auto text-center custom-nav-items">
-            <Nav.Link href="#home" onClick={closeMenu} className="nav-link-custom">Home</Nav.Link>
             <Nav.Link href="#about" onClick={closeMenu} className="nav-link-custom">About</Nav.Link>
             <Nav.Link href="#skills" onClick={closeMenu} className="nav-link-custom">Skills</Nav.Link>
             <Nav.Link href="#portfolio" onClick={closeMenu} className="nav-link-custom">Portfolio</Nav.Link>

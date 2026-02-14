@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
 import { skillsData } from '../data/skills';
 import './SkillsSection.css';
@@ -12,6 +12,17 @@ import './SkillsSection.css';
 const SkillsSection = () => {
   const [hoveredSkill, setHoveredSkill] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  // eslint-disable-next-line no-unused-vars
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Handle window resize for responsive font sizes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Get unique categories
   const categories = useMemo(() => {
@@ -25,9 +36,20 @@ const SkillsSection = () => {
     return skillsData.filter(skill => skill.category === selectedCategory);
   }, [selectedCategory]);
 
-  // Calculate font size based on skill level
+  // Calculate font size based on skill level and screen size
   const calculateFontSize = (level) => {
-    // Range from 0.9rem to 2.8rem based on level (0-100)
+    const windowWidth = window.innerWidth;
+    if (windowWidth < 480) {
+      // For mobile: Range from 0.65rem to 1.2rem
+      return 0.65 + (level / 100) * 0.55;
+    } else if (windowWidth < 768) {
+      // For tablets: Range from 0.75rem to 1.6rem
+      return 0.75 + (level / 100) * 0.85;
+    } else if (windowWidth < 1024) {
+      // For small desktops: Range from 0.85rem to 2rem
+      return 0.85 + (level / 100) * 1.15;
+    }
+    // For large desktops: Range from 0.9rem to 2.8rem
     return 0.9 + (level / 100) * 1.9;
   };
 
