@@ -153,12 +153,13 @@
 .hero-section {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
   background: linear-gradient(135deg, var(--navy-blue) 0%, #000c1a 100%);
   color: white;
-  padding-top: 0;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -211,13 +212,19 @@
 
 /* Hero Content */
 .hero-content {
-  position: relative;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 0 1rem;
+  flex: 1;
+  position: relative;
+  z-index: 2;
+  padding: 2rem 1rem;
+}
+
+.hero-container {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Greeting */

@@ -38,74 +38,74 @@ const HeroSection = () => {
       </div>
 
       {/* Content */}
-      <Container fluid className="hero-content position-relative d-flex align-items-center" style={{ zIndex: 2, height: '100%', minHeight: 'calc(100vh - 80px)' }}>
-        <div className="w-100">
+      <div className="hero-content">
+        <Container className="hero-container">
           <Row className="justify-content-center text-center">
-            <Col md={11} lg={9}>
+            <Col xs={12} md={11} lg={9}>
               {/* Greeting */}
               <div className={`hero-greeting ${showContent ? 'visible' : ''}`}>
-              <h5 className="text-warning fw-bold mb-3">
-                <span className="greeting-icon">👋</span> HELLO, WORLD.
-              </h5>
-            </div>
+                <h5 className="text-warning fw-bold mb-3">
+                  <span className="greeting-icon">👋</span> HELLO, WORLD.
+                </h5>
+              </div>
 
-            {/* Main Name */}
-            <div className={`hero-name-container ${showContent ? 'visible' : ''}`}>
-              <h1 className="hero-title">I'm Muyiwa J. Obadara</h1>
-              <div className="title-underline"></div>
-            </div>
+              {/* Main Name */}
+              <div className={`hero-name-container ${showContent ? 'visible' : ''}`}>
+                <h1 className="hero-title">I'm Muyiwa J. Obadara</h1>
+                <div className="title-underline"></div>
+              </div>
 
-            {/* Rotating Titles */}
-            <div className={`hero-subtitle-container ${showContent ? 'visible' : ''}`}>
-              <h2 className="hero-subtitle">
-                <span className="subtitle-prefix">Building intelligent systems as a </span>
-                <span className="rotating-text" key={titleIndex}>
-                  <span className="title-text">{TITLES[titleIndex]}</span>
-                </span>
-              </h2>
-            </div>
+              {/* Rotating Titles */}
+              <div className={`hero-subtitle-container ${showContent ? 'visible' : ''}`}>
+                <h2 className="hero-subtitle">
+                  <span className="subtitle-prefix">Building intelligent systems as a </span>
+                  <span className="rotating-text" key={titleIndex}>
+                    <span className="title-text">{TITLES[titleIndex]}</span>
+                  </span>
+                </h2>
+              </div>
 
-            {/* Description */}
-            <div className={`hero-description ${showContent ? 'visible' : ''}`}>
-              <p className="hero-text">
-                Turning complex data into intelligent action. Grounded in <strong>Mathematics</strong> and <strong>Linear Algebra</strong>,
-                I specialize in Data Science, Machine Learning, and AI Engineering—building robust models and scalable backends with Python, FastAPI, and cloud deployment.
-              </p>
-            </div>
+              {/* Description */}
+              <div className={`hero-description ${showContent ? 'visible' : ''}`}>
+                <p className="hero-text">
+                  Turning complex data into intelligent action. Grounded in <strong>Mathematics</strong> and <strong>Linear Algebra</strong>,
+                  I specialize in Data Science, Machine Learning, and AI Engineering—building robust models and scalable backends with Python, FastAPI, and cloud deployment.
+                </p>
+              </div>
 
-            {/* Call to Action Buttons */}
-            <div className={`hero-buttons-container ${showContent ? 'visible' : ''}`}>
-              <Button 
-                className="btn-hero btn-primary-hero" 
-                size="lg" 
-                href="#portfolio"
-              >
-                <span className="btn-content">
-                  <i className="bi bi-arrow-right me-2"></i>
-                  View My Work
-                </span>
-              </Button>
-              <Button 
-                className="btn-hero btn-secondary-hero" 
-                size="lg" 
-                href="#contact"
-              >
-                <span className="btn-content">
-                  <i className="bi bi-chat-dots me-2"></i>
-                  Let's Connect
-                </span>
-              </Button>
-            </div>
+              {/* Call to Action Buttons */}
+              <div className={`hero-buttons-container ${showContent ? 'visible' : ''}`}>
+                <Button 
+                  className="btn-hero btn-primary-hero" 
+                  size="lg" 
+                  href="#portfolio"
+                >
+                  <span className="btn-content">
+                    <i className="bi bi-arrow-right me-2"></i>
+                    View My Work
+                  </span>
+                </Button>
+                <Button 
+                  className="btn-hero btn-secondary-hero" 
+                  size="lg" 
+                  href="#contact"
+                >
+                  <span className="btn-content">
+                    <i className="bi bi-chat-dots me-2"></i>
+                    Let's Connect
+                  </span>
+                </Button>
+              </div>
+            </Col>
+          </Row>
+        </Container>
+      </div>
 
-            {/* Scroll Indicator */}
-            <div className="scroll-indicator">
-              <div className="scroll-dot"></div>
-              <div className="scroll-text">Scroll to explore</div>
-            </div>
-          </Col>
-        </Row>
-        </div>
-      </Container>
+      {/* Scroll Indicator */}
+      <div className="scroll-indicator">
+        <div className="scroll-dot"></div>
+        <div className="scroll-text">Scroll to explore</div>
+      </div>
     </section>
   );
 };
