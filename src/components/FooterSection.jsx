@@ -1,37 +1,119 @@
 import Container from 'react-bootstrap/Container';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
 import { FaLinkedin, FaTwitter, FaGithub } from 'react-icons/fa';
 import { SiMedium } from 'react-icons/si';
+import Logo from './Logo';
+import './FooterSection.css';
 
 const FooterSection = () => (
-  <footer id="blog" className="bg-navy text-white text-center py-5 border-top border-secondary">
+  <footer className="bg-navy text-white py-5 border-top border-secondary">
     <Container>
-      <div className="mb-4">
-        <h6 className="text-warning fw-bold small text-uppercase mb-3">Connect & Read</h6>
+      {/* Main Footer Content */}
+      <Row className="mb-5 g-4">
+        {/* Brand Section */}
+        <Col lg={3} md={6} className="mb-4 mb-md-0">
+          <div className="footer-brand mb-4">
+            <Logo height="50" className="mb-3" />
+            <h5 className="fw-bold mb-3">Muyiwa J. Obadara</h5>
+            <p className="small text-light opacity-75 mb-0">
+              Building intelligent systems at the intersection of data, code, and innovation.
+            </p>
+          </div>
+        </Col>
 
-        <div className="d-flex justify-content-center align-items-center flex-wrap gap-4">
-          <div className="d-flex gap-4">
-            <a href="https://linkedin.com/in/obadara-m" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="LinkedIn">
+        {/* Navigation Links */}
+        <Col lg={3} md={6} className="mb-4 mb-md-0">
+          <h6 className="text-warning fw-bold small text-uppercase mb-3">Navigation</h6>
+          <ul className="list-unstyled footer-links">
+            <li><a href="#home" className="text-light text-decoration-none small opacity-75 hover-link">Home</a></li>
+            <li><a href="#about" className="text-light text-decoration-none small opacity-75 hover-link">About</a></li>
+            <li><a href="#skills" className="text-light text-decoration-none small opacity-75 hover-link">Skills</a></li>
+            <li><a href="#portfolio" className="text-light text-decoration-none small opacity-75 hover-link">Portfolio</a></li>
+            <li><a href="#services" className="text-light text-decoration-none small opacity-75 hover-link">Services</a></li>
+            <li><a href="#contact" className="text-light text-decoration-none small opacity-75 hover-link">Contact</a></li>
+          </ul>
+        </Col>
+
+        {/* Resources */}
+        <Col lg={3} md={6} className="mb-4 mb-md-0">
+          <h6 className="text-warning fw-bold small text-uppercase mb-3">Resources</h6>
+          <ul className="list-unstyled footer-links">
+            <li><a href="/resume.pdf" className="text-light text-decoration-none small opacity-75 hover-link" download>Download Resume</a></li>
+            <li><a href="https://github.com/mobadara" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none small opacity-75 hover-link">GitHub Profile</a></li>
+            <li><a href="https://mobadara.medium.com" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none small opacity-75 hover-link">Medium Articles</a></li>
+            <li><a href="https://linkedin.com/in/muyiwa-obadara" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none small opacity-75 hover-link">LinkedIn</a></li>
+            <li><a href="https://twitter.com/mobadara" target="_blank" rel="noopener noreferrer" className="text-light text-decoration-none small opacity-75 hover-link">Twitter / X</a></li>
+          </ul>
+        </Col>
+
+        {/* Connect */}
+        <Col lg={3} md={6} className="mb-4 mb-md-0">
+          <h6 className="text-warning fw-bold small text-uppercase mb-3">Connect</h6>
+          <p className="small opacity-75 mb-3">
+            Let's collaborate on exciting projects.
+          </p>
+          <div className="d-flex gap-3 justify-content-start justify-content-md-start">
+            <a 
+              href="https://linkedin.com/in/muyiwa-obadara" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="social-icon linkedin" 
+              title="LinkedIn"
+              aria-label="LinkedIn"
+            >
               <FaLinkedin />
             </a>
-            <a href="https://twitter.com/m_obadara" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="X (Twitter)">
+            <a 
+              href="https://twitter.com/mobadara" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="social-icon twitter" 
+              title="Twitter"
+              aria-label="Twitter"
+            >
               <FaTwitter />
             </a>
-            <a href="https://github.com/mobadara" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="GitHub">
+            <a 
+              href="https://github.com/mobadara" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="social-icon github" 
+              title="GitHub"
+              aria-label="GitHub"
+            >
               <FaGithub />
             </a>
-          </div>
-
-          <div className="vr bg-secondary opacity-50 mx-2 d-none d-md-block" style={{ height: '30px' }}></div>
-
-          <div className="d-flex gap-4">
-            <a href="https://mobadara.medium.com" target="_blank" rel="noreferrer" className="text-white fs-4 hover-warning" title="Medium Blog">
+            <a 
+              href="https://mobadara.medium.com" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="social-icon medium" 
+              title="Medium"
+              aria-label="Medium"
+            >
               <SiMedium />
             </a>
           </div>
-        </div>
-      </div>
+        </Col>
+      </Row>
 
-      <p className="mb-0 small opacity-50">&copy; {new Date().getFullYear()} Muyiwa J. Obadara. Built with React & FastAPI.</p>
+      {/* Divider */}
+      <hr className="bg-secondary opacity-25 my-4" />
+
+      {/* Bottom Section */}
+      <Row className="align-items-center">
+        <Col md={6} className="text-center text-md-start mb-3 mb-md-0">
+          <p className="small opacity-50 mb-0">
+            &copy; {new Date().getFullYear()} Muyiwa J. Obadara. All rights reserved.
+          </p>
+        </Col>
+        <Col md={6} className="text-center text-md-end">
+          <p className="small opacity-50 mb-0">
+            Built with <span className="text-danger">❤️</span> using React, FastAPI & Python
+          </p>
+        </Col>
+      </Row>
     </Container>
   </footer>
 );
