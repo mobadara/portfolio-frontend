@@ -220,11 +220,16 @@
   position: relative;
   z-index: 2;
   padding: 2rem 1rem;
+  margin: 0;
+  overflow: visible;
+  box-sizing: border-box;
 }
 
-.hero-container {
+.hero-inner-wrapper {
   width: 100%;
-  max-width: 100%;
+  max-width: 900px;
+  text-align: center;
+  padding: 0 1rem;
 }
 
 /* Greeting */
@@ -469,7 +474,7 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .hero-section {
-    padding-top: 60px;
+    padding: 0;
   }
 
   .hero-title {
@@ -524,8 +529,8 @@
 
 @media (max-width: 480px) {
   .hero-section {
-    padding-top: 50px;
-    min-height: calc(100vh - 60px);
+    padding: 0;
+    min-height: 100vh;
   }
 
   .hero-title {

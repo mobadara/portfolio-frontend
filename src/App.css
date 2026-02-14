@@ -55,17 +55,6 @@ section {
   overflow-x: hidden;
 }
 
-/* --- HERO SECTION --- */
-.hero-section {
-  min-height: 100vh; /* Takes up full viewport height */
-  display: flex;
-  align-items: center;
-  position: relative;
-  background: linear-gradient(135deg, var(--navy-blue) 0%, #000c1a 100%); /* Navy Gradient */
-  color: white;
-  padding-top: 80px; /* Offset for the content so it doesn't hit the navbar */
-}
-
 /* --- NAVBAR TRANSITIONS --- */
 .navbar-custom {
   transition: all 0.4s ease-in-out;
