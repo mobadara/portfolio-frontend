@@ -8,7 +8,7 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Alert from 'react-bootstrap/Alert';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiShieldLock, BiUser, BiLockAlt, BiShow, BiHide } from 'react-icons/bi';
+import { BiShield, BiUser, BiLockAlt, BiShow, BiHide } from 'react-icons/bi';
 import './AdminLogin.css';
 
 const ADMIN_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
@@ -84,7 +84,7 @@ const AdminLogin = () => {
               <Card.Body className="p-4 p-md-5">
                 <div className="text-center mb-4">
                   <div className="admin-icon-wrapper mb-3">
-                    <BiShieldLock className="admin-shield-icon" />
+                  <BiShield className="admin-shield-icon" />
                   </div>
                   <h2 className="admin-title fw-bold mb-2">Admin Portal</h2>
                   <p className="admin-subtitle text-muted">
@@ -166,7 +166,7 @@ const AdminLogin = () => {
                       </>
                     ) : (
                       <>
-                        <BiShieldLock className="me-2" />
+                        <BiShield className="me-2" />
                         Sign In
                       </>
                     )}
