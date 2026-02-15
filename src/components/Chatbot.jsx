@@ -3,7 +3,7 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiBot, BiSend, BiX } from 'react-icons/bi';
+import { BiBot, BiSend, BiX, BiMicrophone, BiStopCircle } from 'react-icons/bi';
 import { BsChatDotsFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 
@@ -21,10 +21,13 @@ const Chatbot = () => {
   const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
   const [humanMode, setHumanMode] = useState(false);
   const [requestingHuman, setRequestingHuman] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
   const messageIdRef = useRef(2);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const predefinedQuestions = [
     "What are Muyiwa's main skills?",
@@ -274,6 +277,56 @@ const Chatbot = () => {
     }
   };
 
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondata = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Add user message indicating voice recording
+        const userMsg = {
+          id: getNextMessageId(),
+          text: "🎤 Voice message",
+          sender: 'user',
+          audioBlob: audioBlob
+        };
+        setMessages(prev => [...prev, userMsg]);
+        
+        // Send to WebSocket
+        if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
+          webSocketRef.current.send(JSON.stringify({
+            type: 'voice_message',
+            sessionId: sessionIdRef.current
+          }));
+          setIsLoading(true);
+        }
+        
+        // Stop all tracks to release the microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      mediaRecorderRef.current = mediaRecorder;
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('Unable to access microphone. Please check your browser permissions.');
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
   return (
     <>
       {/* 1. THE FLOATING BUTTON (FAB) */}
@@ -321,7 +374,18 @@ const Chatbot = () => {
           {/* Messages Area */}
           <Card.Body className="chat-body bg-light p-3 overflow-auto">
             {messages.map((msg) => (
-              <div key={msg.id} className={`d-flex mb-3 ${msg.sender === 'user' ? 'justify-content-end' : 'justify-content-start'}`}>
+              <div key={msg.id} className={`d-flex mb-3 gap-2 ${msg.sender === 'user' ? 'justify-content-end' : 'justify-content-start'}`}>
+                {/* Avatar for Bot and Admin */}
+                {msg.sender !== 'user' && (
+                  <div className={`chatbot-message-avatar ${msg.sender === 'admin' ? 'admin-avatar' : 'bot-avatar'}`}>
+                    {msg.sender === 'admin' ? (
+                      <span className="avatar-text">M</span>
+                    ) : (
+                      <BiBot size={20} />
+                    )}
+                  </div>
+                )}
+                
                 <div 
                   className={`p-2 px-3 rounded-3 ${
                     msg.sender === 'user' 
@@ -330,7 +394,7 @@ const Chatbot = () => {
                       ? 'bg-success text-white rounded-bottom-left-0' // Admin Style
                       : 'bg-white text-dark border rounded-bottom-left-0' // Bot Style
                   }`}
-                  style={{ maxWidth: '80%' }}
+                  style={{ maxWidth: '70%' }}
                 >
                   <small className="d-block mb-1 opacity-75" style={{ fontSize: '0.7rem' }}>
                     {msg.sender === 'user' ? 'You' : msg.sender === 'admin' ? '👤 Muyiwa' : 'AI'}
@@ -362,6 +426,13 @@ const Chatbot = () => {
                     msg.text
                   )}
                 </div>
+
+                {/* Avatar for User */}
+                {msg.sender === 'user' && (
+                  <div className="chatbot-message-avatar user-avatar">
+                    <span className="avatar-text">U</span>
+                  </div>
+                )}
               </div>
             ))}
             
@@ -432,24 +503,53 @@ const Chatbot = () => {
 
           {/* Input Area */}
           <div className="card-footer bg-white p-2">
-            <Form onSubmit={handleSend} className="d-flex gap-2">
+            <Form onSubmit={handleSend} className="d-flex gap-2 flex-wrap">
               <Form.Control 
-                type="text" 
-                placeholder={isConnected ? "Type a message..." : isConnecting ? "Connecting..." : "Disconnected..."} 
+                as="textarea"
+                placeholder={isConnected ? "Type a message... (Shift+Enter for new line)" : isConnecting ? "Connecting..." : "Disconnected..."} 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                disabled={!isConnected}
-                className="border-0 bg-light shadow-none"
-                style={{ fontSize: '0.9rem' }}
+                onKeyDown={(e) => {
+                  // Submit on Enter only if Shift is not pressed
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend(e);
+                  }
+                }}
+                disabled={!isConnected || isRecording}
+                className="border-0 bg-light shadow-none chatbot-input"
+                style={{ 
+                  fontSize: '0.9rem',
+                  resize: 'none',
+                  minHeight: '40px',
+                  maxHeight: '100px',
+                  flex: '1',
+                  padding: '0.5rem'
+                }}
+                rows="2"
               />
-              <Button 
-                type="submit" 
-                variant="primary" 
-                disabled={!isConnected || !input.trim()}
-                className="bg-navy border-navy d-flex align-items-center justify-content-center px-3"
-              >
-                <BiSend />
-              </Button>
+              <div className="d-flex gap-2 align-items-flex-end">
+                <Button
+                  type="button"
+                  variant={isRecording ? 'danger' : 'outline-primary'}
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  disabled={!isConnected || !humanMode}
+                  className="d-flex align-items-center justify-content-center"
+                  title={!humanMode ? 'Voice recording only available in human mode' : isRecording ? 'Stop Recording' : 'Start Voice Recording'}
+                  style={{ minWidth: '40px', height: '40px' }}
+                >
+                  {isRecording ? <BiStopCircle size={18} /> : <BiMicrophone size={18} />}
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="primary" 
+                  disabled={!isConnected || (!input.trim() && !isRecording)}
+                  className="bg-navy border-navy d-flex align-items-center justify-content-center px-3"
+                  style={{ height: '40px' }}
+                >
+                  <BiSend />
+                </Button>
+              </div>
             </Form>
           </div>
 
