@@ -4,7 +4,7 @@ import Navbar from 'react-bootstrap/Navbar';
 import Nav from 'react-bootstrap/Nav';
 import Form from 'react-bootstrap/Form';
 import Logo from './Logo';
-import { BiUser, BiCode, BiBriefcase, BiFile, BiGear, BiEnvelope } from 'react-icons/bi';
+import { BiUser, BiCode, BiBriefcase, BiFile, BiCog, BiEnvelope } from 'react-icons/bi';
 import './NavigationBar.css';
 
 const NavigationBar = ({ theme, onToggleTheme }) => {
@@ -59,7 +59,7 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
               <BiFile className="nav-icon" /> Blog
             </Nav.Link>
             <Nav.Link href="#services" onClick={closeMenu} className="nav-link-custom">
-              <BiGear className="nav-icon" /> Services
+              <BiCog className="nav-icon" /> Services
             </Nav.Link>
             <Nav.Link href="#contact" onClick={closeMenu} className="nav-link-custom">
               <BiEnvelope className="nav-icon" /> Contact
