@@ -210,7 +210,20 @@ section {
   overflow: hidden;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 1rem;
+}
+
+.chatbot-header > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.chatbot-header .chatbot-close-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .chatbot-header::before {
@@ -294,6 +307,7 @@ section {
 .chatbot-close-btn {
   opacity: 0.7;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .chatbot-close-btn:hover {
@@ -321,10 +335,7 @@ section {
     right: 20px;
     bottom: 95px;
   }
-
-  .chatbot-close-btn {
-    flex-shrink: 0;
-  }
+}
 
 /* src/App.css */
 
