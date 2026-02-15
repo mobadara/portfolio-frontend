@@ -26,12 +26,12 @@ const FooterSection = () => (
         <Col lg={3} md={6} className="mb-4 mb-md-0 text-center text-lg-start">
           <h6 className="text-warning fw-bold small text-uppercase mb-3">Navigation</h6>
           <ul className="list-unstyled footer-links">
-            <li><a href="#home" className="text-light text-decoration-none small opacity-75 hover-link">Home</a></li>
-            <li><a href="#about" className="text-light text-decoration-none small opacity-75 hover-link">About</a></li>
-            <li><a href="#skills" className="text-light text-decoration-none small opacity-75 hover-link">Skills</a></li>
-            <li><a href="#portfolio" className="text-light text-decoration-none small opacity-75 hover-link">Portfolio</a></li>
-            <li><a href="#services" className="text-light text-decoration-none small opacity-75 hover-link">Services</a></li>
-            <li><a href="#contact" className="text-light text-decoration-none small opacity-75 hover-link">Contact</a></li>
+            <li><a href="https://portfolio-frontend-livid.vercel.app/#home" className="text-light text-decoration-none small opacity-75 hover-link">Home</a></li>
+            <li><a href="https://portfolio-frontend-livid.vercel.app/#about" className="text-light text-decoration-none small opacity-75 hover-link">About</a></li>
+            <li><a href="https://portfolio-frontend-livid.vercel.app/#skills" className="text-light text-decoration-none small opacity-75 hover-link">Skills</a></li>
+            <li><a href="https://portfolio-frontend-livid.vercel.app/#portfolio" className="text-light text-decoration-none small opacity-75 hover-link">Portfolio</a></li>
+            <li><a href="https://portfolio-frontend-livid.vercel.app/#services" className="text-light text-decoration-none small opacity-75 hover-link">Services</a></li>
+            <li><a href="https://portfolio-frontend-livid.vercel.app/#contact" className="text-light text-decoration-none small opacity-75 hover-link">Contact</a></li>
           </ul>
         </Col>
 
