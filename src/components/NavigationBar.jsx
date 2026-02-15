@@ -4,6 +4,7 @@ import Navbar from 'react-bootstrap/Navbar';
 import Nav from 'react-bootstrap/Nav';
 import Form from 'react-bootstrap/Form';
 import Logo from './Logo';
+import { BiUser, BiCode, BiBriefcase, BiFile, BiGear, BiEnvelope } from 'react-icons/bi';
 import './NavigationBar.css';
 
 const NavigationBar = ({ theme, onToggleTheme }) => {
@@ -31,6 +32,10 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
           <Logo height="50" />
         </Navbar.Brand>
 
+        <div className="navbar-name d-lg-none">
+          <span>Muyiwa Obadara</span>
+        </div>
+
         <Navbar.Toggle
           aria-controls="basic-navbar-nav"
           onClick={() => setExpanded(prev => !prev)}
@@ -41,12 +46,24 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
 
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="ms-auto text-center custom-nav-items">
-            <Nav.Link href="#about" onClick={closeMenu} className="nav-link-custom">About</Nav.Link>
-            <Nav.Link href="#skills" onClick={closeMenu} className="nav-link-custom">Skills</Nav.Link>
-            <Nav.Link href="#portfolio" onClick={closeMenu} className="nav-link-custom">Portfolio</Nav.Link>
-            <Nav.Link href="#blog" onClick={closeMenu} className="nav-link-custom">Blog</Nav.Link>
-            <Nav.Link href="#services" onClick={closeMenu} className="nav-link-custom">Services</Nav.Link>
-            <Nav.Link href="#contact" onClick={closeMenu} className="nav-link-custom">Contact</Nav.Link>
+            <Nav.Link href="#about" onClick={closeMenu} className="nav-link-custom">
+              <BiUser className="nav-icon" /> About
+            </Nav.Link>
+            <Nav.Link href="#skills" onClick={closeMenu} className="nav-link-custom">
+              <BiCode className="nav-icon" /> Skills
+            </Nav.Link>
+            <Nav.Link href="#portfolio" onClick={closeMenu} className="nav-link-custom">
+              <BiBriefcase className="nav-icon" /> Portfolio
+            </Nav.Link>
+            <Nav.Link href="#blog" onClick={closeMenu} className="nav-link-custom">
+              <BiFile className="nav-icon" /> Blog
+            </Nav.Link>
+            <Nav.Link href="#services" onClick={closeMenu} className="nav-link-custom">
+              <BiGear className="nav-icon" /> Services
+            </Nav.Link>
+            <Nav.Link href="#contact" onClick={closeMenu} className="nav-link-custom">
+              <BiEnvelope className="nav-icon" /> Contact
+            </Nav.Link>
           </Nav>
 
           <div className="d-flex justify-content-center align-items-center ms-lg-3 mt-4 mt-lg-0">
