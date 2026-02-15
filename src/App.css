@@ -208,6 +208,9 @@ section {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .chatbot-header::before {
@@ -319,12 +322,7 @@ section {
     bottom: 95px;
   }
 
-  .chatbot-header {
-    width: 100%;
-  }
-
   .chatbot-close-btn {
-    margin-left: auto;
     flex-shrink: 0;
   }
 
