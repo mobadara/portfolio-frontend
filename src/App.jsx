@@ -13,6 +13,7 @@ import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
 import SkillsSection from './components/SkillsSection';
 import LoadingAnimation from './components/LoadingAnimation';
+import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import NotFoundPage from './pages/NotFoundPage';
 import projects from './data/projects';
@@ -72,6 +73,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={homeContent} />
+      <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
