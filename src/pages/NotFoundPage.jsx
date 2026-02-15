@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Button } from 'react-bootstrap';
-import NavigationBar from '../components/NavigationBar';
 import FooterSection from '../components/FooterSection';
 import './NotFoundPage.css';
 
@@ -103,9 +102,7 @@ const NotFoundPage = () => {
   };
 
   return (
-    <div className="not-found-page">
-      <NavigationBar theme={theme} onToggleTheme={toggleTheme} />
-      
+    <div className="not-found-page">      
       {/* Floating Icons Background */}
       <div className="floating-icons">
         {floatingIcons.map(icon => (
