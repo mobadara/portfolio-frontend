@@ -1,0 +1,110 @@
+.admin-dashboard-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
+  padding-bottom: 2rem;
+}
+
+.admin-dashboard-wrap {
+  max-width: 1400px;
+}
+
+.admin-dashboard-shell {
+  background: rgba(15, 23, 42, 0.5) !important;
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px;
+}
+
+.admin-panel-card {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96) !important;
+}
+
+.metric-card {
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.metric-icon {
+  font-size: 1.5rem;
+  color: #667eea;
+}
+
+.admin-search-group {
+  position: relative;
+  width: 100%;
+}
+
+.admin-search-group .form-control {
+  padding-left: 2.25rem;
+  border-radius: 12px;
+}
+
+.admin-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+}
+
+.admin-tabs .nav-link {
+  border-radius: 999px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.admin-tabs .nav-link.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.admin-table thead th {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.admin-mobile-card {
+  border-radius: 14px;
+  background: #fff;
+}
+
+.admin-dash-loading {
+  min-height: 100vh;
+  background: #0f172a;
+}
+
+@media (max-width: 767.98px) {
+  .admin-dashboard-wrap {
+    padding-inline: 0.35rem;
+  }
+
+  .admin-dashboard-shell {
+    border-radius: 14px;
+  }
+
+  .admin-panel-card {
+    border-radius: 12px;
+  }
+}
+
+[data-bs-theme="dark"] .admin-panel-card {
+  background: rgba(30, 41, 59, 0.95) !important;
+}
+
+[data-bs-theme="dark"] .metric-card {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .metric-card .text-muted,
+[data-bs-theme="dark"] .admin-search-icon,
+[data-bs-theme="dark"] .admin-table thead th {
+  color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .admin-mobile-card {
+  background: #0f172a;
+  color: #e2e8f0;
+}
