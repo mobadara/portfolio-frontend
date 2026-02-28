@@ -1,6 +1,6 @@
 <div align="center">
 
-# Portfolio Frontend
+# **Portfolio Frontend**
 
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-7-646cff?logo=vite&logoColor=white)
