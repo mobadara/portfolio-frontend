@@ -3,8 +3,8 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiBot, BiSend, BiX, BiMicrophone, BiStopCircle } from 'react-icons/bi';
-import { BsChatDotsFill } from 'react-icons/bs';
+import { BiSend, BiX } from 'react-icons/bi';
+import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
@@ -12,57 +12,27 @@ const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfoli
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { id: 1, text: "Hi! I'm Muyiwa's AI Assistant. Ask me about his skills, projects, or schedule!", sender: 'bot' }
+    { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot' }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
-  const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
-  const [humanMode, setHumanMode] = useState(false);
-  const [requestingHuman, setRequestingHuman] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
   const messageIdRef = useRef(2);
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
 
-  const predefinedQuestions = [
-    "What are Muyiwa's main skills?",
-    "Tell me about his recent projects",
-    "What's his availability?",
-    "How can I contact him?"
+  const suggestedQuestions = [
+    "What are your key skills?",
+    "Tell me about recent projects",
+    "How can I reach you?"
   ];
 
   const getNextMessageId = () => {
     const nextId = messageIdRef.current;
     messageIdRef.current += 1;
     return nextId;
-  };
-
-  const playMessageSound = () => {
-    // Create a simple beep sound using Web Audio API
-    try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800;
-      oscillator.type = 'sine';
-
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.1);
-    } catch (error) {
-      console.log('Could not play sound:', error);
-    }
   };
 
   // Auto-scroll to bottom of chat
@@ -77,7 +47,6 @@ const Chatbot = () => {
     let isMounted = true;
 
     const initializeWebSocket = () => {
-      // Generate or retrieve session ID
       let sessionId = localStorage.getItem('chatSessionId');
       if (!sessionId) {
         sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -85,7 +54,6 @@ const Chatbot = () => {
       }
       sessionIdRef.current = sessionId;
 
-      // Connect to WebSocket
       const wsBase = CHAT_API_BASE.replace(/^http/, 'ws');
       const wsUrl = `${wsBase}/chat/${sessionId}`;
 
@@ -101,34 +69,17 @@ const Chatbot = () => {
         };
 
         ws.onmessage = (event) => {
-          console.log('Message received from server:', event.data);
           if (isMounted) {
             try {
-              // Try to parse as JSON first (for system messages)
               const data = JSON.parse(event.data);
-              
-              if (data.type === 'human_mode_activated') {
-                setHumanMode(true);
-                setRequestingHuman(false);
-                const botMsg = {
-                  id: getNextMessageId(),
-                  text: data.message || "You've been connected to a human! Muyiwa will respond shortly.",
-                  sender: 'bot'
-                };
-                setMessages(prev => [...prev, botMsg]);
-                playMessageSound();
-              } else if (data.type === 'message') {
-                const botMsg = {
-                  id: getNextMessageId(),
-                  text: data.content || data.message,
-                  sender: data.role === 'admin' ? 'admin' : 'bot'
-                };
-                setMessages(prev => [...prev, botMsg]);
-                setIsLoading(false);
-                playMessageSound();
-              }
+              const botMsg = {
+                id: getNextMessageId(),
+                text: data.content || data.message || event.data,
+                sender: data.role === 'admin' ? 'admin' : 'bot'
+              };
+              setMessages(prev => [...prev, botMsg]);
+              setIsLoading(false);
             } catch {
-              // If not JSON, treat as regular text message
               const botMsg = {
                 id: getNextMessageId(),
                 text: event.data,
@@ -136,7 +87,6 @@ const Chatbot = () => {
               };
               setMessages(prev => [...prev, botMsg]);
               setIsLoading(false);
-              playMessageSound();
             }
           }
         };
@@ -171,7 +121,6 @@ const Chatbot = () => {
 
     return () => {
       isMounted = false;
-      // Clean up WebSocket on component unmount
       if (webSocketRef.current) {
         webSocketRef.current.close();
         webSocketRef.current = null;
@@ -179,243 +128,109 @@ const Chatbot = () => {
     };
   }, []);
 
-  // Auto-trigger chatbot after 30 seconds
-  useEffect(() => {
-    const autoTriggerTimer = setTimeout(() => {
-      if (!hasAutoTriggered && !isOpen) {
-        setHasAutoTriggered(true);
-        setIsOpen(true);
-        playMessageSound();
-      }
-    }, 30000); // 30 seconds
-
-    return () => clearTimeout(autoTriggerTimer);
-  }, [hasAutoTriggered, isOpen]);
-
   const handleSend = (e) => {
     e.preventDefault();
     if (!input.trim() || !isConnected) return;
 
-    // 1. Add User Message
     const userMsg = { id: getNextMessageId(), text: input, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
 
-    // 2. Send to WebSocket
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       webSocketRef.current.send(input);
       setIsLoading(true);
     }
   };
 
-  const handlePredefinedQuestion = (question) => {
+  const handleSuggestedQuestion = (question) => {
     if (!isConnected) return;
 
-    // 1. Add User Message
     const userMsg = { id: getNextMessageId(), text: question, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
 
-    // 2. Send to WebSocket
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       webSocketRef.current.send(question);
       setIsLoading(true);
     }
   };
 
-  const requestHumanSupport = async () => {
-    if (requestingHuman || humanMode) return;
-    
-    setRequestingHuman(true);
-    
-    // Add user message indicating they want human support
-    const userMsg = { 
-      id: getNextMessageId(), 
-      text: "I'd like to talk to a human", 
-      sender: 'user' 
-    };
-    setMessages(prev => [...prev, userMsg]);
-
-    try {
-      // Send WebSocket message to request human mode
-      if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-        webSocketRef.current.send(JSON.stringify({
-          type: 'request_human',
-          message: "User requesting human support"
-        }));
-      }
-
-      // Also make HTTP request as backup
-      const response = await fetch(
-        `${CHAT_API_BASE}/chat/${sessionIdRef.current}/request-human`,
-        { method: 'POST' }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setHumanMode(true);
-        
-        const botMsg = {
-          id: getNextMessageId(),
-          text: data.message || "You've been connected to a human! Muyiwa will respond shortly.",
-          sender: 'bot'
-        };
-        setMessages(prev => [...prev, botMsg]);
-        playMessageSound();
-      } else {
-        throw new Error('Failed to request human support');
-      }
-    } catch (error) {
-      console.error('Error requesting human support:', error);
-      const errorMsg = {
-        id: getNextMessageId(),
-        text: "I'm having trouble connecting you to Muyiwa right now. Please try using the contact form or email directly.",
-        sender: 'bot'
-      };
-      setMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setRequestingHuman(false);
-    }
-  };
-
-  const startVoiceRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      audioChunksRef.current = [];
-      
-      mediaRecorder.ondata = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        // Add user message indicating voice recording
-        const userMsg = {
-          id: getNextMessageId(),
-          text: "🎤 Voice message",
-          sender: 'user',
-          audioBlob: audioBlob
-        };
-        setMessages(prev => [...prev, userMsg]);
-        
-        // Send to WebSocket
-        if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-          webSocketRef.current.send(JSON.stringify({
-            type: 'voice_message',
-            sessionId: sessionIdRef.current
-          }));
-          setIsLoading(true);
-        }
-        
-        // Stop all tracks to release the microphone
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      mediaRecorderRef.current = mediaRecorder;
-      setIsRecording(true);
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      alert('Unable to access microphone. Please check your browser permissions.');
-    }
-  };
-
-  const stopVoiceRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-    }
-  };
-
   return (
     <>
-      {/* 1. THE FLOATING BUTTON (FAB) */}
-      <Button 
-        className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-label="Toggle Chat"
-      >
-        {isOpen ? <BiX size={28} /> : <BsChatDotsFill size={24} />}
-      </Button>
+      {/* Floating Chat Button */}
+      <div className="chatbot-fab-wrapper">
+        <Button 
+          className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label="Toggle Chat"
+          title={isOpen ? "Close chat" : "Open chat"}
+        >
+          {isOpen ? <BiX size={26} /> : <BsChatFill size={22} />}
+        </Button>
+        <span
+          className={`chatbot-status-dot ${
+            isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'
+          }`}
+          title={isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+        />
+      </div>
 
-      {/* 2. THE CHAT WINDOW */}
+      {/* Chat Window */}
       <div className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}>
-        <Card className="h-100 border-0 overflow-hidden">
+        <Card className="h-100 border-0 overflow-hidden d-flex flex-column">
           
           {/* Header */}
-          <div className="chatbot-header d-flex align-items-center justify-content-between p-3">
-            <div className="d-flex align-items-center gap-3">
-                <div className="chatbot-avatar-wrapper">
-                    <div className="chatbot-avatar">
-                        <BiBot size={22} />
-                    </div>
-                    <div className={`chatbot-status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></div>
-                </div>
-                <div>
-                    <h6 className="mb-0 fw-bold chatbot-header-title">
-                      {humanMode ? 'Muyiwa' : 'AI Assistant'}
-                    </h6>
-                    <small className="chatbot-header-subtitle">
-                      {isConnecting 
-                        ? 'Connecting...'
-                        : humanMode 
-                        ? '👤 Human Support' 
-                        : isConnected 
-                        ? 'Online • Ready to help' 
-                        : 'Connection lost'}
-                    </small>
-                </div>
+          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3">
+            <div className="d-flex align-items-center gap-2">
+              <span
+                className={`chatbot-status-dot chatbot-status-dot--lg ${
+                  isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'
+                }`}
+              />
+              <div>
+                <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
+                <small className={`lh-1 ${
+                  isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'
+                } opacity-90`}>
+                  {isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+                </small>
+              </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="btn btn-sm text-white p-0 chatbot-close-btn">
-                <BiX size={24} />
+            <button 
+              onClick={() => setIsOpen(false)} 
+              className="btn btn-sm text-white p-0 chatbot-close-btn"
+              aria-label="Close chat"
+            >
+              <BiX size={22} />
             </button>
           </div>
 
-          {/* Messages Area */}
-          <Card.Body className="chat-body bg-light p-3 overflow-auto">
+          {/* Messages */}
+          <Card.Body className="chat-messages overflow-auto p-3 flex-grow-1">
             {messages.map((msg) => (
-              <div key={msg.id} className={`d-flex mb-3 gap-2 ${msg.sender === 'user' ? 'justify-content-end' : 'justify-content-start'}`}>
-                {/* Avatar for Bot and Admin */}
-                {msg.sender !== 'user' && (
-                  <div className={`chatbot-message-avatar ${msg.sender === 'admin' ? 'admin-avatar' : 'bot-avatar'}`}>
-                    {msg.sender === 'admin' ? (
-                      <span className="avatar-text">M</span>
-                    ) : (
-                      <BiBot size={20} />
-                    )}
-                  </div>
-                )}
-                
+              <div 
+                key={msg.id} 
+                className={`d-flex mb-3 gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`}
+              >
                 <div 
-                  className={`p-2 px-3 rounded-3 ${
+                  className={`py-2 px-3 rounded-lg ${
                     msg.sender === 'user' 
-                      ? 'bg-navy text-white rounded-bottom-right-0' // User Style
-                      : msg.sender === 'admin'
-                      ? 'bg-success text-white rounded-bottom-left-0' // Admin Style
-                      : 'bg-white text-dark border rounded-bottom-left-0' // Bot Style
+                      ? 'bg-navy text-white' 
+                      : 'bg-light text-dark'
                   }`}
-                  style={{ maxWidth: '70%' }}
+                  style={{ maxWidth: '80%', borderRadius: '12px' }}
                 >
-                  <small className="d-block mb-1 opacity-75" style={{ fontSize: '0.7rem' }}>
-                    {msg.sender === 'user' ? 'You' : msg.sender === 'admin' ? '👤 Muyiwa' : 'AI'}
-                  </small>
                   {msg.sender !== 'user' ? (
                     <ReactMarkdown 
-                      className="markdown-content"
                       components={{
-                        p: ({children}) => <p style={{marginBottom: '0.5rem'}}>{children}</p>,
+                        p: ({children}) => <p className="mb-2">{children}</p>,
                         code: ({inline, children}) => 
                           inline ? 
-                            <code style={{backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.2rem 0.4rem', borderRadius: '3px', fontSize: '0.9em'}}>{children}</code> :
-                            <code style={{display: 'block', backgroundColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : '#f0f0f0', padding: '0.5rem', borderRadius: '5px', overflowX: 'auto', fontSize: '0.85em'}}>{children}</code>,
-                        ul: ({children}) => <ul style={{marginLeft: '1rem', marginBottom: '0.5rem'}}>{children}</ul>,
-                        ol: ({children}) => <ol style={{marginLeft: '1rem', marginBottom: '0.5rem'}}>{children}</ol>,
-                        li: ({children}) => <li style={{marginBottom: '0.25rem'}}>{children}</li>,
-                        a: ({href, children}) => <a style={{color: msg.sender === 'admin' ? '#fff' : '#0066cc', textDecoration: 'underline'}} href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
-                        h1: ({children}) => <h5 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}}>{children}</h5>,
-                        h2: ({children}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem', fontWeight: 'bold'}}>{children}</h6>,
-                        h3: ({children}) => <h6 style={{marginTop: '0.5rem', marginBottom: '0.5rem'}}>{children}</h6>,
-                        blockquote: ({children}) => <blockquote style={{borderLeft: '3px solid #ccc', paddingLeft: '0.5rem', marginLeft: '0', color: msg.sender === 'admin' ? '#fff' : '#666'}}>{children}</blockquote>,
+                            <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code> :
+                            <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2"><code>{children}</code></pre>,
+                        ul: ({children}) => <ul className="ps-4 mb-2">{children}</ul>,
+                        ol: ({children}) => <ol className="ps-4 mb-2">{children}</ol>,
+                        li: ({children}) => <li className="mb-1">{children}</li>,
+                        a: ({href, children}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">{children}</a>,
                         strong: ({children}) => <strong>{children}</strong>,
                         em: ({children}) => <em>{children}</em>
                       }}
@@ -426,135 +241,165 @@ const Chatbot = () => {
                     msg.text
                   )}
                 </div>
-
-                {/* Avatar for User */}
-                {msg.sender === 'user' && (
-                  <div className="chatbot-message-avatar user-avatar">
-                    <span className="avatar-text">U</span>
-                  </div>
-                )}
               </div>
             ))}
             
-            {/* Loading Indicator */}
             {isLoading && (
-              <div className="d-flex mb-3 justify-content-start">
-                <div className="p-2 px-3 rounded-3 bg-white text-dark border rounded-bottom-left-0 d-flex align-items-center gap-2">
-                  <Spinner animation="grow" size="sm" variant="primary" />
-                  <small style={{ fontSize: '0.9rem' }}>Assistant is typing...</small>
-                </div>
-              </div>
-            )}
-            
-            {/* Show predefined questions only after initial bot message */}
-            {messages.length === 1 && (
-              <div className="mt-4">
-                <p className="text-muted small mb-3">What would you like to know?</p>
-                <div className="d-flex flex-column gap-2">
-                  {predefinedQuestions.map((question, index) => (
-                    <Button
-                      key={index}
-                      variant="outline-navy"
-                      size="sm"
-                      onClick={() => handlePredefinedQuestion(question)}
-                      disabled={!isConnected}
-                      className="text-start"
-                      style={{ 
-                        borderColor: '#001a4d',
-                        color: '#001a4d',
-                        whiteSpace: 'normal',
-                        padding: '0.5rem 0.75rem'
-                      }}
-                    >
-                      {question}
-                    </Button>
-                  ))}
+              <div className="d-flex mb-3">
+                <div className="bg-light text-dark py-2 px-3 rounded-lg d-flex align-items-center gap-2">
+                  <Spinner animation="grow" size="sm" variant="secondary" />
+                  <small>Typing...</small>
                 </div>
               </div>
             )}
 
-            {/* Talk to Human Button */}
-            {!humanMode && messages.length > 1 && (
-              <div className="text-center my-3">
-                <Button
-                  variant="outline-success"
-                  size="sm"
-                  onClick={requestHumanSupport}
-                  disabled={requestingHuman}
-                  className="d-flex align-items-center gap-2 mx-auto"
-                >
-                  {requestingHuman ? (
-                    <>
-                      <Spinner animation="border" size="sm" />
-                      <span>Connecting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <i className="bi bi-person-fill"></i>
-                      <span>Talk to Muyiwa</span>
-                    </>
-                  )}
-                </Button>
+            {/* Suggested Questions - Only show on initial state */}
+            {messages.length === 1 && (
+              <div className="mt-4 pt-2">
+                <small className="text-muted d-block mb-2">Quick questions:</small>
+                <div className="d-flex flex-column gap-2">
+                  {suggestedQuestions.map((q, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSuggestedQuestion(q)}
+                      disabled={!isConnected}
+                      className="btn btn-sm btn-outline-secondary text-start text-wrap"
+                      style={{ fontSize: '0.875rem' }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             
             <div ref={messagesEndRef} />
           </Card.Body>
 
-          {/* Input Area */}
-          <div className="card-footer bg-white p-2">
-            <Form onSubmit={handleSend} className="d-flex gap-2 flex-wrap">
+          {/* Input */}
+          <div className="card-footer bg-white border-top p-2">
+            <Form onSubmit={handleSend} className="d-flex gap-2">
               <Form.Control 
-                as="textarea"
-                placeholder={isConnected ? "Type a message... (Shift+Enter for new line)" : isConnecting ? "Connecting..." : "Disconnected..."} 
+                placeholder={isConnected ? "Type a message..." : "Disconnected..."} 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  // Submit on Enter only if Shift is not pressed
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend(e);
                   }
                 }}
-                disabled={!isConnected || isRecording}
-                className="border-0 bg-light shadow-none chatbot-input"
-                style={{ 
-                  fontSize: '0.9rem',
-                  resize: 'none',
-                  minHeight: '40px',
-                  maxHeight: '100px',
-                  flex: '1',
-                  padding: '0.5rem'
-                }}
-                rows="2"
+                disabled={!isConnected}
+                className="border rounded-lg bg-light"
+                style={{ fontSize: '0.9rem' }}
+                rows="1"
               />
-              <div className="d-flex gap-2 align-items-flex-end">
-                <Button
-                  type="button"
-                  variant={isRecording ? 'danger' : 'outline-primary'}
-                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                  disabled={!isConnected || !humanMode}
-                  className="d-flex align-items-center justify-content-center"
-                  title={!humanMode ? 'Voice recording only available in human mode' : isRecording ? 'Stop Recording' : 'Start Voice Recording'}
-                  style={{ minWidth: '40px', height: '40px' }}
-                >
-                  {isRecording ? <BiStopCircle size={18} /> : <BiMicrophone size={18} />}
-                </Button>
-                <Button 
-                  type="submit" 
-                  variant="primary" 
-                  disabled={!isConnected || (!input.trim() && !isRecording)}
-                  className="bg-navy border-navy d-flex align-items-center justify-content-center px-3"
-                  style={{ height: '40px' }}
-                >
-                  <BiSend />
-                </Button>
-              </div>
+              <Button 
+                type="submit" 
+                variant="primary"
+                disabled={!isConnected || !input.trim()}
+                className="bg-navy border-0 px-3"
+              >
+                <BiSend />
+              </Button>
             </Form>
           </div>
 
         </Card>
       </div>
+
+      <style jsx>{`
+        .chatbot-fab {
+          position: fixed;
+          bottom: 30px;
+          right: 30px;
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+          border: 0;
+          color: white;
+          z-index: 1040;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 4px 16px rgba(0, 31, 63, 0.3);
+        }
+
+        .chatbot-fab:hover {
+          transform: scale(1.1);
+          box-shadow: 0 8px 24px rgba(0, 31, 63, 0.4);
+        }
+
+        .chatbot-fab:active {
+          transform: scale(0.95);
+        }
+
+        .chatbot-window {
+          position: fixed;
+          bottom: 100px;
+          right: 30px;
+          width: 100%;
+          max-width: 400px;
+          height: 600px;
+          max-height: 80vh;
+          border-radius: 12px;
+          z-index: 1039;
+          opacity: 0;
+          pointer-events: none;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transform: translateY(20px);
+        }
+
+        .chatbot-window.open {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateY(0);
+        }
+
+        .chatbot-window .card {
+          border-radius: 12px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .chatbot-header {
+          background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
+          color: white;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chatbot-close-btn {
+          transition: transform 0.2s;
+          cursor: pointer;
+        }
+
+        .chatbot-close-btn:hover {
+          transform: rotate(90deg);
+        }
+
+        .chat-messages {
+          background: #f8f9fa;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .rounded-lg {
+          border-radius: 8px;
+        }
+
+        @media (max-width: 480px) {
+          .chatbot-window {
+            bottom: 20px;
+            right: 20px;
+            left: 20px;
+            max-width: unset;
+            height: 500px;
+          }
+
+          .chatbot-fab {
+            bottom: 20px;
+            right: 20px;
+          }
+        }
+      `}</style>
     </>
   );
 };

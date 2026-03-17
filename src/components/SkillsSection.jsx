@@ -64,6 +64,7 @@ const SkillsSection = () => {
   return (
     <section id="skills" className="section-padding bg-light position-relative">
       <Container className="pt-3 pb-3">
+        <div className="section-shell">
         <div className="text-center mb-5">
           <h2 className="fw-bold display-6 text-dark">Skills & Expertise</h2>
           <p className="text-secondary fs-5">
@@ -147,6 +148,7 @@ const SkillsSection = () => {
             </h5>
             <p className="text-secondary">Expert Level Skills</p>
           </div>
+        </div>
         </div>
       </Container>
     </section>

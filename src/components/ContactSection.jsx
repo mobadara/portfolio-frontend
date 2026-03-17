@@ -8,6 +8,7 @@ import Row from 'react-bootstrap/Row';
 const ContactSection = () => (
   <section id="contact" className="py-5 section-padding" style={{ backgroundColor: 'var(--body-bg)' }}>
     <Container>
+      <div className="section-shell">
       <Row className="justify-content-center">
         <Col md={8}>
           <div className="text-center mb-5">
@@ -54,6 +55,7 @@ const ContactSection = () => (
           </Card>
         </Col>
       </Row>
+      </div>
     </Container>
   </section>
 );

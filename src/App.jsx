@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import AIPlayground from './components/AIPlayground';
 import AboutSection from './components/AboutSection';
@@ -19,6 +19,16 @@ import NotFoundPage from './pages/NotFoundPage';
 import projects from './data/projects';
 import './App.css';
 
+const SECTION_PATHS = {
+  '/': 'home',
+  '/about': 'about',
+  '/skills': 'skills',
+  '/portfolio': 'portfolio',
+  '/blog': 'blog',
+  '/services': 'services',
+  '/contact': 'contact'
+};
+
 /**
  * App - Root component for the portfolio application.
  * Manages global theme state and orchestrates all page sections.
@@ -28,6 +38,7 @@ import './App.css';
 function App() {
   const [theme, setTheme] = useState('light');
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
 
   /**
    * Sync theme state with document theme attribute
@@ -53,6 +64,33 @@ function App() {
    */
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
+  useEffect(() => {
+    const sectionId = SECTION_PATHS[location.pathname];
+    if (!sectionId || location.pathname.startsWith('/admin')) {
+      return;
+    }
+
+    const scrollToSection = () => {
+      const targetSection = document.getElementById(sectionId);
+      if (!targetSection) {
+        return;
+      }
+
+      const navbarElement = document.querySelector('.navbar-custom');
+      const navbarHeight = navbarElement?.offsetHeight ?? 88;
+      const sectionTop = targetSection.getBoundingClientRect().top + window.scrollY;
+      const scrollTop = Math.max(sectionTop - navbarHeight - 12, 0);
+
+      window.scrollTo({
+        top: scrollTop,
+        behavior: 'smooth'
+      });
+    };
+
+    const timer = setTimeout(scrollToSection, 40);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
   const homeContent = (
     <>
       <LoadingAnimation isLoading={isLoading} />
@@ -73,6 +111,12 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={homeContent} />
+      <Route path="/about" element={homeContent} />
+      <Route path="/skills" element={homeContent} />
+      <Route path="/portfolio" element={homeContent} />
+      <Route path="/blog" element={homeContent} />
+      <Route path="/services" element={homeContent} />
+      <Route path="/contact" element={homeContent} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="*" element={<NotFoundPage />} />

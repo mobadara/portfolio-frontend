@@ -48,6 +48,7 @@ const AIPlayground = () => {
   return (
     <section className="py-5 section-padding bg-light border-top border-bottom">
       <Container>
+        <div className="section-shell">
         <div className="text-center mb-5 py -3">
             <h2 className="fw-bold display-6 text-navy">Live Model Demo</h2>
             <p className="text-muted">
@@ -126,6 +127,7 @@ const AIPlayground = () => {
             </Card>
           </Col>
         </Row>
+        </div>
       </Container>
     </section>
   );

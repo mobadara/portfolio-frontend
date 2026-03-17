@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
-import Button from 'react-bootstrap/Button';
-import ParticlesBackground from './ParticlesBackground';
+import { Link } from 'react-router-dom';
 import './HeroSection.css';
 
-const TITLES = ['Data Scientist', 'AI Engineer', 'Full-Stack Developer'];
+const TITLES = ['Data Scientist', 'AI Engineer', 'Software Developer', 'Mentor'];
+const HIRE_TYPES = ['Contract', 'Consultant', 'Tutoring'];
 
 const HeroSection = () => {
   const [titleIndex, setTitleIndex] = useState(0);
-  const [showContent, setShowContent] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    setShowContent(true);
+    setIsVisible(true);
   }, []);
 
   useEffect(() => {
@@ -21,83 +21,83 @@ const HeroSection = () => {
   }, []);
 
   return (
-    <section id="home" className="hero-section position-relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="hero-background">
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
-          <ParticlesBackground />
+    <section id="home" className="hero-section">
+      <div className="hero-container">
+        <div className={`hero-content ${isVisible ? 'fade-in' : ''}`}>
+          <div className="hero-main-grid">
+            <div className="hero-copy">
+              <div className="hero-badge">
+                <span className="badge-text">Senior Data & AI Professional</span>
+              </div>
+
+              <h1 className="hero-title">Muyiwa Obadara</h1>
+              <div className="hero-divider"></div>
+
+              <div className="role-container">
+                <p className="role-text">
+                  <span className="role-prefix">Representing: </span>
+                  <span className="role-highlight" key={titleIndex}>{TITLES[titleIndex]}</span>
+                </p>
+              </div>
+
+              <div className="role-chip-row">
+                {TITLES.map((role) => (
+                  <span key={role} className="role-chip">{role}</span>
+                ))}
+              </div>
+
+              <p className="hero-description">
+                I design and deploy intelligent systems across analytics, machine learning, APIs, and product-ready software. I also mentor aspiring professionals and teams building practical AI solutions.
+              </p>
+
+              <div className="hire-block">
+                <h6 className="hire-title">Available for hire</h6>
+                <div className="hire-chip-row">
+                  {HIRE_TYPES.map((type) => (
+                    <span key={type} className="hire-chip">{type}</span>
+                  ))}
+                  <span className="hire-chip">and more</span>
+                </div>
+              </div>
+
+              <div className="hero-buttons">
+                <Link className="btn-primary-cta" to="/portfolio">View Projects</Link>
+                <Link className="btn-secondary-cta" to="/contact">Get In Touch</Link>
+              </div>
+            </div>
+
+            <div className="pipeline-cartoon" aria-hidden="true">
+              <div className="pipeline-title">Data Pipeline</div>
+              <div className="pipeline-track">
+                <div className="pipeline-node source">Data</div>
+                <div className="pipeline-arrow">→</div>
+                <div className="pipeline-node process">Clean</div>
+                <div className="pipeline-arrow">→</div>
+                <div className="pipeline-node model">Model</div>
+                <div className="pipeline-arrow">→</div>
+                <div className="pipeline-node deploy">Deploy</div>
+                <span className="data-dot dot-1"></span>
+                <span className="data-dot dot-2"></span>
+                <span className="data-dot dot-3"></span>
+              </div>
+            </div>
+          </div>
+
+          <div className="hero-stats">
+            <div className="stat-item">
+              <div className="stat-number">5+</div>
+              <div className="stat-label">Years Experience</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-number">20+</div>
+              <div className="stat-label">Projects</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-number">10+</div>
+              <div className="stat-label">Technologies</div>
+            </div>
+          </div>
         </div>
-        
-        {/* Gradient Orbs */}
-        <div className="gradient-orb orb-1"></div>
-        <div className="gradient-orb orb-2"></div>
-        <div className="gradient-orb orb-3"></div>
-      </div>
-
-      {/* Content */}
-      <div className="hero-content">
-        <div className="hero-inner-wrapper">
-          {/* Greeting */}
-          <div className={`hero-greeting ${showContent ? 'visible' : ''}`}>
-            <h5 className="text-warning fw-bold mb-3">
-              <span className="greeting-icon">👋</span> HELLO, WORLD.
-            </h5>
-          </div>
-
-          {/* Main Name */}
-          <div className={`hero-name-container ${showContent ? 'visible' : ''}`}>
-            <h1 className="hero-title">I'm Muyiwa J. Obadara</h1>
-            <div className="title-underline"></div>
-          </div>
-
-          {/* Rotating Titles */}
-          <div className={`hero-subtitle-container ${showContent ? 'visible' : ''}`}>
-            <h2 className="hero-subtitle">
-              <span className="subtitle-prefix">Building intelligent systems as a </span>
-              <span className="rotating-text" key={titleIndex}>
-                <span className="title-text">{TITLES[titleIndex]}</span>
-              </span>
-            </h2>
-          </div>
-
-          {/* Description */}
-          <div className={`hero-description ${showContent ? 'visible' : ''}`}>
-            <p className="hero-text">
-              Turning complex data into intelligent action. Grounded in <strong>Mathematics</strong> and <strong>Linear Algebra</strong>,
-              I specialize in Data Science, Machine Learning, and AI Engineering—building robust models and scalable backends with Python, FastAPI, and cloud deployment.
-            </p>
-          </div>
-
-          {/* Call to Action Buttons */}
-          <div className={`hero-buttons-container ${showContent ? 'visible' : ''}`}>
-            <Button 
-              className="btn-hero btn-primary-hero" 
-              size="lg" 
-              href="#portfolio"
-            >
-              <span className="btn-content">
-                <i className="bi bi-arrow-right me-2"></i>
-                View My Work
-              </span>
-            </Button>
-            <Button 
-              className="btn-hero btn-secondary-hero" 
-              size="lg" 
-              href="#contact"
-            >
-              <span className="btn-content">
-                <i className="bi bi-chat-dots me-2"></i>
-                Let's Connect
-              </span>
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Scroll Indicator */}
-      <div className="scroll-indicator">
-        <div className="scroll-dot"></div>
-        <div className="scroll-text">Scroll to explore</div>
       </div>
     </section>
   );

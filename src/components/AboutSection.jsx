@@ -12,6 +12,7 @@ const AboutSection = ({ theme }) => {
   return (
     <section id="about" className="py-5 section-padding" style={{ backgroundColor: 'var(--body-bg)' }}>
       <Container>
+        <div className="section-shell">
         <Row className="align-items-center g-5">
           {/* Profile Image */}
           <Col lg={5} className="d-flex justify-content-center">
@@ -99,6 +100,7 @@ const AboutSection = ({ theme }) => {
             </div>
           </Col>
         </Row>
+        </div>
       </Container>
 
       {/* GitHub Activity Modal */}

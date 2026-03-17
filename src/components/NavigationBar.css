@@ -103,6 +103,25 @@
   white-space: nowrap;
 }
 
+.mobile-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1035;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-menu-backdrop.show {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.navbar-right-controls {
+  z-index: 1041;
+}
+
 /* Navigation Links */
 .nav-link-custom {
   font-size: 1rem;
@@ -145,6 +164,16 @@
 }
 
 .nav-link-custom:hover::before {
+  width: 80%;
+  background: linear-gradient(90deg, #ffc107 0%, #ff9800 100%);
+}
+
+.nav-link-custom.active-route {
+  color: #ffc107 !important;
+  background: rgba(255, 193, 7, 0.12);
+}
+
+.nav-link-custom.active-route::before {
   width: 80%;
   background: linear-gradient(90deg, #ffc107 0%, #ff9800 100%);
 }
@@ -291,6 +320,31 @@
 
 /* Responsive Design */
 @media (max-width: 991px) {
+  .navbar-collapse-custom {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: min(84vw, 340px);
+    z-index: 1040;
+    background: var(--navy-blue);
+    padding: 6rem 1.25rem 1.5rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: -12px 0 30px rgba(0, 0, 0, 0.25);
+    transform: translateX(100%);
+    transition: transform 0.35s ease;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .navbar-collapse-custom.show {
+    transform: translateX(0);
+  }
+
+  .custom-nav-items {
+    gap: 0.5rem;
+  }
+
   .nav-link-custom {
     margin: 0.25rem 0;
     padding: 0.75rem 1rem !important;
@@ -317,6 +371,16 @@
   .nav-link-custom:hover .nav-icon {
     transform: scale(1.2) rotate(-10deg);
   }
+
+  .theme-switch-container {
+    padding: 0.4rem 0.6rem;
+  }
+
+  .navbar-toggle-custom {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 576px) {
@@ -330,12 +394,22 @@
     margin: 0 0.5rem;
   }
 
-  .theme-switch-container {
-    margin-top: 1rem;
-  }
-
   .theme-icon {
     font-size: 1rem;
+  }
+}
+
+@media (min-width: 992px) {
+  .mobile-menu-backdrop {
+    display: none;
+  }
+
+  .navbar-toggle-custom {
+    display: none;
+  }
+
+  .navbar-right-controls {
+    margin-left: 1rem;
   }
 }
 

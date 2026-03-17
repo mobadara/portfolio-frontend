@@ -193,8 +193,8 @@
 }
 
 .btn-download {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
+  background: linear-gradient(135deg, #2356d6 0%, #2f6df8 100%);
+  border: 1px solid #2f6df8;
   padding: 0.85rem 2rem;
   font-weight: 700;
   font-size: 1rem;
@@ -204,27 +204,26 @@
 
 .btn-download:hover {
   transform: translateY(-3px);
-  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 15px 35px rgba(35, 86, 214, 0.3);
   color: white;
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  background: linear-gradient(135deg, #1f4dbf 0%, #2a63e4 100%);
 }
 
 .btn-github-activity {
   padding: 0.85rem 2rem;
   font-weight: 700;
   font-size: 1rem;
-  border: 2px solid;
-  border-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%) 1;
-  color: #667eea;
+  border: 2px solid #2f6df8;
+  color: #2f6df8;
   background: transparent;
   transition: all 0.3s ease;
 }
 
 .btn-github-activity:hover {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2356d6 0%, #2f6df8 100%);
   color: white;
   transform: translateY(-3px);
-  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 15px 35px rgba(35, 86, 214, 0.3);
 }
 
 /* GitHub Modal */

@@ -12,51 +12,6 @@ const BlogSection = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchMediumPosts();
-  }, []);
-
-  const fetchMediumPosts = async () => {
-    try {
-      // Using RSS2JSON API to convert Medium RSS feed to JSON and handle CORS
-      const response = await fetch(
-        'https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@mobadara'
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch blog posts');
-      }
-
-      const data = await response.json();
-      
-      if (data.status === 'ok') {
-        // Get latest 3 posts
-        const latestPosts = data.items.slice(0, 3).map(post => ({
-          title: post.title,
-          link: post.link,
-          pubDate: new Date(post.pubDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-          }),
-          description: stripHtml(post.description).substring(0, 150) + '...',
-          thumbnail: extractThumbnail(post.description, post.thumbnail),
-          author: post.author,
-          categories: post.categories || []
-        }));
-        
-        setPosts(latestPosts);
-      } else {
-        throw new Error('Invalid response from RSS feed');
-      }
-    } catch (err) {
-      console.error('Error fetching Medium posts:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Strip HTML tags from description
   const stripHtml = (html) => {
     const tmp = document.createElement('div');
@@ -77,9 +32,53 @@ const BlogSection = () => {
     return fallbackThumbnail || 'https://via.placeholder.com/400x200?text=Blog+Post';
   };
 
+      useEffect(() => {
+        const fetchMediumPosts = async () => {
+          try {
+            const response = await fetch(
+              'https://api.rss2json.com/v1/api.json?rss_url=https://medium.com/feed/@mobadara'
+            );
+
+            if (!response.ok) {
+              throw new Error('Failed to fetch blog posts');
+            }
+
+            const data = await response.json();
+
+            if (data.status === 'ok') {
+              const latestPosts = data.items.slice(0, 3).map(post => ({
+                title: post.title,
+                link: post.link,
+                pubDate: new Date(post.pubDate).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                }),
+                description: stripHtml(post.description).substring(0, 150) + '...',
+                thumbnail: extractThumbnail(post.description, post.thumbnail),
+                author: post.author,
+                categories: post.categories || []
+              }));
+
+              setPosts(latestPosts);
+            } else {
+              throw new Error('Invalid response from RSS feed');
+            }
+          } catch (err) {
+            console.error('Error fetching Medium posts:', err);
+            setError(err.message);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        fetchMediumPosts();
+      }, []);
+
   return (
     <section id="blog" className="py-5 bg-light border-top border-bottom">
       <Container>
+        <div className="section-shell">
         <div className="text-center mb-5">
           <SiMedium className="display-3 mb-3" style={{ color: '#000' }} />
           <h2 className="fw-bold text-navy mb-3">Latest from My Blog</h2>
@@ -184,6 +183,7 @@ const BlogSection = () => {
             </div>
           </>
         )}
+        </div>
       </Container>
 
       <style jsx>{`
