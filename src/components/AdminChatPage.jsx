@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Container, Row, Col, Card, Badge, Alert, Spinner } from 'react-bootstrap';
 import AdminChat from './AdminChat';
 import './AdminChatPage.css';
@@ -10,6 +11,8 @@ const API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-bac
  * Allows admins to manage and chat with users from active sessions
  */
 const AdminChatPage = () => {
+  const { sessionId: routeSessionId } = useParams();
+  const navigate = useNavigate();
   const [activeSession, setActiveSession] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +50,12 @@ const AdminChatPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (routeSessionId) {
+      setActiveSession(routeSessionId);
+    }
+  }, [routeSessionId]);
+
   const formatTimestamp = (timestamp) => {
     try {
       const date = new Date(timestamp);
@@ -64,11 +73,13 @@ const AdminChatPage = () => {
 
   const handleCloseChat = () => {
     setActiveSession(null);
+    navigate('/admin/chat');
     fetchActiveSessions(); // Refresh sessions after closing
   };
 
   const handleOpenSession = (sessionId) => {
     setActiveSession(sessionId);
+    navigate(`/admin/chat/${sessionId}`);
   };
 
   return (

@@ -12,6 +12,7 @@ import BlogSection from './components/BlogSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
 import SkillsSection from './components/SkillsSection';
+import AdminChatPage from './components/AdminChatPage';
 import LoadingAnimation from './components/LoadingAnimation';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
@@ -119,6 +120,8 @@ function App() {
       <Route path="/contact" element={homeContent} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/admin/chat" element={<AdminChatPage />} />
+      <Route path="/admin/chat/:sessionId" element={<AdminChatPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
