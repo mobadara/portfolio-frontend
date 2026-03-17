@@ -38,14 +38,15 @@ const AboutSection = ({ theme }) => {
               </h1>
 
               <p className="about-description">
-                I'm <strong>Muyiwa J. Obadara</strong>, a passionate Data Scientist and AI Engineer building intelligent systems that transform 
-                complex problems into scalable, production-grade solutions. With expertise in machine learning, cloud deployment, and 
-                automation, I specialize in designing end-to-end AI pipelines that create meaningful impact.
+                I'm <strong>Muyiwa J. Obadara</strong>—a curious researcher, Data Scientist, and AI Engineer building intelligent systems that transform complex problems into scalable, production-grade solutions. With a foundational background in Physics from the University of Ibadan, I specialize in designing end-to-end AI pipelines, cloud architecture, and automation that drive meaningful, real-world impact.
               </p>
 
               <p className="about-description">
-                I believe in clean, efficient code and believe that great software is born from clarity of thought. When I'm not building 
-                models or deploying APIs, you'll find me exploring cutting-edge AI technologies or optimizing workflows with LLMs.
+                Beyond writing clean, efficient code, I am deeply committed to tech leadership and community growth. Drawing from my roots as a Mathematics and Physics educator, I actively guide the next generation of tech professionals. I currently serve as an AI/ML Fellow at the Tech4Dev Developers Foundry and a Volunteer Data Science Mentor and Research Assistant at MedicsInTech.
+              </p>
+
+              <p className="about-description">
+                I believe that great software is born from clarity of thought. When I'm not building machine learning models or deploying APIs, you'll find me exploring cutting-edge AI technologies, optimizing workflows with LLMs, or unwinding by playing the piano.
               </p>
 
               {/* Social Links */}

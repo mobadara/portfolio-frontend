@@ -3,15 +3,11 @@ import { Link } from 'react-router-dom';
 import './HeroSection.css';
 
 const TITLES = ['Data Scientist', 'AI Engineer', 'Software Developer', 'Mentor'];
-const HIRE_TYPES = ['Contract', 'Consultant', 'Tutoring'];
+const HIRE_TYPES = ['Contract', 'Full-Time', 'Part-Time', 'Freelance', 'Remote', 'On-site'];
 
 const HeroSection = () => {
   const [titleIndex, setTitleIndex] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    setIsVisible(true);
-  }, []);
+  const isVisible = true;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -26,16 +22,11 @@ const HeroSection = () => {
         <div className={`hero-content ${isVisible ? 'fade-in' : ''}`}>
           <div className="hero-main-grid">
             <div className="hero-copy">
-              <div className="hero-badge">
-                <span className="badge-text">Senior Data & AI Professional</span>
-              </div>
-
               <h1 className="hero-title">Muyiwa Obadara</h1>
               <div className="hero-divider"></div>
 
               <div className="role-container">
                 <p className="role-text">
-                  <span className="role-prefix">Representing: </span>
                   <span className="role-highlight" key={titleIndex}>{TITLES[titleIndex]}</span>
                 </p>
               </div>
@@ -66,35 +57,44 @@ const HeroSection = () => {
               </div>
             </div>
 
-            <div className="pipeline-cartoon" aria-hidden="true">
-              <div className="pipeline-title">Data Pipeline</div>
-              <div className="pipeline-track">
-                <div className="pipeline-node source">Data</div>
-                <div className="pipeline-arrow">→</div>
-                <div className="pipeline-node process">Clean</div>
-                <div className="pipeline-arrow">→</div>
-                <div className="pipeline-node model">Model</div>
-                <div className="pipeline-arrow">→</div>
-                <div className="pipeline-node deploy">Deploy</div>
-                <span className="data-dot dot-1"></span>
-                <span className="data-dot dot-2"></span>
-                <span className="data-dot dot-3"></span>
+            <div className="hero-right-column">
+              <div className="pipeline-cartoon" aria-hidden="true">
+                <div className="pipeline-title">Data Pipeline</div>
+                <div className="pipeline-track">
+                  <div className="pipeline-node pipeline-animated-node source">Data</div>
+                  <div className="pipeline-arrow">→</div>
+                  <div className="pipeline-node pipeline-animated-node process">Clean</div>
+                  <div className="pipeline-arrow">→</div>
+                  <div className="pipeline-node pipeline-animated-node model">Model</div>
+                  <div className="pipeline-arrow">→</div>
+                  <div className="pipeline-node pipeline-animated-node deploy">Deploy</div>
+                  <span className="data-dot dot-1"></span>
+                  <span className="data-dot dot-2"></span>
+                  <span className="data-dot dot-3"></span>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div className="hero-stats">
-            <div className="stat-item">
-              <div className="stat-number">5+</div>
-              <div className="stat-label">Years Experience</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-number">20+</div>
-              <div className="stat-label">Projects</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-number">10+</div>
-              <div className="stat-label">Technologies</div>
+              <div className="leadership-strip" aria-label="AI Leadership and Educator">
+                <h6 className="leadership-title">AI Leadership &amp; Educator</h6>
+                <p className="leadership-text mb-0">
+                  Leading teams, mentoring talent, and translating AI strategy into practical learning and business outcomes.
+                </p>
+              </div>
+
+              <div className="hero-stats hero-stats-right">
+                <div className="stat-item">
+                  <div className="stat-number">5+</div>
+                  <div className="stat-label">Years Experience</div>
+                </div>
+                <div className="stat-item">
+                  <div className="stat-number">20+</div>
+                  <div className="stat-label">Projects</div>
+                </div>
+                <div className="stat-item">
+                  <div className="stat-number">10+</div>
+                  <div className="stat-label">Technologies</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

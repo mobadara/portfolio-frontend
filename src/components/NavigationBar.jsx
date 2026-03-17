@@ -3,8 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import Container from 'react-bootstrap/Container';
 import Navbar from 'react-bootstrap/Navbar';
 import Nav from 'react-bootstrap/Nav';
-import Form from 'react-bootstrap/Form';
-import Logo from './Logo';
 import { BiUser, BiCode, BiBriefcase, BiFile, BiCog, BiEnvelope } from 'react-icons/bi';
 import './NavigationBar.css';
 
@@ -23,6 +21,7 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
   const [expanded, setExpanded] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
+  const [hideForFooter, setHideForFooter] = useState(false);
   const location = useLocation();
 
   // Determine active section from location when navigating via links
@@ -83,6 +82,26 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
     document.body.style.overflow = '';
   }, [expanded]);
 
+  useEffect(() => {
+    const footerElement = document.querySelector('.footer-root');
+    if (!footerElement) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setHideForFooter(entry.isIntersecting);
+      },
+      {
+        threshold: 0.15,
+      }
+    );
+
+    observer.observe(footerElement);
+
+    return () => observer.disconnect();
+  }, [location.pathname]);
+
   const closeMenu = () => setExpanded(false);
 
   return (
@@ -92,12 +111,12 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
         expand="lg"
         fixed="top"
         expanded={expanded}
-        className={`navbar-custom ${scrolled || expanded ? 'navbar-scrolled' : 'navbar-transparent'}`}
+        className={`navbar-custom ${scrolled || expanded ? 'navbar-scrolled' : 'navbar-transparent'} ${hideForFooter ? 'navbar-hidden' : ''}`}
         variant="dark"
       >
         <Container fluid className="px-3 px-md-4">
         <Navbar.Brand as={Link} to="/" className="p-0 m-0 d-flex align-items-center navbar-brand-custom" onClick={closeMenu}>
-          <Logo height="50" />
+          <span className="navbar-brand-text">MO</span>
         </Navbar.Brand>
 
         <Navbar.Collapse id="basic-navbar-nav" className="navbar-collapse-custom">
@@ -111,11 +130,11 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
             <Nav.Link as={Link} to="/portfolio" onClick={closeMenu} className={`nav-link-custom ${isActive('/portfolio') ? 'active-route' : ''}`}>
               <BiBriefcase className="nav-icon" /> Portfolio
             </Nav.Link>
-            <Nav.Link as={Link} to="/blog" onClick={closeMenu} className={`nav-link-custom ${isActive('/blog') ? 'active-route' : ''}`}>
-              <BiFile className="nav-icon" /> Blog
-            </Nav.Link>
             <Nav.Link as={Link} to="/services" onClick={closeMenu} className={`nav-link-custom ${isActive('/services') ? 'active-route' : ''}`}>
               <BiCog className="nav-icon" /> Services
+            </Nav.Link>
+            <Nav.Link as={Link} to="/blog" onClick={closeMenu} className={`nav-link-custom ${isActive('/blog') ? 'active-route' : ''}`}>
+              <BiFile className="nav-icon" /> Blog
             </Nav.Link>
             <Nav.Link as={Link} to="/contact" onClick={closeMenu} className={`nav-link-custom ${isActive('/contact') ? 'active-route' : ''}`}>
               <BiEnvelope className="nav-icon" /> Contact
@@ -124,18 +143,15 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
         </Navbar.Collapse>
 
         <div className="navbar-right-controls ms-auto ms-lg-3 d-flex align-items-center gap-2">
-          <div className="d-flex align-items-center gap-2 theme-switch-container">
-            <i className={`bi bi-moon-fill theme-icon moon-icon ${theme === 'dark' ? 'active' : ''}`}></i>
-            <Form.Check
-              type="switch"
-              id="theme-switch"
-              label=""
-              checked={theme === 'light'}
-              onChange={onToggleTheme}
-              className="theme-switch-custom"
-            />
-            <i className={`bi bi-sun-fill theme-icon sun-icon ${theme === 'light' ? 'active' : ''}`}></i>
-          </div>
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            className="theme-icon-toggle"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          >
+            <i className={`bi ${theme === 'dark' ? 'bi-sun-fill' : 'bi-moon-fill'}`}></i>
+          </button>
 
         <Navbar.Toggle
           aria-controls="basic-navbar-nav"

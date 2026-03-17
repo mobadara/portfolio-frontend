@@ -88,6 +88,22 @@
   transition: all 0.3s ease;
 }
 
+.navbar-brand-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 0.85rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
 .navbar-brand-custom:hover {
   transform: scale(1.05);
 }
@@ -120,6 +136,46 @@
 
 .navbar-right-controls {
   z-index: 1041;
+}
+
+.navbar-custom .container-fluid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.theme-icon-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: all 0.25s ease;
+}
+
+.theme-icon-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.theme-icon-toggle:focus {
+  outline: 2px solid rgba(102, 126, 234, 0.85);
+  outline-offset: 2px;
+}
+
+.navbar-hidden {
+  transform: translateY(-130%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Navigation Links */
@@ -325,7 +381,8 @@
     top: 0;
     right: 0;
     height: 100vh;
-    width: min(84vw, 340px);
+    width: min(82vw, 320px);
+    max-width: calc(100vw - 8px);
     z-index: 1040;
     background: var(--navy-blue);
     padding: 6rem 1.25rem 1.5rem;
@@ -335,6 +392,19 @@
     transition: transform 0.35s ease;
     display: block !important;
     visibility: visible !important;
+  }
+
+  .navbar-brand-text {
+    min-width: 38px;
+    height: 38px;
+    padding: 0 0.65rem;
+    font-size: 0.92rem;
+  }
+
+  .navbar-right-controls {
+    margin-left: auto !important;
+    gap: 0.4rem !important;
+    flex-shrink: 0;
   }
 
   .navbar-collapse-custom.show {
@@ -384,6 +454,11 @@
 }
 
 @media (max-width: 576px) {
+  .navbar-custom .container-fluid {
+    padding-left: 0.7rem !important;
+    padding-right: 0.7rem !important;
+  }
+
   .nav-link-custom {
     font-size: 0.95rem;
     padding: 0.6rem 0.8rem !important;

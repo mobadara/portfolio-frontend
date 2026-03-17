@@ -17,11 +17,16 @@ const Chatbot = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [showHumanForm, setShowHumanForm] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '' });
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
   const messageIdRef = useRef(2);
+  const loadingTimeoutRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const typingSoundIntervalRef = useRef(null);
 
   const suggestedQuestions = [
     "What are your key skills?",
@@ -35,6 +40,117 @@ const Chatbot = () => {
     return nextId;
   };
 
+  const playChatSound = (type = 'receive') => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+
+      const context = audioContextRef.current;
+      if (context.state === 'suspended') {
+        context.resume();
+      }
+
+      const config = {
+        send: { frequency: 620, duration: 0.06 },
+        receive: { frequency: 740, duration: 0.08 },
+        error: { frequency: 280, duration: 0.12 }
+      };
+
+      const { frequency, duration } = config[type] || config.receive;
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = frequency;
+
+      gainNode.gain.setValueAtTime(0.0001, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.05, context.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + duration);
+    } catch {
+      // Silent fail for browsers that block autoplay/audio context.
+    }
+  };
+
+  const playTypingPulse = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+
+      const context = audioContextRef.current;
+      if (context.state === 'suspended') {
+        context.resume();
+      }
+
+      const now = context.currentTime;
+
+      const osc1 = context.createOscillator();
+      const gain1 = context.createGain();
+      osc1.type = 'triangle';
+      osc1.frequency.setValueAtTime(900, now);
+      gain1.gain.setValueAtTime(0.0001, now);
+      gain1.gain.exponentialRampToValueAtTime(0.03, now + 0.01);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+      osc1.connect(gain1);
+      gain1.connect(context.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.06);
+
+      const osc2 = context.createOscillator();
+      const gain2 = context.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(760, now + 0.04);
+      gain2.gain.setValueAtTime(0.0001, now + 0.04);
+      gain2.gain.exponentialRampToValueAtTime(0.025, now + 0.055);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+      osc2.connect(gain2);
+      gain2.connect(context.destination);
+      osc2.start(now + 0.04);
+      osc2.stop(now + 0.11);
+    } catch {
+      // Silent fail for browsers that block autoplay/audio context.
+    }
+  };
+
+  const shouldEnableHumanMode = (text = '') => {
+    const normalized = text.toLowerCase();
+    const triggers = ['human mode', 'human', 'agent', 'real person', 'representative', 'live support'];
+    return triggers.some(trigger => normalized.includes(trigger));
+  };
+
+  const clearLoadingTimeout = () => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+  };
+
+  const startLoadingTimeout = () => {
+    clearLoadingTimeout();
+    loadingTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: getNextMessageId(),
+          text: 'Response timed out. Please try again.',
+          sender: 'bot'
+        }
+      ]);
+    }, 20000);
+  };
+
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,16 +158,66 @@ const Chatbot = () => {
 
   useEffect(scrollToBottom, [messages, isOpen]);
 
-  // Initialize WebSocket connection on component mount
+  const toggleChat = () => {
+    setIsOpen((prev) => {
+      const nextOpen = !prev;
+      if (nextOpen) {
+        setIsConnected(false);
+        setIsConnecting(true);
+      } else {
+        setIsConnecting(false);
+        setIsLoading(false);
+        clearLoadingTimeout();
+        setShowHumanForm(false);
+      }
+      return nextOpen;
+    });
+  };
+
+  // Initialize WebSocket connection only when chat is opened
   useEffect(() => {
+    if (isLoading) {
+      if (typingSoundIntervalRef.current) {
+        clearInterval(typingSoundIntervalRef.current);
+        typingSoundIntervalRef.current = null;
+      }
+      playTypingPulse();
+      typingSoundIntervalRef.current = setInterval(() => {
+        playTypingPulse();
+      }, 900);
+    } else {
+      if (typingSoundIntervalRef.current) {
+        clearInterval(typingSoundIntervalRef.current);
+        typingSoundIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (typingSoundIntervalRef.current) {
+        clearInterval(typingSoundIntervalRef.current);
+        typingSoundIntervalRef.current = null;
+      }
+    };
+  }, [isLoading]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+        webSocketRef.current = null;
+      }
+      clearLoadingTimeout();
+      if (typingSoundIntervalRef.current) {
+        clearInterval(typingSoundIntervalRef.current);
+        typingSoundIntervalRef.current = null;
+      }
+      return undefined;
+    }
+
     let isMounted = true;
 
     const initializeWebSocket = () => {
-      let sessionId = localStorage.getItem('chatSessionId');
-      if (!sessionId) {
-        sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('chatSessionId', sessionId);
-      }
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
       sessionIdRef.current = sessionId;
 
       const wsBase = CHAT_API_BASE.replace(/^http/, 'ws');
@@ -79,6 +245,8 @@ const Chatbot = () => {
               };
               setMessages(prev => [...prev, botMsg]);
               setIsLoading(false);
+              clearLoadingTimeout();
+              playChatSound('receive');
             } catch {
               const botMsg = {
                 id: getNextMessageId(),
@@ -87,6 +255,8 @@ const Chatbot = () => {
               };
               setMessages(prev => [...prev, botMsg]);
               setIsLoading(false);
+              clearLoadingTimeout();
+              playChatSound('receive');
             }
           }
         };
@@ -96,6 +266,9 @@ const Chatbot = () => {
           if (isMounted) {
             setIsConnected(false);
             setIsConnecting(false);
+            setIsLoading(false);
+            clearLoadingTimeout();
+            playChatSound('error');
           }
         };
 
@@ -104,6 +277,8 @@ const Chatbot = () => {
           if (isMounted) {
             setIsConnected(false);
             setIsConnecting(false);
+            setIsLoading(false);
+            clearLoadingTimeout();
           }
           webSocketRef.current = null;
         };
@@ -112,6 +287,7 @@ const Chatbot = () => {
       } catch (error) {
         console.error('Failed to establish WebSocket connection:', error);
         if (isMounted) {
+          setIsConnected(false);
           setIsConnecting(false);
         }
       }
@@ -121,24 +297,45 @@ const Chatbot = () => {
 
     return () => {
       isMounted = false;
+      clearLoadingTimeout();
+      if (typingSoundIntervalRef.current) {
+        clearInterval(typingSoundIntervalRef.current);
+        typingSoundIntervalRef.current = null;
+      }
       if (webSocketRef.current) {
         webSocketRef.current.close();
         webSocketRef.current = null;
       }
     };
-  }, []);
+  }, [isOpen]);
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!input.trim() || !isConnected) return;
 
-    const userMsg = { id: getNextMessageId(), text: input, sender: 'user' };
+    const messageText = input.trim();
+
+    const userMsg = { id: getNextMessageId(), text: messageText, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
+    playChatSound('send');
+
+    if (shouldEnableHumanMode(messageText) && !showHumanForm) {
+      setShowHumanForm(true);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: getNextMessageId(),
+          text: 'Sure — I can connect you to human support. Please share your name, email, and phone number using the form below.',
+          sender: 'bot'
+        }
+      ]);
+    }
 
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-      webSocketRef.current.send(input);
+      webSocketRef.current.send(messageText);
       setIsLoading(true);
+      startLoadingTimeout();
     }
   };
 
@@ -147,11 +344,63 @@ const Chatbot = () => {
 
     const userMsg = { id: getNextMessageId(), text: question, sender: 'user' };
     setMessages(prev => [...prev, userMsg]);
+    playChatSound('send');
 
     if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
       webSocketRef.current.send(question);
       setIsLoading(true);
+      startLoadingTimeout();
     }
+  };
+
+  const handleContactFieldChange = (field, value) => {
+    setContactForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleHumanFormSubmit = (e) => {
+    e.preventDefault();
+    const trimmedName = contactForm.name.trim();
+    const trimmedEmail = contactForm.email.trim();
+    const trimmedPhone = contactForm.phone.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedPhone) {
+      return;
+    }
+
+    const detailsMessage = `Human support details:\n- Name: ${trimmedName}\n- Email: ${trimmedEmail}\n- Phone: ${trimmedPhone}`;
+    const humanSupportPayload = {
+      type: 'HUMAN_SUPPORT_REQUEST',
+      version: 2,
+      schema: 'human_support_lead',
+      name: trimmedName,
+      email: trimmedEmail,
+      phone: trimmedPhone,
+      message: detailsMessage,
+      source: 'portfolio-frontend',
+      timestamp: new Date().toISOString()
+    };
+    const legacyPayload = `HUMAN_SUPPORT_REQUEST\n${detailsMessage}`;
+    setMessages(prev => [
+      ...prev,
+      { id: getNextMessageId(), text: detailsMessage, sender: 'user' },
+      {
+        id: getNextMessageId(),
+        text: 'Thanks! Your details have been captured. A human support contact will follow up shortly.',
+        sender: 'bot'
+      }
+    ]);
+    playChatSound('send');
+
+    if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
+      try {
+        webSocketRef.current.send(JSON.stringify(humanSupportPayload));
+      } catch {
+        webSocketRef.current.send(legacyPayload);
+      }
+    }
+
+    setShowHumanForm(false);
+    setContactForm({ name: '', email: '', phone: '' });
   };
 
   return (
@@ -160,7 +409,7 @@ const Chatbot = () => {
       <div className="chatbot-fab-wrapper">
         <Button 
           className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg"
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={toggleChat}
           aria-label="Toggle Chat"
           title={isOpen ? "Close chat" : "Open chat"}
         >
@@ -195,10 +444,11 @@ const Chatbot = () => {
                 </small>
               </div>
             </div>
-            <button 
-              onClick={() => setIsOpen(false)} 
+            <button
+              onClick={toggleChat}
               className="btn btn-sm text-white p-0 chatbot-close-btn"
               aria-label="Close chat"
+              type="button"
             >
               <BiX size={22} />
             </button>
@@ -206,6 +456,23 @@ const Chatbot = () => {
 
           {/* Messages */}
           <Card.Body className="chat-messages overflow-auto p-3 flex-grow-1">
+            <div className="quick-questions-sticky mb-3">
+              <small className="text-muted d-block mb-2">Quick questions:</small>
+              <div className="d-flex flex-wrap gap-2">
+                {suggestedQuestions.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSuggestedQuestion(q)}
+                    disabled={!isConnected}
+                    className="btn btn-sm btn-outline-secondary text-start text-wrap"
+                    style={{ fontSize: '0.8rem' }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {messages.map((msg) => (
               <div 
                 key={msg.id} 
@@ -252,32 +519,43 @@ const Chatbot = () => {
                 </div>
               </div>
             )}
-
-            {/* Suggested Questions - Only show on initial state */}
-            {messages.length === 1 && (
-              <div className="mt-4 pt-2">
-                <small className="text-muted d-block mb-2">Quick questions:</small>
-                <div className="d-flex flex-column gap-2">
-                  {suggestedQuestions.map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handleSuggestedQuestion(q)}
-                      disabled={!isConnected}
-                      className="btn btn-sm btn-outline-secondary text-start text-wrap"
-                      style={{ fontSize: '0.875rem' }}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             
             <div ref={messagesEndRef} />
           </Card.Body>
 
           {/* Input */}
           <div className="card-footer bg-white border-top p-2">
+            {showHumanForm && (
+              <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3">
+                <Form.Control
+                  className="mb-2"
+                  placeholder="Your name"
+                  value={contactForm.name}
+                  onChange={(e) => handleContactFieldChange('name', e.target.value)}
+                  required
+                />
+                <Form.Control
+                  className="mb-2"
+                  type="email"
+                  placeholder="Your email"
+                  value={contactForm.email}
+                  onChange={(e) => handleContactFieldChange('email', e.target.value)}
+                  required
+                />
+                <Form.Control
+                  className="mb-2"
+                  type="tel"
+                  placeholder="Your phone number"
+                  value={contactForm.phone}
+                  onChange={(e) => handleContactFieldChange('phone', e.target.value)}
+                  required
+                />
+                <Button type="submit" variant="outline-primary" className="w-100">
+                  Submit for Human Support
+                </Button>
+              </Form>
+            )}
+
             <Form onSubmit={handleSend} className="d-flex gap-2">
               <Form.Control 
                 placeholder={isConnected ? "Type a message..." : "Disconnected..."} 
@@ -379,6 +657,23 @@ const Chatbot = () => {
           background: #f8f9fa;
           display: flex;
           flex-direction: column;
+        }
+
+        .quick-questions-sticky {
+          position: sticky;
+          top: -12px;
+          background: #f8f9fa;
+          z-index: 2;
+          padding-top: 2px;
+          padding-bottom: 10px;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .human-form {
+          border: 1px solid rgba(0, 31, 63, 0.12);
+          border-radius: 10px;
+          padding: 10px;
+          background: #f8f9fa;
         }
 
         .rounded-lg {
