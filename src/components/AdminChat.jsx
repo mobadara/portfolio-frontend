@@ -22,10 +22,15 @@ const AdminChat = ({ sessionId, onClose }) => {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [sessionInfo, setSessionInfo] = useState(null);
   
   const webSocketRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+  const pingTimerRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isMountedRef = useRef(false);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -36,9 +41,68 @@ const AdminChat = ({ sessionId, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
+  const clearReconnectTimer = () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  };
+
+  const clearPingTimer = () => {
+    if (pingTimerRef.current) {
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
+    }
+  };
+
+  const startPing = (ws) => {
+    clearPingTimer();
+    pingTimerRef.current = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
+        } catch {
+          // ignore ping failures, close/reconnect lifecycle handles this.
+        }
+      }
+    }, 25000);
+  };
+
+  const getCloseReasonText = (event) => {
+    if (!event) return 'unknown reason';
+    const reason = event.reason?.trim();
+    if (reason) return reason;
+
+    const knownReasons = {
+      1000: 'normal closure',
+      1001: 'endpoint going away',
+      1006: 'network interruption',
+      1008: 'policy violation (often auth/token)',
+      1011: 'server internal error',
+      1012: 'server restart'
+    };
+
+    return knownReasons[event.code] || `close code ${event.code || 'unknown'}`;
+  };
+
+  const scheduleReconnect = (wsConfig) => {
+    if (!isMountedRef.current) return;
+
+    setIsReconnecting(true);
+    clearReconnectTimer();
+    const attempts = reconnectAttemptsRef.current + 1;
+    reconnectAttemptsRef.current = attempts;
+    const delay = Math.min(1500 * attempts, 10000);
+
+    reconnectTimerRef.current = setTimeout(() => {
+      if (!isMountedRef.current) return;
+      connectWebSocket(wsConfig);
+    }, delay);
+  };
+
   // Fetch initial chat session data and establish WebSocket connection
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
 
     const initializeChat = async () => {
       try {
@@ -59,7 +123,7 @@ const AdminChat = ({ sessionId, onClose }) => {
 
         const data = await response.json();
 
-        if (data.status === 'ok' && isMounted) {
+        if (data.status === 'ok' && isMountedRef.current) {
           setSessionInfo(data);
           
           // Convert API messages format to display format
@@ -80,7 +144,7 @@ const AdminChat = ({ sessionId, onClose }) => {
         }
       } catch (err) {
         console.error('Error fetching session data:', err);
-        if (isMounted) {
+        if (isMountedRef.current) {
           setError(err.message || 'Failed to load chat session');
           setIsLoading(false);
         }
@@ -90,7 +154,9 @@ const AdminChat = ({ sessionId, onClose }) => {
     initializeChat();
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
+      clearReconnectTimer();
+      clearPingTimer();
       // Cleanup on unmount
       if (webSocketRef.current) {
         webSocketRef.current.close();
@@ -116,8 +182,14 @@ const AdminChat = ({ sessionId, onClose }) => {
 
       ws.onopen = () => {
         console.log('WebSocket connected for admin');
+        reconnectAttemptsRef.current = 0;
+        setIsReconnecting(false);
+        clearReconnectTimer();
+        clearPingTimer();
         setIsConnected(true);
+        setError(null);
         setIsLoading(false);
+        startPing(ws);
       };
 
       ws.onmessage = (event) => {
@@ -153,18 +225,26 @@ const AdminChat = ({ sessionId, onClose }) => {
 
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        setError('Connection error occurred');
+        setError('Connection error occurred. Attempting to recover...');
         setIsConnected(false);
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        clearPingTimer();
+        const reasonText = getCloseReasonText(event);
+        console.log('WebSocket disconnected:', reasonText);
         setIsConnected(false);
+        setIsSending(false);
+        if (!isMountedRef.current) return;
+
+        setError(`Chat disconnected (${reasonText}). Reconnecting...`);
+        scheduleReconnect(wsConfig);
       };
 
       webSocketRef.current = ws;
     } catch (err) {
       console.error('Failed to establish WebSocket connection:', err);
+      setIsReconnecting(false);
       setError('Failed to connect to chat service');
       setIsLoading(false);
     }
@@ -233,9 +313,12 @@ const AdminChat = ({ sessionId, onClose }) => {
             </div>
             <div>
               <h6 className="mb-0 fw-semibold">Live Support</h6>
-              <small className="my-connection-text">
-                {isConnected ? 'online' : 'disconnected'}
-              </small>
+              <div className="d-flex align-items-center gap-2">
+                <small className="my-connection-text">
+                  {isConnected ? 'online' : isReconnecting ? 'reconnecting...' : 'disconnected'}
+                </small>
+                {isReconnecting && <span className="badge bg-warning text-dark">Reconnecting</span>}
+              </div>
             </div>
           </div>
           <button 

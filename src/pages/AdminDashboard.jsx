@@ -48,7 +48,21 @@ const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
 const emptyForms = {
   user: { username: '', email: '', role: 'assistant', password: '' },
   message: { name: '', email: '', subject: '', message: '', status: 'new' },
-  project: { title: '', description: '', techStack: '', githubUrl: '', liveUrl: '', featured: false },
+  project: { 
+    title: '', 
+    description: '', 
+    fullDescription: '',
+    category: 'General',
+    techStack: '', 
+    image: '',
+    githubUrl: '', 
+    liveUrl: '',
+    youtubeUrl: '',
+    paperUrl: '',
+    order: 0,
+    featured: false,
+    metrics: ''
+  },
   password: { current_password: '', new_password: '', confirm_password: '' }
 };
 
@@ -192,11 +206,37 @@ function AdminDashboard() {
   const openEditModal = (type, item) => {
     setModalType(type);
     setEditingItem(item);
-    setFormData({
-      ...emptyForms[type],
-      ...item,
-      techStack: Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || ''
-    });
+
+    if (type === 'project') {
+      const links = item.links || {};
+      let metricsStr = '';
+      if (item.metrics && Object.keys(item.metrics).length > 0) {
+        try {
+          metricsStr = JSON.stringify(item.metrics);
+        } catch {
+          metricsStr = '';
+        }
+      }
+
+      setFormData({
+        ...emptyForms.project,
+        ...item,
+        techStack: Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || '',
+        githubUrl: item.githubUrl || links.github || '',
+        liveUrl: item.liveUrl || links.demo || '',
+        youtubeUrl: links.youtube || '',
+        paperUrl: links.paper || '',
+        order: item.order || 0,
+        metrics: metricsStr
+      });
+    } else {
+      setFormData({
+        ...emptyForms[type],
+        ...item,
+        techStack: Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || ''
+      });
+    }
+
     setShowModal(true);
   };
 
@@ -265,12 +305,37 @@ function AdminDashboard() {
     }
 
     if (modalType === 'project') {
+      const links = {};
+      if (payload.githubUrl) links.github = payload.githubUrl;
+      if (payload.liveUrl) links.demo = payload.liveUrl;
+      if (payload.youtubeUrl) links.youtube = payload.youtubeUrl;
+      if (payload.paperUrl) links.paper = payload.paperUrl;
+
+      let metrics = {};
+      if (payload.metrics) {
+        try {
+          metrics = JSON.parse(payload.metrics);
+        } catch {
+          metrics = {};
+        }
+      }
+
       payload = {
-        ...payload,
+        title: payload.title,
+        description: payload.description,
+        fullDescription: payload.fullDescription,
+        category: payload.category || 'General',
         techStack: String(payload.techStack || '')
           .split(',')
           .map((item) => item.trim())
-          .filter(Boolean)
+          .filter(Boolean),
+        image: payload.image,
+        links: links,
+        githubUrl: payload.githubUrl,
+        liveUrl: payload.liveUrl,
+        metrics: metrics,
+        order: parseInt(payload.order, 10) || 0,
+        featured: Boolean(payload.featured)
       };
       endpoint = isEdit ? `${PROJECTS_ENDPOINT}/${itemId}` : PROJECTS_ENDPOINT;
     } else if (modalType === 'user') {
@@ -713,22 +778,62 @@ const EditorModal = ({ show, type, formData, isSaving, isEdit, onChange, onHide,
               <Form.Label>Title</Form.Label>
               <Form.Control name="title" value={formData.title || ''} onChange={onChange} required />
             </Form.Group>
+
             <Form.Group className="mb-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control as="textarea" rows={3} name="description" value={formData.description || ''} onChange={onChange} required />
+              <Form.Label>Category</Form.Label>
+              <Form.Control name="category" value={formData.category || 'General'} onChange={onChange} />
             </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Short Description</Form.Label>
+              <Form.Control as="textarea" rows={2} name="description" value={formData.description || ''} onChange={onChange} required />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Full Description</Form.Label>
+              <Form.Control as="textarea" rows={3} name="fullDescription" value={formData.fullDescription || ''} onChange={onChange} />
+            </Form.Group>
+
             <Form.Group className="mb-3">
               <Form.Label>Tech Stack (comma separated)</Form.Label>
-              <Form.Control name="techStack" value={formData.techStack || ''} onChange={onChange} />
+              <Form.Control name="techStack" value={formData.techStack || ''} onChange={onChange} placeholder="e.g., React, Node.js, MongoDB" />
             </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Image URL</Form.Label>
+              <Form.Control name="image" value={formData.image || ''} onChange={onChange} placeholder="https://..." />
+            </Form.Group>
+
             <Form.Group className="mb-3">
               <Form.Label>GitHub URL</Form.Label>
-              <Form.Control name="githubUrl" value={formData.githubUrl || ''} onChange={onChange} />
+              <Form.Control name="githubUrl" value={formData.githubUrl || ''} onChange={onChange} placeholder="https://github.com/..." />
             </Form.Group>
+
             <Form.Group className="mb-3">
-              <Form.Label>Live URL</Form.Label>
-              <Form.Control name="liveUrl" value={formData.liveUrl || ''} onChange={onChange} />
+              <Form.Label>Live Demo URL</Form.Label>
+              <Form.Control name="liveUrl" value={formData.liveUrl || ''} onChange={onChange} placeholder="https://..." />
             </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>YouTube URL</Form.Label>
+              <Form.Control name="youtubeUrl" value={formData.youtubeUrl || ''} onChange={onChange} placeholder="https://youtube.com/..." />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Paper/Documentation URL</Form.Label>
+              <Form.Control name="paperUrl" value={formData.paperUrl || ''} onChange={onChange} placeholder="https://..." />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Display Order</Form.Label>
+              <Form.Control type="number" name="order" value={formData.order || 0} onChange={onChange} />
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label>Metrics (JSON, optional)</Form.Label>
+              <Form.Control as="textarea" rows={2} name="metrics" value={formData.metrics || ''} onChange={onChange} placeholder='{"accuracy": 94, "users": 1000}' />
+            </Form.Group>
+
             <Form.Check label="Featured Project" name="featured" checked={Boolean(formData.featured)} onChange={onChange} />
           </>
         )}

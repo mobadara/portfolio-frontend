@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
@@ -8,18 +8,42 @@ import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
+const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
+const CONTACT_CREATE_ENDPOINT = (import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact');
+
+const COUNTRY_CODES = [
+  { code: '+1', label: '🇺🇸 US/CA (+1)' },
+  { code: '+44', label: '🇬🇧 UK (+44)' },
+  { code: '+234', label: '🇳🇬 Nigeria (+234)' },
+  { code: '+91', label: '🇮🇳 India (+91)' },
+  { code: '+971', label: '🇦🇪 UAE (+971)' },
+  { code: '+49', label: '🇩🇪 Germany (+49)' },
+  { code: '+33', label: '🇫🇷 France (+33)' },
+  { code: '+27', label: '🇿🇦 South Africa (+27)' },
+  { code: '+61', label: '🇦🇺 Australia (+61)' },
+  { code: '+81', label: '🇯🇵 Japan (+81)' }
+];
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot' }
   ]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [showHumanForm, setShowHumanForm] = useState(false);
-  const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '' });
+  const [isLeadSubmitting, setIsLeadSubmitting] = useState(false);
+  const [leadSubmitStatus, setLeadSubmitStatus] = useState(null);
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    countryCode: '+234',
+    phone: ''
+  });
+  const [humanFormStep, setHumanFormStep] = useState(0);
+
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -29,10 +53,15 @@ const Chatbot = () => {
   const typingSoundIntervalRef = useRef(null);
 
   const suggestedQuestions = [
-    "What are your key skills?",
-    "Tell me about recent projects",
-    "How can I reach you?"
+    'What are your key skills?',
+    'Tell me about recent projects',
+    'How can I reach you?'
   ];
+
+  const selectedCountry = useMemo(
+    () => COUNTRY_CODES.find((item) => item.code === contactForm.countryCode) || COUNTRY_CODES[0],
+    [contactForm.countryCode]
+  );
 
   const getNextMessageId = () => {
     const nextId = messageIdRef.current;
@@ -125,8 +154,20 @@ const Chatbot = () => {
 
   const shouldEnableHumanMode = (text = '') => {
     const normalized = text.toLowerCase();
-    const triggers = ['human mode', 'human', 'agent', 'real person', 'representative', 'live support'];
-    return triggers.some(trigger => normalized.includes(trigger));
+    const triggers = [
+      'human mode',
+      'human',
+      'agent',
+      'real person',
+      'representative',
+      'live support',
+      'connect with muyiwa',
+      'talk to muyiwa',
+      'speak with muyiwa',
+      'connect me with muyiwa',
+      'contact muyiwa'
+    ];
+    return triggers.some((trigger) => normalized.includes(trigger));
   };
 
   const clearLoadingTimeout = () => {
@@ -140,41 +181,63 @@ const Chatbot = () => {
     clearLoadingTimeout();
     loadingTimeoutRef.current = setTimeout(() => {
       setIsLoading(false);
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
         {
           id: getNextMessageId(),
-          text: 'Response timed out. Please try again.',
+          text: 'Response timed out. The server may be slow or the connection was lost. Please try again or contact support.',
           sender: 'bot'
         }
       ]);
-    }, 20000);
+    }, 40000);
   };
 
-  // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const resetHumanSupportForm = () => {
+    setShowHumanForm(false);
+    setHumanFormStep(0);
+    setIsLeadSubmitting(false);
+    setContactForm({
+      name: '',
+      email: '',
+      countryCode: '+234',
+      phone: ''
+    });
   };
 
   useEffect(scrollToBottom, [messages, isOpen]);
+
+  useEffect(() => {
+    if (!leadSubmitStatus || leadSubmitStatus.type === 'pending') return undefined;
+
+    const timer = setTimeout(() => {
+      setLeadSubmitStatus(null);
+    }, 7000);
+
+    return () => clearTimeout(timer);
+  }, [leadSubmitStatus]);
 
   const toggleChat = () => {
     setIsOpen((prev) => {
       const nextOpen = !prev;
       if (nextOpen) {
+        setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
       } else {
+        setLeadSubmitStatus(null);
         setIsConnecting(false);
         setIsLoading(false);
         clearLoadingTimeout();
-        setShowHumanForm(false);
+        resetHumanSupportForm();
       }
       return nextOpen;
     });
   };
 
-  // Initialize WebSocket connection only when chat is opened
   useEffect(() => {
     if (isLoading) {
       if (typingSoundIntervalRef.current) {
@@ -185,11 +248,9 @@ const Chatbot = () => {
       typingSoundIntervalRef.current = setInterval(() => {
         playTypingPulse();
       }, 900);
-    } else {
-      if (typingSoundIntervalRef.current) {
-        clearInterval(typingSoundIntervalRef.current);
-        typingSoundIntervalRef.current = null;
-      }
+    } else if (typingSoundIntervalRef.current) {
+      clearInterval(typingSoundIntervalRef.current);
+      typingSoundIntervalRef.current = null;
     }
 
     return () => {
@@ -207,10 +268,6 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
       clearLoadingTimeout();
-      if (typingSoundIntervalRef.current) {
-        clearInterval(typingSoundIntervalRef.current);
-        typingSoundIntervalRef.current = null;
-      }
       return undefined;
     }
 
@@ -227,7 +284,6 @@ const Chatbot = () => {
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-          console.log('WebSocket connected');
           if (isMounted) {
             setIsConnected(true);
             setIsConnecting(false);
@@ -235,57 +291,42 @@ const Chatbot = () => {
         };
 
         ws.onmessage = (event) => {
-          if (isMounted) {
-            try {
-              const data = JSON.parse(event.data);
-              const botMsg = {
-                id: getNextMessageId(),
-                text: data.content || data.message || event.data,
-                sender: data.role === 'admin' ? 'admin' : 'bot'
-              };
-              setMessages(prev => [...prev, botMsg]);
-              setIsLoading(false);
-              clearLoadingTimeout();
-              playChatSound('receive');
-            } catch {
-              const botMsg = {
-                id: getNextMessageId(),
-                text: event.data,
-                sender: 'bot'
-              };
-              setMessages(prev => [...prev, botMsg]);
-              setIsLoading(false);
-              clearLoadingTimeout();
-              playChatSound('receive');
-            }
+          if (!isMounted) return;
+
+          try {
+            const data = JSON.parse(event.data);
+            const content = data.content || data.message || event.data;
+            const sender = data.role === 'admin' ? 'admin' : 'bot';
+            setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender }]);
+          } catch {
+            setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot' }]);
           }
+
+          setIsLoading(false);
+          clearLoadingTimeout();
+          playChatSound('receive');
         };
 
-        ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          if (isMounted) {
-            setIsConnected(false);
-            setIsConnecting(false);
-            setIsLoading(false);
-            clearLoadingTimeout();
-            playChatSound('error');
-          }
+        ws.onerror = () => {
+          if (!isMounted) return;
+          setIsConnected(false);
+          setIsConnecting(false);
+          setIsLoading(false);
+          clearLoadingTimeout();
+          playChatSound('error');
         };
 
         ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          if (isMounted) {
-            setIsConnected(false);
-            setIsConnecting(false);
-            setIsLoading(false);
-            clearLoadingTimeout();
-          }
+          if (!isMounted) return;
+          setIsConnected(false);
+          setIsConnecting(false);
+          setIsLoading(false);
+          clearLoadingTimeout();
           webSocketRef.current = null;
         };
 
         webSocketRef.current = ws;
-      } catch (error) {
-        console.error('Failed to establish WebSocket connection:', error);
+      } catch {
         if (isMounted) {
           setIsConnected(false);
           setIsConnecting(false);
@@ -298,10 +339,6 @@ const Chatbot = () => {
     return () => {
       isMounted = false;
       clearLoadingTimeout();
-      if (typingSoundIntervalRef.current) {
-        clearInterval(typingSoundIntervalRef.current);
-        typingSoundIntervalRef.current = null;
-      }
       if (webSocketRef.current) {
         webSocketRef.current.close();
         webSocketRef.current = null;
@@ -309,31 +346,114 @@ const Chatbot = () => {
     };
   }, [isOpen]);
 
+  const sendSocketMessage = (payload) => {
+    if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) return false;
+
+    try {
+      if (typeof payload === 'string') {
+        webSocketRef.current.send(payload);
+      } else {
+        webSocketRef.current.send(JSON.stringify(payload));
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
+    const sessionId = sessionIdRef.current;
+    const parserFriendlyMessage = `Name: ${name} | Email: ${email} | Phone: ${fullPhone}`;
+    const transferPayload = {
+      name,
+      user_name: name,
+      requester_name: name,
+      email,
+      user_email: email,
+      phone: fullPhone,
+      phone_number: fullPhone,
+      contact_phone: fullPhone,
+      phone_e164: fullPhone,
+      country_code: countryCode,
+      phone_local: localPhone,
+      message: parserFriendlyMessage,
+      details: detailsMessage,
+      notes: detailsMessage,
+      subject: 'Transfer Request',
+      type: 'request_human',
+      source: 'portfolio-frontend',
+      timestamp: new Date().toISOString()
+    };
+
+    if (sessionId) {
+      try {
+        const response = await fetch(CHAT_REQUEST_HUMAN_ENDPOINT(sessionId), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(transferPayload)
+        });
+
+        if (response.ok) {
+          return true;
+        }
+      } catch {
+        // fallback below
+      }
+    }
+
+    try {
+      const response = await fetch(`${CHAT_API_BASE}${CONTACT_CREATE_ENDPOINT}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          subject: 'Transfer Request',
+          message: `${parserFriendlyMessage}\n\n${detailsMessage}`
+        })
+      });
+
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   const handleSend = (e) => {
     e.preventDefault();
-    if (!input.trim() || !isConnected) return;
+    if (!input.trim()) return;
 
     const messageText = input.trim();
-
-    const userMsg = { id: getNextMessageId(), text: messageText, sender: 'user' };
-    setMessages(prev => [...prev, userMsg]);
-    setInput("");
+    setMessages((prev) => [...prev, { id: getNextMessageId(), text: messageText, sender: 'user' }]);
+    setInput('');
     playChatSound('send');
 
     if (shouldEnableHumanMode(messageText) && !showHumanForm) {
       setShowHumanForm(true);
-      setMessages(prev => [
+      setHumanFormStep(0);
+      setLeadSubmitStatus(null);
+      setMessages((prev) => [
         ...prev,
         {
           id: getNextMessageId(),
-          text: 'Sure — I can connect you to human support. Please share your name, email, and phone number using the form below.',
+          text: 'Sure — I can connect you to human support. Please enter your details step by step below.',
           sender: 'bot'
         }
       ]);
+
+      if (!isConnected) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: getNextMessageId(),
+            text: 'Live chat is currently offline, but you can still submit this form and Muyiwa will be notified directly.',
+            sender: 'bot'
+          }
+        ]);
+      }
     }
 
-    if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-      webSocketRef.current.send(messageText);
+    if (isConnected && sendSocketMessage(messageText)) {
       setIsLoading(true);
       startLoadingTimeout();
     }
@@ -342,76 +462,241 @@ const Chatbot = () => {
   const handleSuggestedQuestion = (question) => {
     if (!isConnected) return;
 
-    const userMsg = { id: getNextMessageId(), text: question, sender: 'user' };
-    setMessages(prev => [...prev, userMsg]);
+    setMessages((prev) => [...prev, { id: getNextMessageId(), text: question, sender: 'user' }]);
     playChatSound('send');
 
-    if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-      webSocketRef.current.send(question);
+    if (sendSocketMessage(question)) {
       setIsLoading(true);
       startLoadingTimeout();
     }
   };
 
   const handleContactFieldChange = (field, value) => {
-    setContactForm(prev => ({ ...prev, [field]: value }));
+    setContactForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleHumanFormSubmit = (e) => {
+  const handleHumanFormSubmit = async (e) => {
     e.preventDefault();
-    const trimmedName = contactForm.name.trim();
-    const trimmedEmail = contactForm.email.trim();
-    const trimmedPhone = contactForm.phone.trim();
 
-    if (!trimmedName || !trimmedEmail || !trimmedPhone) {
+    if (humanFormStep === 0) {
+      const trimmedName = contactForm.name.trim();
+      if (!trimmedName) return;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: getNextMessageId(), text: trimmedName, sender: 'user' },
+        {
+          id: getNextMessageId(),
+          text: "Got it! Now, what's your email address? (e.g., john@example.com)",
+          sender: 'bot'
+        }
+      ]);
+      playChatSound('send');
+      setHumanFormStep(1);
       return;
     }
 
-    const detailsMessage = `Human support details:\n- Name: ${trimmedName}\n- Email: ${trimmedEmail}\n- Phone: ${trimmedPhone}`;
-    const humanSupportPayload = {
-      type: 'HUMAN_SUPPORT_REQUEST',
-      version: 2,
-      schema: 'human_support_lead',
-      name: trimmedName,
-      email: trimmedEmail,
-      phone: trimmedPhone,
-      message: detailsMessage,
-      source: 'portfolio-frontend',
-      timestamp: new Date().toISOString()
-    };
-    const legacyPayload = `HUMAN_SUPPORT_REQUEST\n${detailsMessage}`;
-    setMessages(prev => [
-      ...prev,
-      { id: getNextMessageId(), text: detailsMessage, sender: 'user' },
-      {
-        id: getNextMessageId(),
-        text: 'Thanks! Your details have been captured. A human support contact will follow up shortly.',
-        sender: 'bot'
+    if (humanFormStep === 1) {
+      const trimmedEmail = contactForm.email.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: getNextMessageId(),
+            text: 'Please enter a valid email address (e.g., john@example.com)',
+            sender: 'bot'
+          }
+        ]);
+        return;
       }
-    ]);
-    playChatSound('send');
 
-    if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-      try {
-        webSocketRef.current.send(JSON.stringify(humanSupportPayload));
-      } catch {
-        webSocketRef.current.send(legacyPayload);
-      }
+      setMessages((prev) => [
+        ...prev,
+        { id: getNextMessageId(), text: trimmedEmail, sender: 'user' },
+        {
+          id: getNextMessageId(),
+          text: "Perfect! Finally, choose your country code and enter your phone number.",
+          sender: 'bot'
+        }
+      ]);
+      playChatSound('send');
+      setHumanFormStep(2);
+      return;
     }
 
-    setShowHumanForm(false);
-    setContactForm({ name: '', email: '', phone: '' });
+    if (humanFormStep === 2) {
+      const trimmedName = contactForm.name.trim();
+      const trimmedEmail = contactForm.email.trim();
+      const localPhone = contactForm.phone.replace(/[^\d]/g, '');
+      if (!localPhone) return;
+
+      const fullPhone = `${contactForm.countryCode}${localPhone}`;
+
+      const detailsMessage = `Human support details:\n- Name: ${trimmedName}\n- Email: ${trimmedEmail}\n- Phone: ${fullPhone}`;
+
+      const humanSupportPayload = {
+        type: 'HUMAN_SUPPORT_REQUEST',
+        version: 3,
+        schema: 'human_support_lead',
+        name: trimmedName,
+        email: trimmedEmail,
+        country_code: contactForm.countryCode,
+        phone_local: localPhone,
+        phone: fullPhone,
+        phone_e164: fullPhone,
+        message: detailsMessage,
+        source: 'portfolio-frontend',
+        timestamp: new Date().toISOString()
+      };
+
+      const legacyPayload = `HUMAN_SUPPORT_REQUEST\n${detailsMessage}`;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: getNextMessageId(), text: detailsMessage, sender: 'user' },
+        {
+          id: getNextMessageId(),
+          text: 'Perfect! Your details have been captured. A human support representative will reach out to you shortly. Thank you!',
+          sender: 'bot'
+        }
+      ]);
+      playChatSound('send');
+
+      setIsLeadSubmitting(true);
+      setLeadSubmitStatus({ type: 'pending', text: 'Sending details to support...' });
+
+      const leadSaved = await submitHumanSupportLead({
+        name: trimmedName,
+        email: trimmedEmail,
+        countryCode: contactForm.countryCode,
+        localPhone,
+        fullPhone,
+        detailsMessage
+      });
+
+      if (leadSaved) {
+        setLeadSubmitStatus({ type: 'success', text: 'Details sent successfully.' });
+      } else {
+        setLeadSubmitStatus({ type: 'error', text: 'Could not confirm delivery. Please try again.' });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: getNextMessageId(),
+            text: 'I could not confirm lead delivery to the support inbox. Please submit again or use the contact page.',
+            sender: 'bot'
+          }
+        ]);
+      }
+
+      setIsLeadSubmitting(false);
+
+      if (!sendSocketMessage(humanSupportPayload)) {
+        sendSocketMessage(legacyPayload);
+      }
+
+      resetHumanSupportForm();
+    }
+  };
+
+  const renderHumanFormStep = () => {
+    if (!showHumanForm) return null;
+
+    return (
+      <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3">
+        {leadSubmitStatus && (
+          <div
+            className={`alert py-2 px-2 mb-2 small ${
+              leadSubmitStatus.type === 'success'
+                ? 'alert-success'
+                : leadSubmitStatus.type === 'error'
+                  ? 'alert-danger'
+                  : 'alert-info'
+            }`}
+            role="status"
+          >
+            {leadSubmitStatus.text}
+          </div>
+        )}
+
+        {humanFormStep === 0 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 1 of 3</small>
+            <Form.Control
+              className="mb-2"
+              type="text"
+              placeholder="Enter your full name"
+              value={contactForm.name}
+              onChange={(e) => handleContactFieldChange('name', e.target.value)}
+              autoFocus
+            />
+            <Button type="submit" variant="primary" className="w-100" disabled={!contactForm.name.trim()}>
+              Continue
+            </Button>
+          </>
+        )}
+
+        {humanFormStep === 1 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 2 of 3</small>
+            <Form.Control
+              className="mb-2"
+              type="email"
+              placeholder="Enter your email (e.g., john@example.com)"
+              value={contactForm.email}
+              onChange={(e) => handleContactFieldChange('email', e.target.value)}
+              autoFocus
+            />
+            <Button type="submit" variant="primary" className="w-100" disabled={!contactForm.email.trim()}>
+              Next
+            </Button>
+          </>
+        )}
+
+        {humanFormStep === 2 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 3 of 3</small>
+            <div className="d-flex gap-2 mb-2">
+              <Form.Select
+                style={{ maxWidth: '48%' }}
+                value={contactForm.countryCode}
+                onChange={(e) => handleContactFieldChange('countryCode', e.target.value)}
+                aria-label="Select country code"
+              >
+                {COUNTRY_CODES.map((entry) => (
+                  <option key={entry.code} value={entry.code}>
+                    {entry.label}
+                  </option>
+                ))}
+              </Form.Select>
+              <Form.Control
+                type="tel"
+                placeholder="Phone number"
+                value={contactForm.phone}
+                onChange={(e) => handleContactFieldChange('phone', e.target.value)}
+                autoFocus
+              />
+            </div>
+            <small className="d-block mb-2 text-muted">
+              Selected: {selectedCountry.label}
+            </small>
+            <Button type="submit" variant="success" className="w-100" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
+              {isLeadSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </>
+        )}
+      </Form>
+    );
   };
 
   return (
     <>
-      {/* Floating Chat Button */}
-      <div className="chatbot-fab-wrapper">
-        <Button 
+      <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
+        <Button
           className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg"
           onClick={toggleChat}
           aria-label="Toggle Chat"
-          title={isOpen ? "Close chat" : "Open chat"}
+          title={isOpen ? 'Close chat' : 'Open chat'}
         >
           {isOpen ? <BiX size={26} /> : <BsChatFill size={22} />}
         </Button>
@@ -423,11 +708,8 @@ const Chatbot = () => {
         />
       </div>
 
-      {/* Chat Window */}
       <div className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}>
         <Card className="h-100 border-0 overflow-hidden d-flex flex-column">
-          
-          {/* Header */}
           <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3">
             <div className="d-flex align-items-center gap-2">
               <span
@@ -437,9 +719,7 @@ const Chatbot = () => {
               />
               <div>
                 <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
-                <small className={`lh-1 ${
-                  isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'
-                } opacity-90`}>
+                <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'} opacity-90`}>
                   {isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
                 </small>
               </div>
@@ -454,52 +734,52 @@ const Chatbot = () => {
             </button>
           </div>
 
-          {/* Messages */}
           <Card.Body className="chat-messages overflow-auto p-3 flex-grow-1">
             <div className="quick-questions-sticky mb-3">
               <small className="text-muted d-block mb-2">Quick questions:</small>
               <div className="d-flex flex-wrap gap-2">
-                {suggestedQuestions.map((q, i) => (
+                {suggestedQuestions.map((question, index) => (
                   <button
-                    key={i}
-                    onClick={() => handleSuggestedQuestion(q)}
+                    key={index}
+                    onClick={() => handleSuggestedQuestion(question)}
                     disabled={!isConnected}
                     className="btn btn-sm btn-outline-secondary text-start text-wrap"
                     style={{ fontSize: '0.8rem' }}
                   >
-                    {q}
+                    {question}
                   </button>
                 ))}
               </div>
             </div>
 
             {messages.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`d-flex mb-3 gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`}
-              >
-                <div 
-                  className={`py-2 px-3 rounded-lg ${
-                    msg.sender === 'user' 
-                      ? 'bg-navy text-white' 
-                      : 'bg-light text-dark'
-                  }`}
+              <div key={msg.id} className={`d-flex mb-3 gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`}>
+                <div
+                  className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
                   style={{ maxWidth: '80%', borderRadius: '12px' }}
                 >
                   {msg.sender !== 'user' ? (
-                    <ReactMarkdown 
+                    <ReactMarkdown
                       components={{
-                        p: ({children}) => <p className="mb-2">{children}</p>,
-                        code: ({inline, children}) => 
-                          inline ? 
-                            <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code> :
-                            <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2"><code>{children}</code></pre>,
-                        ul: ({children}) => <ul className="ps-4 mb-2">{children}</ul>,
-                        ol: ({children}) => <ol className="ps-4 mb-2">{children}</ol>,
-                        li: ({children}) => <li className="mb-1">{children}</li>,
-                        a: ({href, children}) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">{children}</a>,
-                        strong: ({children}) => <strong>{children}</strong>,
-                        em: ({children}) => <em>{children}</em>
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        code: ({ inline, children }) =>
+                          inline ? (
+                            <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code>
+                          ) : (
+                            <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2">
+                              <code>{children}</code>
+                            </pre>
+                          ),
+                        ul: ({ children }) => <ul className="ps-4 mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="ps-4 mb-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        a: ({ href, children }) => (
+                          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">
+                            {children}
+                          </a>
+                        ),
+                        strong: ({ children }) => <strong>{children}</strong>,
+                        em: ({ children }) => <em>{children}</em>
                       }}
                     >
                       {msg.text}
@@ -510,7 +790,7 @@ const Chatbot = () => {
                 </div>
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="d-flex mb-3">
                 <div className="bg-light text-dark py-2 px-3 rounded-lg d-flex align-items-center gap-2">
@@ -519,46 +799,31 @@ const Chatbot = () => {
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </Card.Body>
 
-          {/* Input */}
           <div className="card-footer bg-white border-top p-2">
-            {showHumanForm && (
-              <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3">
-                <Form.Control
-                  className="mb-2"
-                  placeholder="Your name"
-                  value={contactForm.name}
-                  onChange={(e) => handleContactFieldChange('name', e.target.value)}
-                  required
-                />
-                <Form.Control
-                  className="mb-2"
-                  type="email"
-                  placeholder="Your email"
-                  value={contactForm.email}
-                  onChange={(e) => handleContactFieldChange('email', e.target.value)}
-                  required
-                />
-                <Form.Control
-                  className="mb-2"
-                  type="tel"
-                  placeholder="Your phone number"
-                  value={contactForm.phone}
-                  onChange={(e) => handleContactFieldChange('phone', e.target.value)}
-                  required
-                />
-                <Button type="submit" variant="outline-primary" className="w-100">
-                  Submit for Human Support
-                </Button>
-              </Form>
+            {renderHumanFormStep()}
+
+            {!showHumanForm && leadSubmitStatus && (
+              <div
+                className={`alert py-2 px-2 mb-2 small ${
+                  leadSubmitStatus.type === 'success'
+                    ? 'alert-success'
+                    : leadSubmitStatus.type === 'error'
+                      ? 'alert-danger'
+                      : 'alert-info'
+                }`}
+                role="status"
+              >
+                {leadSubmitStatus.text}
+              </div>
             )}
 
             <Form onSubmit={handleSend} className="d-flex gap-2">
-              <Form.Control 
-                placeholder={isConnected ? "Type a message..." : "Disconnected..."} 
+              <Form.Control
+                placeholder={isConnected ? 'Type a message...' : 'Disconnected...'}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -572,129 +837,13 @@ const Chatbot = () => {
                 style={{ fontSize: '0.9rem' }}
                 rows="1"
               />
-              <Button 
-                type="submit" 
-                variant="primary"
-                disabled={!isConnected || !input.trim()}
-                className="bg-navy border-0 px-3"
-              >
+              <Button type="submit" variant="primary" disabled={!isConnected || !input.trim()} className="bg-navy border-0 px-3">
                 <BiSend />
               </Button>
             </Form>
           </div>
-
         </Card>
       </div>
-
-      <style jsx>{`
-        .chatbot-fab {
-          position: fixed;
-          bottom: 30px;
-          right: 30px;
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
-          border: 0;
-          color: white;
-          z-index: 1040;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 4px 16px rgba(0, 31, 63, 0.3);
-        }
-
-        .chatbot-fab:hover {
-          transform: scale(1.1);
-          box-shadow: 0 8px 24px rgba(0, 31, 63, 0.4);
-        }
-
-        .chatbot-fab:active {
-          transform: scale(0.95);
-        }
-
-        .chatbot-window {
-          position: fixed;
-          bottom: 100px;
-          right: 30px;
-          width: 100%;
-          max-width: 400px;
-          height: 600px;
-          max-height: 80vh;
-          border-radius: 12px;
-          z-index: 1039;
-          opacity: 0;
-          pointer-events: none;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          transform: translateY(20px);
-        }
-
-        .chatbot-window.open {
-          opacity: 1;
-          pointer-events: auto;
-          transform: translateY(0);
-        }
-
-        .chatbot-window .card {
-          border-radius: 12px;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-        }
-
-        .chatbot-header {
-          background: linear-gradient(135deg, #001f3f 0%, #003366 100%);
-          color: white;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .chatbot-close-btn {
-          transition: transform 0.2s;
-          cursor: pointer;
-        }
-
-        .chatbot-close-btn:hover {
-          transform: rotate(90deg);
-        }
-
-        .chat-messages {
-          background: #f8f9fa;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .quick-questions-sticky {
-          position: sticky;
-          top: -12px;
-          background: #f8f9fa;
-          z-index: 2;
-          padding-top: 2px;
-          padding-bottom: 10px;
-          border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-        }
-
-        .human-form {
-          border: 1px solid rgba(0, 31, 63, 0.12);
-          border-radius: 10px;
-          padding: 10px;
-          background: #f8f9fa;
-        }
-
-        .rounded-lg {
-          border-radius: 8px;
-        }
-
-        @media (max-width: 480px) {
-          .chatbot-window {
-            bottom: 20px;
-            right: 20px;
-            left: 20px;
-            max-width: unset;
-            height: 500px;
-          }
-
-          .chatbot-fab {
-            bottom: 20px;
-            right: 20px;
-          }
-        }
-      `}</style>
     </>
   );
 };

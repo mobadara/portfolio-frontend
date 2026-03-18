@@ -17,7 +17,7 @@ import LoadingAnimation from './components/LoadingAnimation';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import NotFoundPage from './pages/NotFoundPage';
-import projects from './data/projects';
+import projectsLocalData from './data/projects';
 import './App.css';
 
 const SECTION_PATHS = {
@@ -39,7 +39,33 @@ const SECTION_PATHS = {
 function App() {
   const [theme, setTheme] = useState('light');
   const [isLoading, setIsLoading] = useState(true);
+  const [projects, setProjects] = useState(projectsLocalData);
   const location = useLocation();
+
+  /**
+   * Fetch projects from backend API
+   * Falls back to local data if API is unavailable
+   */
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const apiBase = import.meta.env.VITE_ADMIN_API_BASE || '/api';
+        const response = await fetch(`${apiBase}/projects`);
+        if (response.ok) {
+          const data = await response.json();
+          const projectList = Array.isArray(data) ? data : data.projects || [];
+          if (projectList.length > 0) {
+            setProjects(projectList);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch projects from backend, using local data:', error);
+        // Keep using local data as fallback
+      }
+    };
+
+    fetchProjects();
+  }, []);
 
   /**
    * Sync theme state with document theme attribute
