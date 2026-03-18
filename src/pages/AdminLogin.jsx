@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
@@ -8,13 +8,13 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Alert from 'react-bootstrap/Alert';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiShield, BiUser, BiLockAlt, BiShow, BiHide } from 'react-icons/bi';
+import { BiShield, BiUser, BiLockAlt, BiShow, BiHide, BiMoon, BiSun } from 'react-icons/bi';
+import { ADMIN_ROUTES, buildAdminUrl, saveAdminAuth } from '../utils/adminApi';
 import './AdminLogin.css';
-
-const ADMIN_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const [theme, setTheme] = useState(() => localStorage.getItem('adminTheme') || 'dark');
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -22,6 +22,11 @@ const AdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('adminTheme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
+  }, [theme]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -39,25 +44,49 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${ADMIN_API_BASE}/admin/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const possibleRoutes = [
+        ADMIN_ROUTES.login,
+        '/admin/auth/login'
+      ];
 
-      const data = await response.json();
+      let loginError = 'Invalid credentials. Please try again.';
+      let loginSuccessful = false;
 
-      if (response.ok) {
-        // Store auth token
-        localStorage.setItem('adminToken', data.token);
-        localStorage.setItem('adminUser', JSON.stringify(data.user));
-        
-        // Navigate to dashboard
+      for (const route of possibleRoutes) {
+        const response = await fetch(buildAdminUrl(route), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (response.ok) {
+          saveAdminAuth({
+            token: data?.token || data?.access_token,
+            user: data?.user || data?.admin || { username: formData.username, role: 'admin' }
+          });
+          loginSuccessful = true;
+          break;
+        }
+
+        if (response.status !== 404) {
+          loginError = data?.message || loginError;
+          break;
+        }
+      }
+
+      if (loginSuccessful) {
         navigate('/admin/dashboard');
       } else {
-        setError(data.message || 'Invalid credentials. Please try again.');
+        setError(loginError);
       }
     } catch (err) {
       console.error('Login error:', err);
@@ -69,30 +98,36 @@ const AdminLogin = () => {
 
   return (
     <div className="admin-login-page">
-      {/* Background Effects */}
-      <div className="admin-login-bg">
-        <div className="gradient-orb orb-1"></div>
-        <div className="gradient-orb orb-2"></div>
-        <div className="gradient-grid"></div>
-      </div>
+      <div className="admin-login-my-strip" />
+      <div className="admin-login-bg-pattern" />
 
       <Container className="admin-login-container">
+        <div className="admin-login-theme-toggle-wrap">
+          <Button
+            type="button"
+            variant="link"
+            className="admin-login-theme-toggle"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? <BiSun /> : <BiMoon />}
+            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </Button>
+        </div>
         <Row className="justify-content-center align-items-center min-vh-100">
           <Col xs={12} sm={10} md={8} lg={5} xl={4}>
             <Card className="admin-login-card shadow-lg border-0">
-              {/* Header */}
               <Card.Body className="p-4 p-md-5">
                 <div className="text-center mb-4">
                   <div className="admin-icon-wrapper mb-3">
-                  <BiShield className="admin-shield-icon" />
+                    <BiShield className="admin-shield-icon" />
                   </div>
-                  <h2 className="admin-title fw-bold mb-2">Admin Portal</h2>
-                  <p className="admin-subtitle text-muted">
-                    Secure access to your portfolio management
+                  <h2 className="admin-title fw-bold mb-2">My Admin</h2>
+                  <p className="admin-subtitle mb-0">
+                    Sign in to manage chats, users, and projects
                   </p>
                 </div>
 
-                {/* Error Alert */}
                 {error && (
                   <Alert variant="danger" dismissible onClose={() => setError('')} className="mb-4">
                     <div className="d-flex align-items-center gap-2">
@@ -102,9 +137,7 @@ const AdminLogin = () => {
                   </Alert>
                 )}
 
-                {/* Login Form */}
                 <Form onSubmit={handleSubmit}>
-                  {/* Username Field */}
                   <Form.Group className="mb-3" controlId="username">
                     <Form.Label className="fw-semibold">
                       <BiUser className="me-2" />
@@ -122,7 +155,6 @@ const AdminLogin = () => {
                     />
                   </Form.Group>
 
-                  {/* Password Field */}
                   <Form.Group className="mb-4" controlId="password">
                     <Form.Label className="fw-semibold">
                       <BiLockAlt className="me-2" />
@@ -152,7 +184,6 @@ const AdminLogin = () => {
                     </div>
                   </Form.Group>
 
-                  {/* Submit Button */}
                   <Button
                     type="submit"
                     variant="primary"
@@ -173,17 +204,15 @@ const AdminLogin = () => {
                   </Button>
                 </Form>
 
-                {/* Footer */}
                 <div className="text-center mt-4">
-                  <p className="small text-muted mb-0">
-                    <i className="bi bi-shield-lock-fill me-1"></i>
-                    Protected by secure authentication
+                  <p className="small admin-login-security-note mb-0">
+                    <i className="bi bi-shield-lock-fill me-1" />
+                    Secure backend authentication is enabled
                   </p>
                 </div>
               </Card.Body>
             </Card>
 
-            {/* Back to Home Link */}
             <div className="text-center mt-3">
               <Button
                 variant="link"

@@ -16,43 +16,47 @@ import {
   Table
 } from 'react-bootstrap';
 import {
+  BiChat,
   BiEnvelope,
   BiFolder,
   BiLogOut,
+  BiMoon,
   BiPlus,
   BiRefresh,
   BiSearch,
   BiShield,
+  BiSun,
   BiTrash,
   BiUser,
   BiUserCheck
 } from 'react-icons/bi';
+import {
+  ADMIN_ROUTES,
+  buildAdminUrl,
+  clearAdminAuth,
+  getStoredAdminToken,
+  getStoredAdminUser,
+  withAuthHeaders
+} from '../utils/adminApi';
 import './AdminDashboard.css';
 
-const ADMIN_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
-const USERS_ENDPOINT = import.meta?.env?.VITE_ADMIN_USERS_ENDPOINT || '/admin/users';
-const MESSAGES_ENDPOINT = import.meta?.env?.VITE_ADMIN_MESSAGES_ENDPOINT || '/admin/contact-messages';
-const MESSAGES_CREATE_PUBLIC_ENDPOINT = import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact';
-const PROJECTS_ENDPOINT = import.meta?.env?.VITE_ADMIN_PROJECTS_ENDPOINT || '/admin/projects';
+const USERS_ENDPOINT = ADMIN_ROUTES.users;
+const MESSAGES_ENDPOINT = ADMIN_ROUTES.messages;
+const MESSAGES_CREATE_PUBLIC_ENDPOINT = ADMIN_ROUTES.contactCreate;
+const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
 
 const emptyForms = {
   user: { username: '', email: '', role: 'assistant', password: '' },
   message: { name: '', email: '', subject: '', message: '', status: 'new' },
-  project: { title: '', description: '', techStack: '', githubUrl: '', liveUrl: '', featured: false }
-};
-
-const getAuthUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem('adminUser') || '{}');
-  } catch {
-    return {};
-  }
+  project: { title: '', description: '', techStack: '', githubUrl: '', liveUrl: '', featured: false },
+  password: { current_password: '', new_password: '', confirm_password: '' }
 };
 
 function AdminDashboard() {
   const navigate = useNavigate();
-  const token = localStorage.getItem('adminToken');
-  const authUser = getAuthUser();
+  const token = getStoredAdminToken();
+  const authUser = getStoredAdminUser();
+  const [theme, setTheme] = useState(() => localStorage.getItem('adminTheme') || 'dark');
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,6 +81,11 @@ function AdminDashboard() {
   const canManageUsersAndProjects = ['owner', 'admin', 'superadmin'].includes(currentRole);
 
   useEffect(() => {
+    localStorage.setItem('adminTheme', theme);
+    document.documentElement.setAttribute('data-bs-theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
     if (!token) {
       navigate('/admin');
       return;
@@ -85,12 +94,11 @@ function AdminDashboard() {
   }, [navigate, token]);
 
   const requestWithAuth = useCallback(async (endpoint, options = {}) => {
-    const response = await fetch(`${ADMIN_API_BASE}${endpoint}`, {
+    const response = await fetch(buildAdminUrl(endpoint), {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        ...(options.headers || {})
+        ...withAuthHeaders(token),
+        ...options.headers
       }
     });
 
@@ -174,6 +182,13 @@ function AdminDashboard() {
     setShowModal(true);
   };
 
+  const openPasswordModal = () => {
+    setModalType('password');
+    setEditingItem(null);
+    setFormData(emptyForms.password);
+    setShowModal(true);
+  };
+
   const openEditModal = (type, item) => {
     setModalType(type);
     setEditingItem(item);
@@ -202,7 +217,7 @@ function AdminDashboard() {
   const getItemId = (item) => item.id || item._id || item.userId || item.messageId || item.projectId;
 
   const createMessagePublic = async (payload) => {
-    const response = await fetch(`${ADMIN_API_BASE}${MESSAGES_CREATE_PUBLIC_ENDPOINT}`, {
+    const response = await fetch(buildAdminUrl(MESSAGES_CREATE_PUBLIC_ENDPOINT), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -229,6 +244,25 @@ function AdminDashboard() {
     let endpoint = '';
     let method = isEdit ? 'PUT' : 'POST';
     let payload = { ...formData };
+
+    if (modalType === 'password') {
+      if (!payload.current_password || !payload.new_password) {
+        setError('Please fill in current and new password.');
+        return;
+      }
+
+      if (payload.new_password !== payload.confirm_password) {
+        setError('New password and confirmation do not match.');
+        return;
+      }
+
+      endpoint = ADMIN_ROUTES.changePassword;
+      method = 'POST';
+      payload = {
+        current_password: payload.current_password,
+        new_password: payload.new_password
+      };
+    }
 
     if (modalType === 'project') {
       payload = {
@@ -262,9 +296,15 @@ function AdminDashboard() {
         });
       }
 
-      setSuccess(`${modalType[0].toUpperCase()}${modalType.slice(1)} ${isEdit ? 'updated' : 'created'} successfully.`);
+      if (modalType === 'password') {
+        setSuccess('Password updated successfully. Use your new password next login.');
+      } else {
+        setSuccess(`${modalType[0].toUpperCase()}${modalType.slice(1)} ${isEdit ? 'updated' : 'created'} successfully.`);
+      }
       closeModal();
-      await loadDashboardData();
+      if (modalType !== 'password') {
+        await loadDashboardData();
+      }
     } catch (err) {
       setError(err.message || 'Unable to save changes.');
     } finally {
@@ -296,8 +336,7 @@ function AdminDashboard() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    localStorage.removeItem('adminUser');
+    clearAdminAuth();
     navigate('/admin');
   };
 
@@ -311,21 +350,35 @@ function AdminDashboard() {
 
   return (
     <div className="admin-dashboard-page">
-      <Container fluid className="py-3 py-md-4 admin-dashboard-wrap">
+      <Container fluid className="py-2 py-md-3 admin-dashboard-wrap">
         <Card className="admin-dashboard-shell border-0 shadow-lg">
-          <Card.Body className="p-3 p-md-4">
-            <div className="d-flex flex-column flex-md-row gap-3 align-items-md-center justify-content-between mb-4">
+          <Card.Body className="p-3">
+            <div className="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
               <div>
-                <h3 className="mb-1 text-white fw-bold d-flex align-items-center gap-2">
+                <h3 className="mb-1 text-white fw-bold d-flex align-items-center gap-2 admin-dash-title">
                   <BiShield /> Admin Dashboard
                 </h3>
                 <p className="mb-0 text-white-50 small">
                   Signed in as <strong>{authUser?.username || 'admin'}</strong> • Role: <Badge bg="info">{currentRole}</Badge>
                 </p>
               </div>
-              <div className="d-flex flex-wrap gap-2">
+              <div className="d-flex flex-wrap gap-2 admin-dash-actions">
+                <Button variant="primary" size="sm" onClick={() => navigate('/admin/chat')}>
+                  <BiChat className="me-1" /> Open Chats
+                </Button>
+                <Button variant="outline-light" size="sm" onClick={openPasswordModal}>
+                  Change Password
+                </Button>
                 <Button variant="light" size="sm" onClick={loadDashboardData} disabled={isLoading}>
                   {isLoading ? <Spinner animation="border" size="sm" /> : <BiRefresh className="me-1" />} Refresh
+                </Button>
+                <Button
+                  variant="outline-light"
+                  size="sm"
+                  onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+                >
+                  {theme === 'dark' ? <BiSun className="me-1" /> : <BiMoon className="me-1" />}
+                  {theme === 'dark' ? 'Light' : 'Dark'}
                 </Button>
                 <Button variant="outline-light" size="sm" onClick={handleLogout}>
                   <BiLogOut className="me-1" /> Logout
@@ -333,10 +386,10 @@ function AdminDashboard() {
               </div>
             </div>
 
-            <Row className="g-3 mb-4">
+            <Row className="g-2 mb-3">
               <Col xs={12} sm={6} xl={4}>
                 <Card className="metric-card border-0 h-100">
-                  <Card.Body>
+                  <Card.Body className="py-3">
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
                         <small className="text-muted">Users</small>
@@ -349,7 +402,7 @@ function AdminDashboard() {
               </Col>
               <Col xs={12} sm={6} xl={4}>
                 <Card className="metric-card border-0 h-100">
-                  <Card.Body>
+                  <Card.Body className="py-3">
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
                         <small className="text-muted">Contact Messages</small>
@@ -362,7 +415,7 @@ function AdminDashboard() {
               </Col>
               <Col xs={12} sm={6} xl={4}>
                 <Card className="metric-card border-0 h-100">
-                  <Card.Body>
+                  <Card.Body className="py-3">
                     <div className="d-flex justify-content-between align-items-start">
                       <div>
                         <small className="text-muted">Projects</small>
@@ -379,7 +432,7 @@ function AdminDashboard() {
             {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
 
             <Card className="border-0 admin-panel-card">
-              <Card.Body className="p-3">
+              <Card.Body className="p-2 p-md-3">
                 <div className="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
                   <Form.Group className="admin-search-group">
                     <BiSearch className="admin-search-icon" />
@@ -586,10 +639,18 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
 const EditorModal = ({ show, type, formData, isSaving, isEdit, onChange, onHide, onSave }) => {
   if (!type) return null;
 
+  const modalTitle = type === 'password'
+    ? 'Change Password'
+    : `${isEdit ? 'Edit' : 'Create'} ${type}`;
+
+  const saveLabel = type === 'password'
+    ? 'Update Password'
+    : (isEdit ? 'Save Changes' : 'Create');
+
   return (
     <Modal centered show={show} onHide={onHide}>
       <Modal.Header closeButton>
-        <Modal.Title>{isEdit ? 'Edit' : 'Create'} {type}</Modal.Title>
+        <Modal.Title>{modalTitle}</Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {type === 'user' && (
@@ -671,11 +732,28 @@ const EditorModal = ({ show, type, formData, isSaving, isEdit, onChange, onHide,
             <Form.Check label="Featured Project" name="featured" checked={Boolean(formData.featured)} onChange={onChange} />
           </>
         )}
+
+        {type === 'password' && (
+          <>
+            <Form.Group className="mb-3">
+              <Form.Label>Current Password</Form.Label>
+              <Form.Control type="password" name="current_password" value={formData.current_password || ''} onChange={onChange} required />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>New Password</Form.Label>
+              <Form.Control type="password" name="new_password" value={formData.new_password || ''} onChange={onChange} required />
+            </Form.Group>
+            <Form.Group>
+              <Form.Label>Confirm New Password</Form.Label>
+              <Form.Control type="password" name="confirm_password" value={formData.confirm_password || ''} onChange={onChange} required />
+            </Form.Group>
+          </>
+        )}
       </Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" onClick={onHide} disabled={isSaving}>Cancel</Button>
         <Button variant="primary" onClick={onSave} disabled={isSaving}>
-          {isSaving ? <Spinner size="sm" animation="border" /> : (isEdit ? 'Save Changes' : 'Create')}
+          {isSaving ? <Spinner size="sm" animation="border" /> : saveLabel}
         </Button>
       </Modal.Footer>
     </Modal>
