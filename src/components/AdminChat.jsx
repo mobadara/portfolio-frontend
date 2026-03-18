@@ -152,6 +152,11 @@ const AdminChat = ({ sessionId, onClose }) => {
         const data = await response.json();
 
         if (data.status === 'ok' && isMountedRef.current) {
+          console.log('📥 DEBUG: Session data received:', {
+            hasAdminWebsocket: !!data.admin_websocket,
+            adminWebsocket: data.admin_websocket,
+            messageCount: data.messages?.length || 0
+          });
           setSessionInfo(data);
           
           // Convert API messages format to display format
@@ -190,6 +195,7 @@ const AdminChat = ({ sessionId, onClose }) => {
           
           // Step 2: Connect to WebSocket after session data is loaded
           // Always attempt connection - the user might come back online
+          console.log('🔌 Initiating WebSocket connection with:', data.admin_websocket);
           connectWebSocket(data.admin_websocket || data.websocket || '');
         } else {
           throw new Error('Invalid response from server');
@@ -222,27 +228,40 @@ const AdminChat = ({ sessionId, onClose }) => {
 
   const connectWebSocket = (wsConfig) => {
     try {
+      console.log('🔍 DEBUG: connectWebSocket called with wsConfig:', wsConfig);
+      console.log('🔍 DEBUG: wsConfig type:', typeof wsConfig);
+      console.log('🔍 DEBUG: token exists:', !!token);
+      
       if (webSocketRef.current) {
         intentionalCloseRef.current = true;
         webSocketRef.current.close(1000, 'switching websocket connection');
       }
 
       const rawUrl = typeof wsConfig === 'string' ? wsConfig : wsConfig?.url;
+      console.log('🔍 DEBUG: rawUrl extracted:', rawUrl);
+      
       let wsUrl = toWebSocketUrl(rawUrl);
+      console.log('🔍 DEBUG: wsUrl after toWebSocketUrl:', wsUrl);
 
       if (token && wsUrl) {
         const separator = wsUrl.includes('?') ? '&' : '?';
         wsUrl += `${separator}token=${encodeURIComponent(token)}`;
+        console.log('🔍 DEBUG: wsUrl after token appended:', wsUrl);
+      } else {
+        console.log('🔍 DEBUG: NOT appending token - token:', !!token, 'wsUrl:', !!wsUrl);
       }
 
       if (!wsUrl) {
         throw new Error('Invalid websocket URL from backend');
       }
       
+      console.log('🔍 DEBUG: About to create WebSocket with URL:', wsUrl);
       const ws = new WebSocket(wsUrl);
+      console.log('🔍 DEBUG: WebSocket object created, readyState:', ws.readyState);
 
       ws.onopen = () => {
-        console.log('WebSocket connected for admin');
+        console.log('✅ WebSocket connected for admin');
+        console.log('✅ DEBUG: ws.readyState OPEN:', ws.readyState === WebSocket.OPEN);
         intentionalCloseRef.current = false;
         reconnectAttemptsRef.current = 0;
         setIsReconnecting(false);
@@ -319,7 +338,16 @@ const AdminChat = ({ sessionId, onClose }) => {
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('❌ WebSocket error:', error);
+        console.error('❌ DEBUG: ws.readyState:', ws.readyState);
+        console.error('❌ DEBUG: error object:', JSON.stringify({
+          type: error.type,
+          message: error.message,
+          target: {
+            readyState: error.target?.readyState,
+            url: error.target?.url
+          }
+        }));
         setError('Connection error occurred. Attempting to recover...');
         setIsConnected(false);
       };
@@ -327,7 +355,13 @@ const AdminChat = ({ sessionId, onClose }) => {
       ws.onclose = (event) => {
         clearPingTimer();
         const reasonText = getCloseReasonText(event);
-        console.log('WebSocket disconnected:', reasonText);
+        console.log('🔴 WebSocket disconnected:', {
+          code: event?.code,
+          reason: event?.reason,
+          reasonText,
+          wasClean: event?.wasClean
+        });
+        console.log('🔴 DEBUG: ws.readyState CLOSED:', event?.code === 1000);
         setIsConnected(false);
         setIsSending(false);
 
@@ -349,7 +383,11 @@ const AdminChat = ({ sessionId, onClose }) => {
 
       webSocketRef.current = ws;
     } catch (err) {
-      console.error('Failed to establish WebSocket connection:', err);
+      console.error('❌ Failed to establish WebSocket connection:', err);
+      console.error('❌ DEBUG: Error details:', {
+        message: err.message,
+        stack: err.stack
+      });
       setIsReconnecting(false);
       setError('Failed to connect to chat service');
       setIsLoading(false);
