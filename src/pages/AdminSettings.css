@@ -1,0 +1,140 @@
+.admin-settings {
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+  min-height: 100vh;
+  color: #f8f9fa;
+}
+
+.admin-title {
+  color: #fff;
+  font-weight: 700;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.settings-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.settings-card:hover {
+  border-color: rgba(0, 119, 182, 0.3);
+}
+
+.settings-card .card-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.25rem;
+}
+
+.settings-card .card-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.form-label {
+  color: #e6f1ff;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-select {
+  background-color: #112240;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+  background-color: #112240;
+  border-color: #0077be;
+  color: #f8f9fa;
+  box-shadow: 0 0 0 0.2rem rgba(0, 119, 182, 0.25);
+}
+
+.form-control::placeholder {
+  color: #8892b0;
+}
+
+.form-check-input {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.form-check-input:checked {
+  background-color: #0077be;
+  border-color: #0077be;
+}
+
+.form-check-input:focus {
+  border-color: #00d4ff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 119, 182, 0.25);
+}
+
+.form-check-label {
+  color: #e6f1ff;
+  margin-bottom: 0;
+}
+
+.form-switch .form-check-input {
+  width: 3em;
+  height: 1.5em;
+}
+
+small.text-muted {
+  color: #8892b0 !important;
+}
+
+.btn-primary {
+  background-color: #0077be;
+  border-color: #0077be;
+}
+
+.btn-primary:hover {
+  background-color: #005a99;
+  border-color: #005a99;
+}
+
+.btn-outline-primary {
+  border-color: #0077be;
+  color: #0077be;
+}
+
+.btn-outline-primary:hover {
+  background-color: #0077be;
+  border-color: #0077be;
+  color: #fff;
+}
+
+.btn-outline-secondary {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.btn-outline-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+}
+
+@media (max-width: 576px) {
+  .admin-title {
+    font-size: 1.5rem;
+  }
+
+  .d-flex.gap-2 {
+    flex-direction: column;
+  }
+
+  .d-flex.gap-2 .btn {
+    width: 100%;
+  }
+}

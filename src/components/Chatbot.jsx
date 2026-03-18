@@ -154,20 +154,37 @@ const Chatbot = () => {
 
   const shouldEnableHumanMode = (text = '') => {
     const normalized = text.toLowerCase();
-    const triggers = [
+    const normalizedCompact = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const directTriggers = [
       'human mode',
-      'human',
-      'agent',
-      'real person',
-      'representative',
+      'human support',
       'live support',
+      'live chat',
+      'real person',
+      'customer support',
+      'technical support',
+      'support agent',
+      'transfer me',
+      'escalate this',
       'connect with muyiwa',
+      'connect me with muyiwa',
       'talk to muyiwa',
       'speak with muyiwa',
-      'connect me with muyiwa',
-      'contact muyiwa'
+      'contact muyiwa',
+      'reach muyiwa',
+      'chat with muyiwa',
+      'message muyiwa'
     ];
-    return triggers.some((trigger) => normalized.includes(trigger));
+
+    if (directTriggers.some((trigger) => normalizedCompact.includes(trigger))) {
+      return true;
+    }
+
+    const hasConnectVerb = /(connect|talk|speak|chat|contact|reach|transfer|escalate|forward|handoff)/.test(normalizedCompact);
+    const hasHumanTarget = /(human|person|agent|representative|support|operator|muyiwa|owner|admin)/.test(normalizedCompact);
+
+    return hasConnectVerb && hasHumanTarget;
   };
 
   const clearLoadingTimeout = () => {
@@ -274,7 +291,10 @@ const Chatbot = () => {
     let isMounted = true;
 
     const initializeWebSocket = () => {
-      const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+      // Generate 16-digit unique session ID
+      const timestamp = Date.now().toString();
+      const randomPart = Math.random().toString().slice(2, 9);
+      const sessionId = (timestamp + randomPart).slice(0, 16).padEnd(16, '0');
       sessionIdRef.current = sessionId;
 
       const wsBase = CHAT_API_BASE.replace(/^http/, 'ws');
@@ -419,16 +439,8 @@ const Chatbot = () => {
     }
   };
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const messageText = input.trim();
-    setMessages((prev) => [...prev, { id: getNextMessageId(), text: messageText, sender: 'user' }]);
-    setInput('');
-    playChatSound('send');
-
-    if (shouldEnableHumanMode(messageText) && !showHumanForm) {
+  const openHumanSupportForm = () => {
+    if (!showHumanForm) {
       setShowHumanForm(true);
       setHumanFormStep(0);
       setLeadSubmitStatus(null);
@@ -451,6 +463,34 @@ const Chatbot = () => {
           }
         ]);
       }
+    }
+  };
+
+  const handleSend = (e) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    const messageText = input.trim();
+    setMessages((prev) => [...prev, { id: getNextMessageId(), text: messageText, sender: 'user' }]);
+    setInput('');
+    playChatSound('send');
+
+    const wantsHumanSupport = shouldEnableHumanMode(messageText);
+
+    if (wantsHumanSupport) {
+      openHumanSupportForm();
+    }
+
+    if (!isConnected && !wantsHumanSupport) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: getNextMessageId(),
+          text: 'Chat is currently offline. You can use the “Transfer to Muyiwa” button below to send your details directly.',
+          sender: 'bot'
+        }
+      ]);
+      return;
     }
 
     if (isConnected && sendSocketMessage(messageText)) {
@@ -749,6 +789,14 @@ const Chatbot = () => {
                     {question}
                   </button>
                 ))}
+                <button
+                  onClick={openHumanSupportForm}
+                  className="btn btn-sm btn-outline-primary text-start text-wrap"
+                  style={{ fontSize: '0.8rem' }}
+                  type="button"
+                >
+                  Transfer to Muyiwa
+                </button>
               </div>
             </div>
 
@@ -832,12 +880,12 @@ const Chatbot = () => {
                     handleSend(e);
                   }
                 }}
-                disabled={!isConnected}
+                disabled={false}
                 className="border rounded-lg bg-light"
                 style={{ fontSize: '0.9rem' }}
                 rows="1"
               />
-              <Button type="submit" variant="primary" disabled={!isConnected || !input.trim()} className="bg-navy border-0 px-3">
+              <Button type="submit" variant="primary" disabled={!input.trim()} className="bg-navy border-0 px-3">
                 <BiSend />
               </Button>
             </Form>

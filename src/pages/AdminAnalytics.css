@@ -1,0 +1,116 @@
+.admin-analytics {
+  background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+  min-height: 100vh;
+  color: #f8f9fa;
+}
+
+.admin-title {
+  color: #fff;
+  font-weight: 700;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.metric-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-4px);
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: #8892b0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.analytics-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.analytics-card .card-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.25rem;
+}
+
+.analytics-card .card-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.section-stat,
+.device-stat {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.section-stat:last-child,
+.device-stat:last-child {
+  border-bottom: none;
+}
+
+.section-stat span,
+.device-stat span {
+  color: #e6f1ff;
+}
+
+.progress {
+  background-color: rgba(255, 255, 255, 0.1);
+  height: 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, #0077be, #00d4ff);
+  border-radius: 0.25rem;
+}
+
+.chat-metric {
+  background: rgba(0, 119, 182, 0.1);
+  border: 1px solid rgba(0, 119, 182, 0.2);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.chat-metric-label {
+  color: #8892b0;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.chat-metric-value {
+  color: #0077be;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+@media (max-width: 576px) {
+  .admin-title {
+    font-size: 1.5rem;
+  }
+
+  .metric-value {
+    font-size: 1.5rem;
+  }
+}

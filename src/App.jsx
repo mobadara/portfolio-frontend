@@ -16,6 +16,10 @@ import AdminChatPage from './components/AdminChatPage';
 import LoadingAnimation from './components/LoadingAnimation';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminAnalytics from './pages/AdminAnalytics';
+import AdminContent from './pages/AdminContent';
+import AdminSettings from './pages/AdminSettings';
+import AdminMessages from './pages/AdminMessages';
 import NotFoundPage from './pages/NotFoundPage';
 import projectsLocalData from './data/projects';
 import './App.css';
@@ -146,6 +150,10 @@ function App() {
       <Route path="/contact" element={homeContent} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/admin/analytics" element={<AdminAnalytics />} />
+      <Route path="/admin/content" element={<AdminContent />} />
+      <Route path="/admin/settings" element={<AdminSettings />} />
+      <Route path="/admin/messages" element={<AdminMessages />} />
       <Route path="/admin/chat" element={<AdminChatPage />} />
       <Route path="/admin/chat/:sessionId" element={<AdminChatPage />} />
       <Route path="*" element={<NotFoundPage />} />

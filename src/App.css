@@ -20,6 +20,7 @@ html, body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100%;
+  overflow-y: auto;
 }
 
 #root {
@@ -510,8 +511,8 @@ section + section {
 /* 5. Mobile Responsiveness */
 @media (max-width: 576px) {
   .chatbot-window {
-    width: 100vw;
-    max-width: 100vw;
+    width: 100%;
+    max-width: 100%;
     height: 100dvh;
     max-height: 100dvh;
     right: 0;
