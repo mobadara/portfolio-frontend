@@ -481,7 +481,7 @@ function AdminDashboard() {
                   {isLoading ? <Spinner animation="border" size="sm" /> : <BiRefresh className="me-1" />} Refresh
                 </Button>
                 <Button
-                  variant="outline-light"
+                  variant={theme === 'dark' ? 'light' : 'dark'}
                   size="sm"
                   onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
                 >

@@ -31,11 +31,11 @@ const AdminChatPage = () => {
     document.documentElement.setAttribute('data-bs-theme', theme);
   }, [theme]);
 
-  // Fetch active sessions on component mount
+  // Fetch active sessions on component mount and set up polling
   useEffect(() => {
     fetchActiveSessions();
-    // Poll for new sessions every 3 seconds (faster for better UX)
-    const interval = setInterval(fetchActiveSessions, 3000);
+    // Poll for new sessions every 2 seconds (faster response)
+    const interval = setInterval(fetchActiveSessions, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -119,7 +119,8 @@ const AdminChatPage = () => {
   const handleCloseChat = () => {
     setActiveSession(null);
     navigate('/admin/chat');
-    fetchActiveSessions(); // Refresh sessions after closing
+    // Refresh sessions to show updated list
+    setTimeout(() => fetchActiveSessions(), 500);
   };
 
   const handleOpenSession = (sessionId) => {

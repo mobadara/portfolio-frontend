@@ -132,6 +132,11 @@ const AdminChat = ({ sessionId, onClose }) => {
         setIsReconnecting(false);
         reconnectAttemptsRef.current = 0;
         
+        // Verify token exists before attempting connection
+        if (!token) {
+          throw new Error('Authentication token not found. Please log in again.');
+        }
+        
         // Step 1: Fetch session data
         const response = await fetch(
           buildAdminUrl(`${ADMIN_ROUTES.chatSessions}/${sessionId}`),
@@ -184,6 +189,7 @@ const AdminChat = ({ sessionId, onClose }) => {
           setIsLoading(false);
           
           // Step 2: Connect to WebSocket after session data is loaded
+          // Always attempt connection - the user might come back online
           connectWebSocket(data.admin_websocket || data.websocket || '');
         } else {
           throw new Error('Invalid response from server');
@@ -212,7 +218,7 @@ const AdminChat = ({ sessionId, onClose }) => {
         webSocketRef.current.close();
       }
     };
-  }, [sessionId]);
+  }, [sessionId, token]);
 
   const connectWebSocket = (wsConfig) => {
     try {

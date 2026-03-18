@@ -1139,8 +1139,8 @@ const Chatbot = () => {
                   }
                 }}
                 disabled={false}
-                className="border rounded-lg bg-light"
-                style={{ fontSize: '0.9rem' }}
+                className="border rounded-lg bg-light chatbot-message-input"
+                style={{ fontSize: '0.9rem', color: '#333' }}
                 rows="1"
               />
               {isHumanMode && (
