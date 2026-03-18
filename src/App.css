@@ -235,6 +235,24 @@ section + section {
   border: 1px solid var(--navy-blue) !important;
 }
 
+.contact-form-control {
+  background-color: #f8f9fa !important;
+  color: #111827 !important;
+}
+
+.contact-form-control::placeholder {
+  color: #6b7280 !important;
+}
+
+[data-bs-theme="dark"] .contact-form-control {
+  background-color: #1f2937 !important;
+  color: #f8fafc !important;
+}
+
+[data-bs-theme="dark"] .contact-form-control::placeholder {
+  color: #9ca3af !important;
+}
+
 /* Specific hover color for Substack */
 .hover-warning:hover .si-substack {
     color: #FF6719 !important; /* Substack Orange */

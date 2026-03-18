@@ -4,7 +4,7 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Spinner from 'react-bootstrap/Spinner';
 import Alert from 'react-bootstrap/Alert';
-import { BiSend, BiX } from 'react-icons/bi';
+import { BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
 
 /**
@@ -24,6 +24,8 @@ const AdminChat = ({ sessionId, onClose }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [sessionInfo, setSessionInfo] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
   
   const webSocketRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -31,6 +33,23 @@ const AdminChat = ({ sessionId, onClose }) => {
   const pingTimerRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const isMountedRef = useRef(false);
+  const intentionalCloseRef = useRef(false);
+  const mediaRecorderRef = useRef(null);
+  const recordingChunksRef = useRef([]);
+
+  const getAudioStorageKey = (messageId) => `portfolio_admin_chat_audio_${sessionId}_${messageId}`;
+
+  const storeAudioForMessage = (messageId, audioData) => {
+    const key = getAudioStorageKey(messageId);
+    localStorage.setItem(key, audioData);
+    return key;
+  };
+
+  const resolveAudioSource = (msg) => {
+    if (msg?.audioData) return msg.audioData;
+    if (!msg?.audioStorageKey) return '';
+    return localStorage.getItem(msg.audioStorageKey) || '';
+  };
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -103,11 +122,15 @@ const AdminChat = ({ sessionId, onClose }) => {
   // Fetch initial chat session data and establish WebSocket connection
   useEffect(() => {
     isMountedRef.current = true;
+    intentionalCloseRef.current = false;
 
     const initializeChat = async () => {
       try {
         setIsLoading(true);
         setError(null);
+        setIsConnected(false);
+        setIsReconnecting(false);
+        reconnectAttemptsRef.current = 0;
         
         // Step 1: Fetch session data
         const response = await fetch(
@@ -127,15 +150,38 @@ const AdminChat = ({ sessionId, onClose }) => {
           setSessionInfo(data);
           
           // Convert API messages format to display format
-          const formattedMessages = data.messages.map((msg, index) => ({
-            id: index,
-            role: msg.role,
-            content: msg.content,
-            timestamp: msg.timestamp,
-            sender: msg.role === 'user' ? 'user' : 'admin'
-          }));
+          const formattedMessages = data.messages.map((msg, index) => {
+            try {
+              const parsed = JSON.parse(msg.content);
+              if (parsed?.type === 'audio' && parsed?.audio_base64) {
+                const messageId = `audio-${Date.now()}-${index}`;
+                const audioStorageKey = storeAudioForMessage(messageId, parsed.audio_base64);
+                return {
+                  id: messageId,
+                  role: msg.role,
+                  type: 'audio',
+                  mimeType: parsed.mime_type || 'audio/webm',
+                  audioStorageKey,
+                  timestamp: parsed.timestamp || msg.timestamp,
+                  sender: parsed.role === 'admin' ? 'admin' : 'user'
+                };
+              }
+            } catch {
+              // keep as text message
+            }
+
+            return {
+              id: index,
+              role: msg.role,
+              type: 'text',
+              content: msg.content,
+              timestamp: msg.timestamp,
+              sender: msg.role === 'user' ? 'user' : 'admin'
+            };
+          });
           
           setMessages(formattedMessages);
+          setIsLoading(false);
           
           // Step 2: Connect to WebSocket after session data is loaded
           connectWebSocket(data.admin_websocket || data.websocket || '');
@@ -155,8 +201,12 @@ const AdminChat = ({ sessionId, onClose }) => {
 
     return () => {
       isMountedRef.current = false;
+      intentionalCloseRef.current = true;
       clearReconnectTimer();
       clearPingTimer();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
       // Cleanup on unmount
       if (webSocketRef.current) {
         webSocketRef.current.close();
@@ -166,6 +216,11 @@ const AdminChat = ({ sessionId, onClose }) => {
 
   const connectWebSocket = (wsConfig) => {
     try {
+      if (webSocketRef.current) {
+        intentionalCloseRef.current = true;
+        webSocketRef.current.close(1000, 'switching websocket connection');
+      }
+
       const rawUrl = typeof wsConfig === 'string' ? wsConfig : wsConfig?.url;
       let wsUrl = toWebSocketUrl(rawUrl);
 
@@ -182,6 +237,7 @@ const AdminChat = ({ sessionId, onClose }) => {
 
       ws.onopen = () => {
         console.log('WebSocket connected for admin');
+        intentionalCloseRef.current = false;
         reconnectAttemptsRef.current = 0;
         setIsReconnecting(false);
         clearReconnectTimer();
@@ -195,11 +251,43 @@ const AdminChat = ({ sessionId, onClose }) => {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (data.type === 'audio' && data.audio_base64) {
+            const messageId = `audio-${Date.now()}`;
+            const audioStorageKey = storeAudioForMessage(messageId, data.audio_base64);
+            setMessages(prev => [
+              ...prev,
+              {
+                id: messageId,
+                role: data.role || 'user',
+                type: 'audio',
+                mimeType: data.mime_type || 'audio/webm',
+                audioStorageKey,
+                timestamp: data.timestamp || new Date().toISOString(),
+                sender: data.role === 'admin' ? 'admin' : 'user'
+              }
+            ]);
+            setIsSending(false);
+            return;
+          }
+
+          if (data.type === 'session_cleared') {
+            setSessionInfo((prev) => ({
+              ...(prev || {}),
+              cleared_by_user: true,
+              cleared_at: data.timestamp || new Date().toISOString()
+            }));
+            setMessages([]);
+            setError('User cleared this chat session. You can now delete the session.');
+            setIsSending(false);
+            return;
+          }
           
           if (data.type === 'message') {
             const newMessage = {
               id: Date.now(),
               role: data.role || 'user',
+              type: 'text',
               content: data.content || data.message,
               timestamp: new Date().toISOString(),
               sender: data.role === 'admin' ? 'admin' : 'user'
@@ -213,6 +301,7 @@ const AdminChat = ({ sessionId, onClose }) => {
           const newMessage = {
             id: Date.now(),
             role: 'user',
+            type: 'text',
             content: event.data,
             timestamp: new Date().toISOString(),
             sender: 'user'
@@ -235,9 +324,20 @@ const AdminChat = ({ sessionId, onClose }) => {
         console.log('WebSocket disconnected:', reasonText);
         setIsConnected(false);
         setIsSending(false);
+
+        const isIntentional = intentionalCloseRef.current;
+        intentionalCloseRef.current = false;
+
+        if (isIntentional || event?.code === 1000) {
+          setIsReconnecting(false);
+          setIsLoading(false);
+          return;
+        }
+
         if (!isMountedRef.current) return;
 
         setError(`Chat disconnected (${reasonText}). Reconnecting...`);
+        setIsLoading(false);
         scheduleReconnect(wsConfig);
       };
 
@@ -262,6 +362,7 @@ const AdminChat = ({ sessionId, onClose }) => {
       const userMessage = {
         id: Date.now(),
         role: 'admin',
+        type: 'text',
         content: input,
         timestamp: new Date().toISOString(),
         sender: 'admin'
@@ -302,6 +403,107 @@ const AdminChat = ({ sessionId, onClose }) => {
     }
   };
 
+  const startVoiceRecording = async () => {
+    if (isRecording || !sessionInfo?.human_mode) return;
+    if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setError('Voice recording is not supported in this browser.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recordingChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+
+        if (!blob.size) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
+          if (!audioBase64) return;
+
+          const messageId = `audio-${Date.now()}`;
+          const audioStorageKey = storeAudioForMessage(messageId, audioBase64);
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: messageId,
+              role: 'admin',
+              sender: 'admin',
+              type: 'audio',
+              mimeType: blob.type || 'audio/webm',
+              audioStorageKey,
+              timestamp: new Date().toISOString()
+            }
+          ]);
+
+          if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
+            webSocketRef.current.send(JSON.stringify({
+              type: 'audio',
+              role: 'admin',
+              audio_base64: audioBase64,
+              mime_type: blob.type || 'audio/webm',
+              duration_seconds: null,
+              timestamp: new Date().toISOString()
+            }));
+          }
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch {
+      setError('Microphone access was denied.');
+      setIsRecording(false);
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!sessionId || isDeletingSession) return;
+
+    const shouldDelete = window.confirm('Delete this cleared chat session permanently?');
+    if (!shouldDelete) return;
+
+    setIsDeletingSession(true);
+    setError(null);
+    try {
+      const response = await fetch(buildAdminUrl(`${ADMIN_ROUTES.chatSessions}/${sessionId}`), {
+        method: 'DELETE',
+        headers: withAuthHeaders(token)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete session.');
+      }
+
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Unable to delete session.');
+    } finally {
+      setIsDeletingSession(false);
+    }
+  };
+
   return (
     <div className="admin-chat-container">
       <Card className="h-100 border-0 overflow-hidden my-chat-card">
@@ -337,7 +539,22 @@ const AdminChat = ({ sessionId, onClose }) => {
               {sessionInfo.human_mode && (
                 <span className="badge bg-primary">HUMAN MODE</span>
               )}
+              {sessionInfo.cleared_by_user && (
+                <span className="badge bg-warning text-dark">CLEARED BY USER</span>
+              )}
             </small>
+            {sessionInfo.cleared_by_user && (
+              <div className="mt-2 d-flex justify-content-end">
+                <Button
+                  size="sm"
+                  variant="outline-danger"
+                  onClick={handleDeleteSession}
+                  disabled={isDeletingSession}
+                >
+                  {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -373,9 +590,18 @@ const AdminChat = ({ sessionId, onClose }) => {
                   }`}
                   style={{ maxWidth: '78%', wordWrap: 'break-word' }}
                 >
-                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {msg.content}
-                  </div>
+                  {msg.type === 'audio' ? (
+                    <audio
+                      controls
+                      preload="metadata"
+                      style={{ width: '230px', maxWidth: '100%' }}
+                      src={resolveAudioSource(msg)}
+                    />
+                  ) : (
+                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {msg.content}
+                    </div>
+                  )}
                   {msg.timestamp && (
                     <small className="d-flex justify-content-end mt-1 my-message-time">
                       {formatTimestamp(msg.timestamp)}
@@ -409,6 +635,16 @@ const AdminChat = ({ sessionId, onClose }) => {
               className="border-0 shadow-none my-chat-input"
               style={{ fontSize: '0.88rem' }}
             />
+            <Button
+              type="button"
+              variant={isRecording ? 'danger' : 'outline-primary'}
+              disabled={!sessionInfo?.human_mode}
+              onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+              title={sessionInfo?.human_mode ? (isRecording ? 'Stop recording' : 'Record voice message') : 'Voice is available in human mode'}
+              className="d-flex align-items-center justify-content-center px-2"
+            >
+              {isRecording ? <BiStopCircle /> : <BiMicrophone />}
+            </Button>
             <Button 
               type="submit" 
               variant="primary"

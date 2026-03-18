@@ -3,13 +3,33 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiSend, BiX } from 'react-icons/bi';
+import { BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
 const CONTACT_CREATE_ENDPOINT = (import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact');
+const CHAT_CLEAR_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/clear`;
+const CHATBOT_SESSION_STORAGE_KEY = 'portfolio_chatbot_session_id';
+const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
+const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
+const defaultBotMessage = { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
+
+const getChatMessagesStorageKey = (sessionId) => `${CHATBOT_MESSAGES_PREFIX}${sessionId}`;
+const getChatAudioStorageKey = (sessionId, messageId) => `${CHATBOT_AUDIO_PREFIX}${sessionId}_${messageId}`;
+
+const clearChatStorageForSession = (sessionId) => {
+  if (!sessionId) return;
+  localStorage.removeItem(getChatMessagesStorageKey(sessionId));
+
+  const audioPrefix = `${CHATBOT_AUDIO_PREFIX}${sessionId}_`;
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith(audioPrefix)) {
+      localStorage.removeItem(key);
+    }
+  });
+};
 
 const COUNTRY_CODES = [
   { code: '+1', label: '🇺🇸 US/CA (+1)' },
@@ -26,13 +46,14 @@ const COUNTRY_CODES = [
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot' }
-  ]);
+  const [messages, setMessages] = useState([defaultBotMessage]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isHumanMode, setIsHumanMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [socketResetNonce, setSocketResetNonce] = useState(0);
   const [showHumanForm, setShowHumanForm] = useState(false);
   const [isLeadSubmitting, setIsLeadSubmitting] = useState(false);
   const [leadSubmitStatus, setLeadSubmitStatus] = useState(null);
@@ -51,6 +72,8 @@ const Chatbot = () => {
   const loadingTimeoutRef = useRef(null);
   const audioContextRef = useRef(null);
   const typingSoundIntervalRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordingChunksRef = useRef([]);
 
   const suggestedQuestions = [
     'What are your key skills?',
@@ -67,6 +90,46 @@ const Chatbot = () => {
     const nextId = messageIdRef.current;
     messageIdRef.current += 1;
     return nextId;
+  };
+
+  const generateSessionId = () => {
+    const timestamp = Date.now().toString();
+    const randomPart = Math.random().toString().slice(2, 9);
+    return (timestamp + randomPart).slice(0, 16).padEnd(16, '0');
+  };
+
+  const loadMessagesForSession = (sessionId) => {
+    const key = getChatMessagesStorageKey(sessionId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return [defaultBotMessage];
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      return [defaultBotMessage];
+    } catch {
+      return [defaultBotMessage];
+    }
+  };
+
+  const persistMessagesForSession = (sessionId, updatedMessages) => {
+    if (!sessionId) return;
+    localStorage.setItem(getChatMessagesStorageKey(sessionId), JSON.stringify(updatedMessages));
+  };
+
+  const resolveAudioSource = (sessionId, message) => {
+    if (message?.audioData) return message.audioData;
+    if (!sessionId || !message?.audioStorageKey) return '';
+    return localStorage.getItem(message.audioStorageKey) || '';
+  };
+
+  const storeAudioForMessage = (sessionId, messageId, audioData) => {
+    if (!sessionId || !messageId || !audioData) return null;
+    const key = getChatAudioStorageKey(sessionId, messageId);
+    localStorage.setItem(key, audioData);
+    return key;
   };
 
   const playChatSound = (type = 'receive') => {
@@ -237,6 +300,12 @@ const Chatbot = () => {
     return () => clearTimeout(timer);
   }, [leadSubmitStatus]);
 
+  useEffect(() => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+    persistMessagesForSession(sessionId, messages);
+  }, [messages]);
+
   const toggleChat = () => {
     setIsOpen((prev) => {
       const nextOpen = !prev;
@@ -248,6 +317,8 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
         setIsLoading(false);
+        setIsHumanMode(false);
+        setIsRecording(false);
         clearLoadingTimeout();
         resetHumanSupportForm();
       }
@@ -278,6 +349,12 @@ const Chatbot = () => {
     };
   }, [isLoading]);
 
+  useEffect(() => () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       if (webSocketRef.current) {
@@ -291,11 +368,16 @@ const Chatbot = () => {
     let isMounted = true;
 
     const initializeWebSocket = () => {
-      // Generate 16-digit unique session ID
-      const timestamp = Date.now().toString();
-      const randomPart = Math.random().toString().slice(2, 9);
-      const sessionId = (timestamp + randomPart).slice(0, 16).padEnd(16, '0');
+      const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
+      const sessionId = storedSessionId || generateSessionId();
       sessionIdRef.current = sessionId;
+      localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
+
+      const restoredMessages = loadMessagesForSession(sessionId);
+      setMessages(restoredMessages);
+
+      const maxId = restoredMessages.reduce((acc, item) => Math.max(acc, Number(item?.id || 0)), 0);
+      messageIdRef.current = Math.max(maxId + 1, 2);
 
       const wsBase = CHAT_API_BASE.replace(/^http/, 'ws');
       const wsUrl = `${wsBase}/chat/${sessionId}`;
@@ -315,11 +397,49 @@ const Chatbot = () => {
 
           try {
             const data = JSON.parse(event.data);
+            if (data?.type === 'audio' && data.audio_base64) {
+              const nextId = getNextMessageId();
+              const activeSession = sessionIdRef.current;
+              const audioStorageKey = storeAudioForMessage(activeSession, nextId, data.audio_base64);
+              const sender = data.role === 'admin' ? 'admin' : 'bot';
+
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: nextId,
+                  sender,
+                  type: 'audio',
+                  mimeType: data.mime_type || 'audio/webm',
+                  audioStorageKey,
+                  timestamp: data.timestamp || new Date().toISOString()
+                }
+              ]);
+              setIsHumanMode(true);
+              setIsLoading(false);
+              clearLoadingTimeout();
+              playChatSound('receive');
+              return;
+            }
+
+            if (data?.type === 'session_cleared') {
+              setMessages([defaultBotMessage]);
+              setIsHumanMode(false);
+              setShowHumanForm(false);
+              setLeadSubmitStatus({ type: 'success', text: 'Chat cleared. Start a new conversation anytime.' });
+              clearLoadingTimeout();
+              setIsLoading(false);
+              return;
+            }
+
             const content = data.content || data.message || event.data;
             const sender = data.role === 'admin' ? 'admin' : 'bot';
-            setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender }]);
+            setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
+
+            if (sender === 'admin') {
+              setIsHumanMode(true);
+            }
           } catch {
-            setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot' }]);
+            setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot', type: 'text' }]);
           }
 
           setIsLoading(false);
@@ -364,7 +484,7 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
     };
-  }, [isOpen]);
+  }, [isOpen, socketResetNonce]);
 
   const sendSocketMessage = (payload) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) return false;
@@ -471,7 +591,7 @@ const Chatbot = () => {
     if (!input.trim()) return;
 
     const messageText = input.trim();
-    setMessages((prev) => [...prev, { id: getNextMessageId(), text: messageText, sender: 'user' }]);
+    setMessages((prev) => [...prev, { id: getNextMessageId(), text: messageText, sender: 'user', type: 'text' }]);
     setInput('');
     playChatSound('send');
 
@@ -502,7 +622,7 @@ const Chatbot = () => {
   const handleSuggestedQuestion = (question) => {
     if (!isConnected) return;
 
-    setMessages((prev) => [...prev, { id: getNextMessageId(), text: question, sender: 'user' }]);
+    setMessages((prev) => [...prev, { id: getNextMessageId(), text: question, sender: 'user', type: 'text' }]);
     playChatSound('send');
 
     if (sendSocketMessage(question)) {
@@ -635,6 +755,8 @@ const Chatbot = () => {
         sendSocketMessage(legacyPayload);
       }
 
+      setIsHumanMode(true);
+
       resetHumanSupportForm();
     }
   };
@@ -729,6 +851,118 @@ const Chatbot = () => {
     );
   };
 
+  const startVoiceRecording = async () => {
+    if (!isHumanMode || isRecording) return;
+    if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setLeadSubmitStatus({ type: 'error', text: 'Voice recording is not supported in this browser.' });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recordingChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+
+        if (!blob.size) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
+          if (!audioBase64) return;
+
+          const messageId = getNextMessageId();
+          const sessionId = sessionIdRef.current;
+          const audioStorageKey = storeAudioForMessage(sessionId, messageId, audioBase64);
+
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: messageId,
+              sender: 'user',
+              type: 'audio',
+              mimeType: blob.type || 'audio/webm',
+              audioStorageKey,
+              timestamp: new Date().toISOString()
+            }
+          ]);
+
+          sendSocketMessage({
+            type: 'audio',
+            audio_base64: audioBase64,
+            mime_type: blob.type || 'audio/webm',
+            duration_seconds: null,
+            timestamp: new Date().toISOString()
+          });
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch {
+      setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' });
+      setIsRecording(false);
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleClearChat = async () => {
+    const activeSession = sessionIdRef.current;
+
+    if (activeSession) {
+      sendSocketMessage({ type: 'clear_chat', session_id: activeSession, timestamp: new Date().toISOString() });
+      try {
+        await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' });
+      } catch {
+        // WebSocket clear event already sent; ignore network fallback failures.
+      }
+    }
+
+    if (activeSession) {
+      clearChatStorageForSession(activeSession);
+    }
+
+    localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+    sessionIdRef.current = null;
+
+    if (webSocketRef.current) {
+      webSocketRef.current.close();
+      webSocketRef.current = null;
+    }
+
+    setMessages([defaultBotMessage]);
+    setShowHumanForm(false);
+    setLeadSubmitStatus({ type: 'success', text: 'Chat cleared. A fresh session has started.' });
+    setInput('');
+    setIsHumanMode(false);
+    setIsRecording(false);
+    setIsLoading(false);
+    setIsConnected(false);
+    setIsConnecting(true);
+    clearLoadingTimeout();
+
+    if (isOpen) {
+      setSocketResetNonce((prev) => prev + 1);
+    }
+  };
+
   return (
     <>
       <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
@@ -806,7 +1040,14 @@ const Chatbot = () => {
                   className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
                   style={{ maxWidth: '80%', borderRadius: '12px' }}
                 >
-                  {msg.sender !== 'user' ? (
+                  {msg.type === 'audio' ? (
+                    <audio
+                      controls
+                      preload="metadata"
+                      style={{ width: '220px', maxWidth: '100%' }}
+                      src={resolveAudioSource(sessionIdRef.current, msg)}
+                    />
+                  ) : msg.sender !== 'user' ? (
                     <ReactMarkdown
                       components={{
                         p: ({ children }) => <p className="mb-2">{children}</p>,
@@ -885,8 +1126,28 @@ const Chatbot = () => {
                 style={{ fontSize: '0.9rem' }}
                 rows="1"
               />
+              {isHumanMode && (
+                <Button
+                  type="button"
+                  variant={isRecording ? 'danger' : 'outline-primary'}
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  title={isRecording ? 'Stop recording' : 'Record voice message'}
+                  className="px-2"
+                >
+                  {isRecording ? <BiStopCircle /> : <BiMicrophone />}
+                </Button>
+              )}
               <Button type="submit" variant="primary" disabled={!input.trim()} className="bg-navy border-0 px-3">
                 <BiSend />
+              </Button>
+              <Button
+                type="button"
+                variant="outline-secondary"
+                onClick={handleClearChat}
+                title="Clear chat"
+                className="px-2"
+              >
+                <BiTrash />
               </Button>
             </Form>
           </div>

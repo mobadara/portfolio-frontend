@@ -23,8 +23,10 @@ import {
   BiMoon,
   BiPlus,
   BiRefresh,
+  BiReply,
   BiSearch,
   BiShield,
+  BiShow,
   BiSun,
   BiTrash,
   BiUser,
@@ -44,6 +46,7 @@ const USERS_ENDPOINT = ADMIN_ROUTES.users;
 const MESSAGES_ENDPOINT = ADMIN_ROUTES.messages;
 const MESSAGES_CREATE_PUBLIC_ENDPOINT = ADMIN_ROUTES.contactCreate;
 const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
+const CONTACT_REPLY_TO_EMAIL = import.meta?.env?.VITE_CONTACT_REPLY_TO_EMAIL || 'muyiwa.j.obadara@gmail.com';
 
 const emptyForms = {
   user: { username: '', email: '', role: 'assistant', password: '' },
@@ -89,6 +92,8 @@ function AdminDashboard() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState(emptyForms.message);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [showMessageModal, setShowMessageModal] = useState(false);
 
   const currentRole = String(authUser?.role || 'assistant').toLowerCase();
   const canManageMessages = true;
@@ -400,6 +405,44 @@ function AdminDashboard() {
     }
   };
 
+  const openMessageModal = (item) => {
+    setSelectedMessage(item || null);
+    setShowMessageModal(Boolean(item));
+  };
+
+  const closeMessageModal = () => {
+    setShowMessageModal(false);
+    setSelectedMessage(null);
+  };
+
+  const handleReplyToMessage = (message) => {
+    const recipientEmail = String(message?.email || '').trim();
+    if (!recipientEmail) {
+      setError('This message has no sender email to reply to.');
+      return;
+    }
+
+    const replySubject = 'Replying to your message from my portfolio';
+    const emailBody = [
+      `Hi ${message?.name || 'there'},`,
+      '',
+      'Thanks for your message from my portfolio website.',
+      '',
+      'Best regards,',
+      'Muyiwa Obadara',
+      '',
+      `Reply-To: ${CONTACT_REPLY_TO_EMAIL}`
+    ].join('\n');
+
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(replySubject)}&body=${encodeURIComponent(emailBody)}&reply_to=${encodeURIComponent(CONTACT_REPLY_TO_EMAIL)}`;
+    const openedTab = window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+
+    if (!openedTab) {
+      const fallbackMailto = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(replySubject)}&body=${encodeURIComponent(emailBody)}&reply-to=${encodeURIComponent(CONTACT_REPLY_TO_EMAIL)}`;
+      window.location.href = fallbackMailto;
+    }
+  };
+
   const handleLogout = () => {
     clearAdminAuth();
     navigate('/admin');
@@ -545,7 +588,8 @@ function AdminDashboard() {
                       <ResourceTable
                         type="message"
                         items={filteredMessages}
-                        onEdit={canManageMessages ? openEditModal : null}
+                        onView={canManageMessages ? openMessageModal : null}
+                        onReply={canManageMessages ? handleReplyToMessage : null}
                         onDelete={canManageMessages ? handleDelete : null}
                         emptyText="No contact messages found."
                       />
@@ -596,11 +640,18 @@ function AdminDashboard() {
         onHide={closeModal}
         onSave={handleSave}
       />
+
+      <MessageDetailsModal
+        show={showMessageModal}
+        message={selectedMessage}
+        onHide={closeMessageModal}
+        onReply={handleReplyToMessage}
+      />
     </div>
   );
 }
 
-const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
+const ResourceTable = ({ type, items, onEdit, onView, onReply, onDelete, emptyText }) => {
   if (items.length === 0) {
     return <Alert variant="secondary" className="mb-0">{emptyText}</Alert>;
   }
@@ -614,7 +665,7 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
           <thead>
             <tr>
               {type === 'user' && <><th>User</th><th>Email</th><th>Role</th></>}
-              {type === 'message' && <><th>Sender</th><th>Subject</th><th>Status</th></>}
+              {type === 'message' && <><th>Sender</th><th>Subject</th><th>Received</th></>}
               {type === 'project' && <><th>Title</th><th>Tech Stack</th><th>Featured</th></>}
               <th className="text-end">Actions</th>
             </tr>
@@ -636,7 +687,7 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
                       <div className="small text-muted">{item.email || 'No email'}</div>
                     </td>
                     <td>{item.subject || String(item.message || '').slice(0, 56)}</td>
-                    <td><Badge bg={item.status === 'resolved' ? 'success' : 'warning'}>{item.status || 'new'}</Badge></td>
+                    <td className="small text-muted">{item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</td>
                   </>
                 )}
                 {type === 'project' && (
@@ -648,6 +699,16 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
                 )}
                 <td className="text-end">
                   <div className="d-flex justify-content-end gap-2">
+                    {type === 'message' && onView && (
+                      <Button size="sm" variant="outline-secondary" onClick={() => onView(item)}>
+                        <BiShow />
+                      </Button>
+                    )}
+                    {type === 'message' && onReply && (
+                      <Button size="sm" variant="outline-primary" onClick={() => onReply(item)}>
+                        <BiReply />
+                      </Button>
+                    )}
                     {onEdit && <Button size="sm" variant="outline-primary" onClick={() => onEdit(type, item)}>Edit</Button>}
                     {onDelete && (
                       <Button size="sm" variant="outline-danger" onClick={() => onDelete(type, item)}>
@@ -678,7 +739,7 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
                   <h6 className="mb-1">{item.subject || 'No subject'}</h6>
                   <p className="mb-2 small text-muted">{item.name || 'Unknown'} • {item.email || 'No email'}</p>
                   <p className="mb-2 small">{String(item.message || '').slice(0, 90)}</p>
-                  <Badge bg={item.status === 'resolved' ? 'success' : 'warning'}>{item.status || 'new'}</Badge>
+                  <small className="text-muted d-block">{item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</small>
                 </>
               )}
               {type === 'project' && (
@@ -690,6 +751,12 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
               )}
 
               <div className="d-flex gap-2 mt-3">
+                {type === 'message' && onView && (
+                  <Button size="sm" variant="outline-secondary" className="flex-fill" onClick={() => onView(item)}>Open</Button>
+                )}
+                {type === 'message' && onReply && (
+                  <Button size="sm" variant="outline-primary" className="flex-fill" onClick={() => onReply(item)}>Reply</Button>
+                )}
                 {onEdit && <Button size="sm" variant="outline-primary" className="flex-fill" onClick={() => onEdit(type, item)}>Edit</Button>}
                 {onDelete && <Button size="sm" variant="outline-danger" className="flex-fill" onClick={() => onDelete(type, item)}>Delete</Button>}
               </div>
@@ -698,6 +765,34 @@ const ResourceTable = ({ type, items, onEdit, onDelete, emptyText }) => {
         ))}
       </div>
     </>
+  );
+};
+
+const MessageDetailsModal = ({ show, message, onHide, onReply }) => {
+  if (!message) return null;
+
+  return (
+    <Modal centered show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>Message Details</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="mb-2"><strong>From:</strong> {message.name || 'Unknown'}</p>
+        <p className="mb-2"><strong>Email:</strong> {message.email || 'N/A'}</p>
+        <p className="mb-2"><strong>Subject:</strong> {message.subject || 'No subject'}</p>
+        <p className="mb-3"><strong>Received:</strong> {message.created_at ? new Date(message.created_at).toLocaleString() : 'N/A'}</p>
+        <Form.Group>
+          <Form.Label><strong>Message</strong></Form.Label>
+          <Form.Control as="textarea" rows={8} value={String(message.message || '')} readOnly />
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onHide}>Close</Button>
+        <Button variant="primary" onClick={() => onReply(message)}>
+          <BiReply className="me-1" /> Reply
+        </Button>
+      </Modal.Footer>
+    </Modal>
   );
 };
 

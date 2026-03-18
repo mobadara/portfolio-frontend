@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Container, Row, Col, Card, Badge, Alert, Spinner, Button } from 'react-bootstrap';
-import { BiMoon, BiRefresh, BiSun } from 'react-icons/bi';
+import { BiArrowBack, BiMoon, BiRefresh, BiSun } from 'react-icons/bi';
 import AdminChat from './AdminChat';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, withAuthHeaders } from '../utils/adminApi';
 import './AdminChatPage.css';
@@ -71,6 +71,16 @@ const AdminChatPage = () => {
     }
   }, [routeSessionId]);
 
+  useEffect(() => {
+    if (!activeSession || loading) return;
+
+    const sessionStillExists = sessions.some((session) => session.session_id === activeSession);
+    if (!sessionStillExists) {
+      setActiveSession(null);
+      navigate('/admin/chat');
+    }
+  }, [activeSession, loading, navigate, sessions]);
+
   const formatRelativeTime = (timestamp) => {
     try {
       const date = new Date(timestamp);
@@ -118,6 +128,14 @@ const AdminChatPage = () => {
           <Card className="border-0 my-sidebar-card h-100">
             <Card.Header className="my-sidebar-header d-flex align-items-center justify-content-between">
               <div className="d-flex align-items-center gap-2">
+                <Button
+                  variant="link"
+                  className="p-0 my-icon-btn my-back-btn"
+                  onClick={() => navigate('/admin/dashboard')}
+                  aria-label="Back to admin dashboard"
+                >
+                  <BiArrowBack />
+                </Button>
                 <h6 className="mb-0">Chats</h6>
                 <Badge bg="light" text="dark" pill>{sessions.length}</Badge>
               </div>
@@ -159,16 +177,25 @@ const AdminChatPage = () => {
                       className={`list-group-item list-group-item-action text-start border-0 border-bottom my-session-item ${
                         activeSession === session.session_id ? 'active' : ''
                       }`}
+                      aria-current={activeSession === session.session_id ? 'true' : undefined}
                     >
                       <div className="d-flex justify-content-between align-items-start mb-1">
                         <strong className="small text-truncate me-2">
                           {session.user_id ? `User ${session.user_id.slice(0, 8)}...` : 'Anonymous'}
                         </strong>
-                        {session.human_mode ? (
-                          <Badge bg="primary" pill>Live</Badge>
-                        ) : (
-                          <Badge bg="secondary" pill>Bot</Badge>
-                        )}
+                        <div className="d-flex align-items-center gap-2">
+                          {activeSession === session.session_id && (
+                            <Badge bg="success" pill>Selected</Badge>
+                          )}
+                          {session.cleared_by_user && (
+                            <Badge bg="warning" text="dark" pill>Cleared</Badge>
+                          )}
+                          {session.human_mode ? (
+                            <Badge bg="primary" pill>Live</Badge>
+                          ) : (
+                            <Badge bg="secondary" pill>Bot</Badge>
+                          )}
+                        </div>
                       </div>
                       <div className="d-flex justify-content-between align-items-center mb-1">
                         <small className="text-muted">{session.message_count || 0} messages</small>
