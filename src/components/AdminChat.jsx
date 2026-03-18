@@ -506,7 +506,7 @@ const AdminChat = ({ sessionId, onClose }) => {
 
   return (
     <div className="admin-chat-container">
-      <Card className="h-100 border-0 overflow-hidden my-chat-card">
+      <Card className="h-100 border-0 d-flex flex-column my-chat-card">
         
         <div className="card-header my-chat-header d-flex align-items-center justify-content-between py-2 px-3">
           <div className="d-flex align-items-center gap-2">
@@ -564,7 +564,7 @@ const AdminChat = ({ sessionId, onClose }) => {
           </Alert>
         )}
 
-        <Card.Body className="chat-body my-chat-body p-3 overflow-auto" style={{ minHeight: '420px' }}>
+        <Card.Body className="chat-body my-chat-body p-3 overflow-auto flex-grow-1">
           {isLoading ? (
             <div className="d-flex align-items-center justify-content-center h-100">
               <div className="text-center">
@@ -625,6 +625,12 @@ const AdminChat = ({ sessionId, onClose }) => {
         </Card.Body>
 
         <div className="card-footer my-input-wrap p-2 border-top">
+          {isRecording && (
+            <div className="chat-recording-indicator mb-2">
+              <span className="chat-recording-dot" /> Recording in progress — speak now.
+            </div>
+          )}
+
           <Form onSubmit={handleSendMessage} className="d-flex gap-2">
             <Form.Control 
               type="text" 

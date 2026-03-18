@@ -34,8 +34,8 @@ const AdminChatPage = () => {
   // Fetch active sessions on component mount
   useEffect(() => {
     fetchActiveSessions();
-    // Poll for new sessions every 10 seconds
-    const interval = setInterval(fetchActiveSessions, 10000);
+    // Poll for new sessions every 3 seconds (faster for better UX)
+    const interval = setInterval(fetchActiveSessions, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -52,7 +52,13 @@ const AdminChatPage = () => {
       const data = await response.json();
       
       if (data.status === 'ok' && data.sessions) {
-        setSessions(data.sessions);
+        // Sort sessions by most recent activity first (new sessions appear at top)
+        const sortedSessions = [...data.sessions].sort((a, b) => {
+          const timeA = new Date(a.last_activity || a.created_at || 0);
+          const timeB = new Date(b.last_activity || b.created_at || 0);
+          return timeB - timeA; // Most recent first
+        });
+        setSessions(sortedSessions);
         setError(null);
       } else {
         setSessions([]);
@@ -181,7 +187,7 @@ const AdminChatPage = () => {
                     >
                       <div className="d-flex justify-content-between align-items-start mb-1">
                         <strong className="small text-truncate me-2">
-                          {session.user_id ? `User ${session.user_id.slice(0, 8)}...` : 'Anonymous'}
+                          {session.user_name ? session.user_name : 'Anonymous'}
                         </strong>
                         <div className="d-flex align-items-center gap-2">
                           {activeSession === session.session_id && (

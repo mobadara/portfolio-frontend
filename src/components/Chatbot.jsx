@@ -74,6 +74,7 @@ const Chatbot = () => {
   const typingSoundIntervalRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
+  const pendingReachSupportTriggerRef = useRef(false);
 
   const suggestedQuestions = [
     'What are your key skills?',
@@ -438,6 +439,13 @@ const Chatbot = () => {
             if (sender === 'admin') {
               setIsHumanMode(true);
             }
+
+            if (pendingReachSupportTriggerRef.current && sender === 'bot') {
+              pendingReachSupportTriggerRef.current = false;
+              if (!showHumanForm) {
+                openHumanSupportForm();
+              }
+            }
           } catch {
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot', type: 'text' }]);
           }
@@ -621,6 +629,9 @@ const Chatbot = () => {
 
   const handleSuggestedQuestion = (question) => {
     if (!isConnected) return;
+
+    const normalizedQuestion = String(question || '').toLowerCase();
+    pendingReachSupportTriggerRef.current = normalizedQuestion.includes('how can i reach you');
 
     setMessages((prev) => [...prev, { id: getNextMessageId(), text: question, sender: 'user', type: 'text' }]);
     playChatSound('send');
@@ -1017,7 +1028,7 @@ const Chatbot = () => {
                     key={index}
                     onClick={() => handleSuggestedQuestion(question)}
                     disabled={!isConnected}
-                    className="btn btn-sm btn-outline-secondary text-start text-wrap"
+                    className="btn btn-sm chatbot-quick-btn text-start text-wrap"
                     style={{ fontSize: '0.8rem' }}
                   >
                     {question}
@@ -1025,7 +1036,7 @@ const Chatbot = () => {
                 ))}
                 <button
                   onClick={openHumanSupportForm}
-                  className="btn btn-sm btn-outline-primary text-start text-wrap"
+                  className="btn btn-sm chatbot-transfer-btn text-start text-wrap"
                   style={{ fontSize: '0.8rem' }}
                   type="button"
                 >
@@ -1107,6 +1118,12 @@ const Chatbot = () => {
                 role="status"
               >
                 {leadSubmitStatus.text}
+              </div>
+            )}
+
+            {isRecording && (
+              <div className="chat-recording-indicator mb-2">
+                <span className="chat-recording-dot" /> Recording in progress — speak now.
               </div>
             )}
 
