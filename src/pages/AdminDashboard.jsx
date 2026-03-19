@@ -46,6 +46,9 @@ const USERS_ENDPOINT = ADMIN_ROUTES.users;
 const MESSAGES_ENDPOINT = ADMIN_ROUTES.messages;
 const MESSAGES_CREATE_PUBLIC_ENDPOINT = ADMIN_ROUTES.contactCreate;
 const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
+const DELETE_ALL_CHAT_SESSIONS_ENDPOINT = ADMIN_ROUTES.deleteAllChatSessions;
+const DELETE_ALL_MESSAGES_ENDPOINT = ADMIN_ROUTES.deleteAllMessages;
+const DELETE_ALL_PROJECTS_ENDPOINT = ADMIN_ROUTES.deleteAllProjects;
 const CONTACT_REPLY_TO_EMAIL = import.meta?.env?.VITE_CONTACT_REPLY_TO_EMAIL || 'muyiwa.j.obadara@gmail.com';
 
 const emptyForms = {
@@ -94,8 +97,13 @@ function AdminDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showDangerModal, setShowDangerModal] = useState(false);
+  const [dangerAction, setDangerAction] = useState('');
+  const [dangerPassword, setDangerPassword] = useState('');
+  const [isRunningDangerAction, setIsRunningDangerAction] = useState(false);
 
   const currentRole = String(authUser?.role || 'assistant').toLowerCase();
+  const isAdminRole = currentRole === 'admin';
   const canManageMessages = true;
   const canManageUsersAndProjects = ['owner', 'admin', 'superadmin'].includes(currentRole);
 
@@ -448,6 +456,64 @@ function AdminDashboard() {
     navigate('/admin');
   };
 
+  const dangerLabels = {
+    sessions: 'Delete All Chat Sessions',
+    messages: 'Delete All Messages',
+    projects: 'Delete All Projects'
+  };
+
+  const dangerEndpoints = {
+    sessions: DELETE_ALL_CHAT_SESSIONS_ENDPOINT,
+    messages: DELETE_ALL_MESSAGES_ENDPOINT,
+    projects: DELETE_ALL_PROJECTS_ENDPOINT
+  };
+
+  const openDangerModal = (action) => {
+    setDangerAction(action);
+    setDangerPassword('');
+    setShowDangerModal(true);
+  };
+
+  const closeDangerModal = (force = false) => {
+    if (isRunningDangerAction && !force) return;
+    setShowDangerModal(false);
+    setDangerAction('');
+    setDangerPassword('');
+  };
+
+  const handleConfirmDangerAction = async () => {
+    if (!isAdminRole) {
+      setError('Only admin role can perform this action.');
+      return;
+    }
+
+    if (!dangerAction || !dangerEndpoints[dangerAction]) return;
+
+    if (!dangerPassword.trim()) {
+      setError('Please enter your admin password to continue.');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setIsRunningDangerAction(true);
+
+    try {
+      const response = await requestWithAuth(dangerEndpoints[dangerAction], {
+        method: 'POST',
+        body: JSON.stringify({ admin_password: dangerPassword })
+      });
+
+      setSuccess(response?.message || `${dangerLabels[dangerAction]} completed successfully.`);
+      closeDangerModal(true);
+      await loadDashboardData();
+    } catch (err) {
+      setError(err.message || `Failed to run ${dangerLabels[dangerAction]}.`);
+    } finally {
+      setIsRunningDangerAction(false);
+    }
+  };
+
   if (isBootstrapping) {
     return (
       <div className="admin-dash-loading d-flex align-items-center justify-content-center">
@@ -538,6 +604,30 @@ function AdminDashboard() {
 
             {error && <Alert variant="danger">{error}</Alert>}
             {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
+
+            {isAdminRole && (
+              <Card className="border-danger-subtle bg-danger-subtle mb-3">
+                <Card.Body className="p-3">
+                  <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+                    <div>
+                      <h6 className="mb-1 text-danger fw-bold">Danger Zone</h6>
+                      <p className="mb-0 small text-danger-emphasis">These actions permanently delete data and require your admin password.</p>
+                    </div>
+                    <div className="d-flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('sessions')}>
+                        Delete All Chat Sessions
+                      </Button>
+                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('messages')}>
+                        Delete All Messages
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => openDangerModal('projects')}>
+                        Delete All Projects
+                      </Button>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
 
             <Card className="border-0 admin-panel-card">
               <Card.Body className="p-2 p-md-3">
@@ -646,6 +736,17 @@ function AdminDashboard() {
         message={selectedMessage}
         onHide={closeMessageModal}
         onReply={handleReplyToMessage}
+      />
+
+      <DangerActionModal
+        show={showDangerModal}
+        action={dangerAction}
+        password={dangerPassword}
+        isSaving={isRunningDangerAction}
+        labels={dangerLabels}
+        onPasswordChange={(value) => setDangerPassword(value)}
+        onHide={closeDangerModal}
+        onConfirm={handleConfirmDangerAction}
       />
     </div>
   );
@@ -954,6 +1055,41 @@ const EditorModal = ({ show, type, formData, isSaving, isEdit, onChange, onHide,
         <Button variant="secondary" onClick={onHide} disabled={isSaving}>Cancel</Button>
         <Button variant="primary" onClick={onSave} disabled={isSaving}>
           {isSaving ? <Spinner size="sm" animation="border" /> : saveLabel}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+};
+
+const DangerActionModal = ({ show, action, password, isSaving, labels, onPasswordChange, onHide, onConfirm }) => {
+  if (!action) return null;
+
+  return (
+    <Modal centered show={show} onHide={onHide}>
+      <Modal.Header closeButton>
+        <Modal.Title>{labels[action] || 'Confirm Action'}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Alert variant="danger" className="mb-3">
+          This action is permanent and cannot be undone.
+        </Alert>
+        <p className="mb-2 small">
+          Enter your admin password to confirm <strong>{(labels[action] || '').toLowerCase()}</strong>.
+        </p>
+        <Form.Group>
+          <Form.Label>Admin Password</Form.Label>
+          <Form.Control
+            type="password"
+            value={password}
+            onChange={(event) => onPasswordChange(event.target.value)}
+            autoFocus
+          />
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onHide} disabled={isSaving}>Cancel</Button>
+        <Button variant="danger" onClick={onConfirm} disabled={isSaving || !password.trim()}>
+          {isSaving ? <Spinner size="sm" animation="border" /> : 'Confirm Delete'}
         </Button>
       </Modal.Footer>
     </Modal>

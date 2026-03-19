@@ -8,7 +8,10 @@ export const ADMIN_ROUTES = {
   contactCreate: import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact',
   projects: import.meta?.env?.VITE_ADMIN_PROJECTS_ENDPOINT || '/admin/projects',
   sessions: import.meta?.env?.VITE_ADMIN_SESSIONS_ENDPOINT || '/admin/sessions',
-  chatSessions: import.meta?.env?.VITE_ADMIN_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions'
+  chatSessions: import.meta?.env?.VITE_ADMIN_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions',
+  deleteAllChatSessions: import.meta?.env?.VITE_ADMIN_DELETE_ALL_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions/delete-all',
+  deleteAllMessages: import.meta?.env?.VITE_ADMIN_DELETE_ALL_MESSAGES_ENDPOINT || '/admin/contact-messages/delete-all',
+  deleteAllProjects: import.meta?.env?.VITE_ADMIN_DELETE_ALL_PROJECTS_ENDPOINT || '/admin/projects/delete-all'
 };
 
 export const buildAdminUrl = (endpoint = '') => `${ADMIN_API_BASE}${endpoint}`;
