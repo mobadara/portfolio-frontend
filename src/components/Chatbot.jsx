@@ -11,10 +11,17 @@ const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfoli
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
 const CONTACT_CREATE_ENDPOINT = (import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact');
 const CHAT_CLEAR_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/clear`;
+const CHAT_SESSION_STATUS_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/status`;
 const CHATBOT_SESSION_STORAGE_KEY = 'portfolio_chatbot_session_id';
 const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
 const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
 const defaultBotMessage = { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
+
+const generateSessionId = () => {
+  const timestamp = Date.now().toString();
+  const randomPart = Math.random().toString().slice(2, 9);
+  return (timestamp + randomPart).slice(0, 16).padEnd(16, '0');
+};
 
 const getChatMessagesStorageKey = (sessionId) => `${CHATBOT_MESSAGES_PREFIX}${sessionId}`;
 const getChatAudioStorageKey = (sessionId, messageId) => `${CHATBOT_AUDIO_PREFIX}${sessionId}_${messageId}`;
@@ -93,12 +100,6 @@ const Chatbot = () => {
     return nextId;
   };
 
-  const generateSessionId = () => {
-    const timestamp = Date.now().toString();
-    const randomPart = Math.random().toString().slice(2, 9);
-    return (timestamp + randomPart).slice(0, 16).padEnd(16, '0');
-  };
-
   const loadMessagesForSession = (sessionId) => {
     const key = getChatMessagesStorageKey(sessionId);
     const raw = localStorage.getItem(key);
@@ -120,9 +121,9 @@ const Chatbot = () => {
     localStorage.setItem(getChatMessagesStorageKey(sessionId), JSON.stringify(updatedMessages));
   };
 
-  const resolveAudioSource = (sessionId, message) => {
+  const resolveAudioSource = (message) => {
     if (message?.audioData) return message.audioData;
-    if (!sessionId || !message?.audioStorageKey) return '';
+    if (!message?.audioStorageKey) return '';
     return localStorage.getItem(message.audioStorageKey) || '';
   };
 
@@ -368,9 +369,36 @@ const Chatbot = () => {
 
     let isMounted = true;
 
-    const initializeWebSocket = () => {
+    const resolveSessionId = async () => {
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-      const sessionId = storedSessionId || generateSessionId();
+      if (!storedSessionId) {
+        return generateSessionId();
+      }
+
+      try {
+        const response = await fetch(CHAT_SESSION_STATUS_ENDPOINT(storedSessionId));
+        if (!response.ok) {
+          return storedSessionId;
+        }
+
+        const data = await response.json();
+        if (data?.exists) {
+          return storedSessionId;
+        }
+      } catch {
+        return storedSessionId;
+      }
+
+      clearChatStorageForSession(storedSessionId);
+      localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+      return generateSessionId();
+    };
+
+    const initializeWebSocket = async () => {
+      const sessionId = await resolveSessionId();
+
+      if (!isMounted) return;
+
       sessionIdRef.current = sessionId;
       localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
 
@@ -432,6 +460,37 @@ const Chatbot = () => {
               return;
             }
 
+            if (data?.type === 'session_deleted') {
+              const activeSession = sessionIdRef.current;
+              if (activeSession) {
+                clearChatStorageForSession(activeSession);
+              }
+
+              localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+              sessionIdRef.current = null;
+
+              setMessages([defaultBotMessage]);
+              setIsHumanMode(false);
+              setShowHumanForm(false);
+              setInput('');
+              setLeadSubmitStatus({
+                type: 'success',
+                text: 'Previous chat session was closed by admin. A new session will start now.'
+              });
+              clearLoadingTimeout();
+              setIsLoading(false);
+              setIsConnected(false);
+              setIsConnecting(true);
+
+              if (webSocketRef.current) {
+                webSocketRef.current.close();
+                webSocketRef.current = null;
+              }
+
+              setSocketResetNonce((prev) => prev + 1);
+              return;
+            }
+
             const content = data.content || data.message || event.data;
             const sender = data.role === 'admin' ? 'admin' : 'bot';
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
@@ -442,9 +501,17 @@ const Chatbot = () => {
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
               pendingReachSupportTriggerRef.current = false;
-              if (!showHumanForm) {
-                openHumanSupportForm();
-              }
+              setShowHumanForm(true);
+              setHumanFormStep(0);
+              setLeadSubmitStatus(null);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: getNextMessageId(),
+                  text: 'Sure — I can connect you to human support. Please enter your details step by step below.',
+                  sender: 'bot'
+                }
+              ]);
             }
           } catch {
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot', type: 'text' }]);
@@ -1056,7 +1123,7 @@ const Chatbot = () => {
                       controls
                       preload="metadata"
                       style={{ width: '220px', maxWidth: '100%' }}
-                      src={resolveAudioSource(sessionIdRef.current, msg)}
+                      src={resolveAudioSource(msg)}
                     />
                   ) : msg.sender !== 'user' ? (
                     <ReactMarkdown

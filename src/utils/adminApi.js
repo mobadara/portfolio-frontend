@@ -51,6 +51,10 @@ export const toWebSocketUrl = (input = '') => {
     return input;
   }
 
+  if (input.startsWith('http://') || input.startsWith('https://')) {
+    return input.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
+  }
+
   const base = ADMIN_API_BASE.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://');
 
   if (input.startsWith('/')) {

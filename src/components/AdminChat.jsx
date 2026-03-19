@@ -307,6 +307,15 @@ const AdminChat = ({ sessionId, onClose }) => {
             setIsSending(false);
             return;
           }
+
+          if (data.type === 'session_deleted') {
+            setError('This chat session was deleted. Returning to chat list...');
+            setIsSending(false);
+            setTimeout(() => {
+              onClose();
+            }, 500);
+            return;
+          }
           
           if (data.type === 'message') {
             const newMessage = {
