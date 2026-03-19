@@ -6,6 +6,8 @@ import Spinner from 'react-bootstrap/Spinner';
 import { BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
@@ -1125,8 +1127,10 @@ const Chatbot = () => {
                       style={{ width: '220px', maxWidth: '100%' }}
                       src={resolveAudioSource(msg)}
                     />
-                  ) : msg.sender !== 'user' ? (
+                  ) : (
                     <ReactMarkdown
+                      remarkPlugins={[remarkMath]}
+                      rehypePlugins={[rehypeKatex]}
                       components={{
                         p: ({ children }) => <p className="mb-2">{children}</p>,
                         code: ({ inline, children }) =>
@@ -1149,10 +1153,8 @@ const Chatbot = () => {
                         em: ({ children }) => <em>{children}</em>
                       }}
                     >
-                      {msg.text}
+                      {msg.text || ''}
                     </ReactMarkdown>
-                  ) : (
-                    msg.text
                   )}
                 </div>
               </div>

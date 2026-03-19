@@ -9,8 +9,16 @@
 }
 
 .admin-dashboard-shell {
-  background: linear-gradient(135deg, #111b21 0%, #1f2c34 100%) !important;
+  background: linear-gradient(135deg, #e8eef8 0%, #f8fafc 100%) !important;
   border-radius: 14px;
+}
+
+.admin-shell-title {
+  color: #0f172a;
+}
+
+.admin-shell-subtitle {
+  color: #334155;
 }
 
 .admin-dash-title {
@@ -93,7 +101,15 @@
 }
 
 [data-bs-theme='dark'] .admin-dashboard-shell {
-  background: #202c33 !important;
+  background: linear-gradient(135deg, #111b21 0%, #1f2c34 100%) !important;
+}
+
+[data-bs-theme='dark'] .admin-shell-title {
+  color: #f8fafc;
+}
+
+[data-bs-theme='dark'] .admin-shell-subtitle {
+  color: #cbd5e1;
 }
 
 [data-bs-theme='dark'] .admin-panel-card,

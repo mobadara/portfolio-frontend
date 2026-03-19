@@ -529,10 +529,10 @@ function AdminDashboard() {
           <Card.Body className="p-3">
             <div className="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
               <div>
-                <h3 className="mb-1 text-white fw-bold d-flex align-items-center gap-2 admin-dash-title">
+                <h3 className="mb-1 fw-bold d-flex align-items-center gap-2 admin-dash-title admin-shell-title">
                   <BiShield /> Admin Dashboard
                 </h3>
-                <p className="mb-0 text-white-50 small">
+                <p className="mb-0 small admin-shell-subtitle">
                   Signed in as <strong>{authUser?.username || 'admin'}</strong> • Role: <Badge bg="info">{currentRole}</Badge>
                 </p>
               </div>
@@ -540,7 +540,7 @@ function AdminDashboard() {
                 <Button variant="primary" size="sm" onClick={() => navigate('/admin/chat')}>
                   <BiChat className="me-1" /> Open Chats
                 </Button>
-                <Button variant="outline-light" size="sm" onClick={openPasswordModal}>
+                <Button variant={theme === 'dark' ? 'outline-light' : 'outline-secondary'} size="sm" onClick={openPasswordModal}>
                   Change Password
                 </Button>
                 <Button variant="light" size="sm" onClick={loadDashboardData} disabled={isLoading}>
@@ -554,7 +554,7 @@ function AdminDashboard() {
                   {theme === 'dark' ? <BiSun className="me-1" /> : <BiMoon className="me-1" />}
                   {theme === 'dark' ? 'Light' : 'Dark'}
                 </Button>
-                <Button variant="outline-light" size="sm" onClick={handleLogout}>
+                <Button variant={theme === 'dark' ? 'outline-light' : 'outline-secondary'} size="sm" onClick={handleLogout}>
                   <BiLogOut className="me-1" /> Logout
                 </Button>
               </div>

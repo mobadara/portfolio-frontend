@@ -5,6 +5,9 @@ import Form from 'react-bootstrap/Form';
 import Spinner from 'react-bootstrap/Spinner';
 import Alert from 'react-bootstrap/Alert';
 import { BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
 
 /**
@@ -25,6 +28,7 @@ const AdminChat = ({ sessionId, onClose }) => {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [sessionInfo, setSessionInfo] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
   
   const webSocketRef = useRef(null);
@@ -36,6 +40,7 @@ const AdminChat = ({ sessionId, onClose }) => {
   const intentionalCloseRef = useRef(false);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
 
   const getAudioStorageKey = (messageId) => `portfolio_admin_chat_audio_${sessionId}_${messageId}`;
 
@@ -71,6 +76,13 @@ const AdminChat = ({ sessionId, onClose }) => {
     if (pingTimerRef.current) {
       clearInterval(pingTimerRef.current);
       pingTimerRef.current = null;
+    }
+  };
+
+  const clearRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
   };
 
@@ -216,6 +228,7 @@ const AdminChat = ({ sessionId, onClose }) => {
       intentionalCloseRef.current = true;
       clearReconnectTimer();
       clearPingTimer();
+      clearRecordingTimer();
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
@@ -270,12 +283,17 @@ const AdminChat = ({ sessionId, onClose }) => {
         setIsConnected(true);
         setError(null);
         setIsLoading(false);
+        setSessionInfo((prev) => ({ ...(prev || {}), human_mode: true }));
         startPing(ws);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+
+          if (data.type === 'pong') {
+            return;
+          }
 
           if (data.type === 'audio' && data.audio_base64) {
             const messageId = `audio-${Date.now()}`;
@@ -322,23 +340,51 @@ const AdminChat = ({ sessionId, onClose }) => {
               id: Date.now(),
               role: data.role || 'user',
               type: 'text',
-              content: data.content || data.message,
-              timestamp: new Date().toISOString(),
+              content: String(data.content || data.message || ''),
+              timestamp: data.timestamp || new Date().toISOString(),
               sender: data.role === 'admin' ? 'admin' : 'user'
             };
             
             setMessages(prev => [...prev, newMessage]);
+            return;
+          }
+
+          if (typeof data.content === 'string' || typeof data.message === 'string') {
+            const content = String(data.content || data.message || '').trim();
+            if (!content) return;
+            const sender = data.role === 'admin' ? 'admin' : 'user';
+
+            setMessages(prev => [
+              ...prev,
+              {
+                id: Date.now(),
+                role: data.role || (sender === 'admin' ? 'assistant' : 'user'),
+                type: 'text',
+                content,
+                timestamp: data.timestamp || new Date().toISOString(),
+                sender
+              }
+            ]);
+            return;
           }
         } catch (err) {
-          console.error('Error parsing WebSocket message:', err);
-          // If not JSON, treat as plain text message
+          const rawContent = String(event?.data || '').trim();
+          if (!rawContent || rawContent.startsWith('---')) {
+            return;
+          }
+
+          const isAdminPrefixed = /^Admin:\s*/i.test(rawContent);
+          const normalized = rawContent
+            .replace(/^User:\s*/i, '')
+            .replace(/^Admin:\s*/i, '');
+
           const newMessage = {
             id: Date.now(),
-            role: 'user',
+            role: isAdminPrefixed ? 'assistant' : 'user',
             type: 'text',
-            content: event.data,
+            content: normalized,
             timestamp: new Date().toISOString(),
-            sender: 'user'
+            sender: isAdminPrefixed ? 'admin' : 'user'
           };
           setMessages(prev => [...prev, newMessage]);
         }
@@ -430,6 +476,7 @@ const AdminChat = ({ sessionId, onClose }) => {
           content: input,
           role: 'admin'
         }));
+        setIsSending(false);
       } else {
         setError('Connection lost. Please refresh the page.');
         setIsSending(false);
@@ -479,6 +526,7 @@ const AdminChat = ({ sessionId, onClose }) => {
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         stream.getTracks().forEach((track) => track.stop());
         setIsRecording(false);
+        clearRecordingTimer();
 
         if (!blob.size) return;
 
@@ -519,9 +567,15 @@ const AdminChat = ({ sessionId, onClose }) => {
 
       recorder.start();
       setIsRecording(true);
+      setRecordingSeconds(0);
+      clearRecordingTimer();
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
     } catch {
       setError('Microphone access was denied.');
       setIsRecording(false);
+      clearRecordingTimer();
     }
   };
 
@@ -529,6 +583,26 @@ const AdminChat = ({ sessionId, onClose }) => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
+  };
+
+  const handleRecordPressStart = (event) => {
+    event.preventDefault();
+    if (!isRecording) {
+      startVoiceRecording();
+    }
+  };
+
+  const handleRecordPressEnd = (event) => {
+    event.preventDefault();
+    if (isRecording) {
+      stopVoiceRecording();
+    }
+  };
+
+  const formatRecordingDuration = (seconds = 0) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
   const handleDeleteSession = async () => {
@@ -651,8 +725,32 @@ const AdminChat = ({ sessionId, onClose }) => {
                       src={resolveAudioSource(msg)}
                     />
                   ) : (
-                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {msg.content}
+                    <div className="my-chat-markdown" style={{ wordBreak: 'break-word' }}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                        components={{
+                          p: ({ children }) => <p className="mb-1">{children}</p>,
+                          code: ({ inline, children }) =>
+                            inline ? (
+                              <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code>
+                            ) : (
+                              <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2">
+                                <code>{children}</code>
+                              </pre>
+                            ),
+                          ul: ({ children }) => <ul className="ps-3 mb-1">{children}</ul>,
+                          ol: ({ children }) => <ol className="ps-3 mb-1">{children}</ol>,
+                          li: ({ children }) => <li className="mb-1">{children}</li>,
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer">
+                              {children}
+                            </a>
+                          )
+                        }}
+                      >
+                        {msg.content || ''}
+                      </ReactMarkdown>
                     </div>
                   )}
                   {msg.timestamp && (
@@ -680,27 +778,31 @@ const AdminChat = ({ sessionId, onClose }) => {
         <div className="card-footer my-input-wrap p-2 border-top">
           {isRecording && (
             <div className="chat-recording-indicator mb-2">
-              <span className="chat-recording-dot" /> Recording in progress — speak now.
+              <span className="chat-recording-dot" /> Recording... {formatRecordingDuration(recordingSeconds)}
             </div>
           )}
 
-          <Form onSubmit={handleSendMessage} className="d-flex gap-2">
+          <Form onSubmit={handleSendMessage} className="d-flex gap-2 my-input-row">
             <Form.Control 
               type="text" 
               placeholder={isConnected ? 'Type a message' : 'Disconnected...'}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={!isConnected || isLoading}
-              className="border-0 shadow-none my-chat-input"
+              className="border-0 shadow-none my-chat-input my-mobile-input"
               style={{ fontSize: '0.88rem' }}
             />
             <Button
               type="button"
               variant={isRecording ? 'danger' : 'outline-primary'}
               disabled={!sessionInfo?.human_mode}
-              onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-              title={sessionInfo?.human_mode ? (isRecording ? 'Stop recording' : 'Record voice message') : 'Voice is available in human mode'}
-              className="d-flex align-items-center justify-content-center px-2"
+              onPointerDown={handleRecordPressStart}
+              onPointerUp={handleRecordPressEnd}
+              onPointerCancel={handleRecordPressEnd}
+              onPointerLeave={handleRecordPressEnd}
+              onContextMenu={(event) => event.preventDefault()}
+              title={sessionInfo?.human_mode ? 'Hold to record voice message' : 'Voice is available in human mode'}
+              className={`d-flex align-items-center justify-content-center px-2 my-mic-btn ${isRecording ? 'is-recording' : ''}`}
             >
               {isRecording ? <BiStopCircle /> : <BiMicrophone />}
             </Button>
