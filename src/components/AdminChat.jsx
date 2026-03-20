@@ -720,15 +720,16 @@ import { useState, useEffect, useRef } from 'react';
               messages.map((msg) => (
                 <div 
                   key={msg.id} 
-                  className={`d-flex mb-2 ${msg.sender === 'admin' ? 'justify-content-end' : 'justify-content-start'}`}
+                  className={`d-flex mb-2 align-items-center ${msg.sender === 'admin' ? 'justify-content-end' : 'justify-content-start'}`}
                 >
+                  {/* Message bubble */}
                   <div 
                     className={`p-2 px-3 rounded-3 my-message-bubble ${
                       msg.sender === 'admin'
                         ? 'my-message-admin rounded-bottom-end-0'
                         : 'my-message-user rounded-bottom-start-0'
                     }`}
-                    style={{ maxWidth: '78%', wordWrap: 'break-word', position: 'relative' }}
+                    style={{ maxWidth: '78%', wordWrap: 'break-word' }}
                   >
                     {msg.type === 'audio' ? (
                       <audio
@@ -738,7 +739,7 @@ import { useState, useEffect, useRef } from 'react';
                         src={resolveAudioSource(msg)}
                       />
                     ) : (
-                      <div className="my-chat-markdown" style={{ wordBreak: 'break-word', position: 'relative' }}>
+                      <div className="my-chat-markdown" style={{ wordBreak: 'break-word' }}>
                         <ReactMarkdown
                           remarkPlugins={[remarkMath]}
                           rehypePlugins={[rehypeKatex]}
@@ -764,22 +765,6 @@ import { useState, useEffect, useRef } from 'react';
                         >
                           {msg.content || ''}
                         </ReactMarkdown>
-                        {msg.type === 'text' && msg.content && (
-                          <button
-                            className="btn btn-sm btn-light my-copy-btn"
-                            style={{ position: 'absolute', top: 2, right: 2, zIndex: 2 }}
-                            title="Copy message"
-                            aria-label="Copy message"
-                            onClick={() => {
-                              navigator.clipboard.writeText(msg.content);
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" className="bi bi-clipboard" viewBox="0 0 16 16">
-                              <path d="M10 1.5v1a.5.5 0 0 0 .5.5h1A1.5 1.5 0 0 1 13 4.5v9A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h1a.5.5 0 0 0 .5-.5v-1A1.5 1.5 0 0 1 7.5 0h1A1.5 1.5 0 0 1 10 1.5zm-1 0A.5.5 0 0 0 8.5 1h-1a.5.5 0 0 0-.5.5v1A.5.5 0 0 0 7.5 3h1a.5.5 0 0 0 .5-.5v-1z"/>
-                              <path d="M3.5 4a.5.5 0 0 0-.5.5v9A.5.5 0 0 0 4.5 14h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7z"/>
-                            </svg>
-                          </button>
-                        )}
                       </div>
                     )}
                     {msg.timestamp && (
@@ -788,6 +773,23 @@ import { useState, useEffect, useRef } from 'react';
                       </small>
                     )}
                   </div>
+                  {/* Copy icon, only for text messages */}
+                  {msg.type === 'text' && msg.content && (
+                    <button
+                      className="btn btn-sm btn-light my-copy-btn ms-2"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'none', boxShadow: 'none' }}
+                      title="Copy message"
+                      aria-label="Copy message"
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                      }}
+                    >
+                      {/* WhatsApp style copy icon (Material Design) */}
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ))
             )}
@@ -830,7 +832,7 @@ import { useState, useEffect, useRef } from 'react';
                   onChange={(e) => setInput(e.target.value)}
                   disabled={!isConnected || isLoading}
                   className="border-0 shadow-none my-chat-input my-mobile-input rounded-pill"
-                  style={{ fontSize: '0.88rem' }}
+                  style={{ fontSize: '0.88rem', color: 'var(--text-main)', background: 'var(--section-bg)' }}
                 />
                 <Button
                   type="button"
