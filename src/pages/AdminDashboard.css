@@ -27,8 +27,31 @@
 
 .admin-dash-actions .btn {
   border-radius: 8px;
+  color: #fff;
+  background: #0d6efd;
+  border: none;
 }
 
+/* Theme toggler button fix */
+.admin-dash-actions .btn.theme-toggle-btn {
+  background: #fff;
+  color: #0d6efd;
+  border: 1px solid #0d6efd;
+}
+
+/* Light mode fixes */
+[data-bs-theme='light'] .admin-dash-actions .btn {
+  color: #0d6efd;
+  background: #fff;
+  border: 1px solid #0d6efd;
+}
+
+/* Dark mode fixes */
+[data-bs-theme='dark'] .admin-dash-actions .btn {
+  color: #fff;
+  background: #0d6efd;
+  border: none;
+}
 .admin-panel-card {
   border-radius: 12px;
   background: #ffffff !important;
@@ -102,6 +125,13 @@
 
 [data-bs-theme='dark'] .admin-dashboard-shell {
   background: linear-gradient(135deg, #111b21 0%, #1f2c34 100%) !important;
+}
+
+[data-bs-theme='dark'] .admin-dash-actions .btn.theme-toggle-btn {
+  background: #202c33;
+  color: #0d6efd;
+  border: 1px solid #0d6efd;
+}
 }
 
 [data-bs-theme='dark'] .admin-shell-title {

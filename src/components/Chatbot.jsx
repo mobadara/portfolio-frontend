@@ -690,10 +690,14 @@ const Chatbot = () => {
       return;
     }
 
-    if (isConnected && sendSocketMessage(messageText)) {
-      setIsLoading(true);
-      startLoadingTimeout();
-    }
+      if (isConnected && sendSocketMessage({
+        type: 'message',
+        content: messageText,
+        role: 'user'
+      })) {
+        setIsLoading(true);
+        startLoadingTimeout();
+      }
   };
 
   const handleSuggestedQuestion = (question) => {
@@ -1160,7 +1164,7 @@ const Chatbot = () => {
                             </button>
                             );
                           }
-  
+
                         // Standard links
                           return (
                             <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">

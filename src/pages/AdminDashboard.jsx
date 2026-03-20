@@ -549,6 +549,7 @@ function AdminDashboard() {
                 <Button
                   variant={theme === 'dark' ? 'light' : 'dark'}
                   size="sm"
+                  className="theme-toggle-btn"
                   onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
                 >
                   {theme === 'dark' ? <BiSun className="me-1" /> : <BiMoon className="me-1" />}
