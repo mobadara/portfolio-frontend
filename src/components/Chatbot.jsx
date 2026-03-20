@@ -415,8 +415,6 @@ const Chatbot = () => {
 
       try {
         const ws = new WebSocket(wsUrl);
-      try {
-        const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           if (isMounted) {
