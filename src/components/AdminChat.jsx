@@ -728,7 +728,7 @@ import { useState, useEffect, useRef } from 'react';
                         ? 'my-message-admin rounded-bottom-end-0'
                         : 'my-message-user rounded-bottom-start-0'
                     }`}
-                    style={{ maxWidth: '78%', wordWrap: 'break-word' }}
+                    style={{ maxWidth: '78%', wordWrap: 'break-word', position: 'relative' }}
                   >
                     {msg.type === 'audio' ? (
                       <audio
@@ -738,7 +738,7 @@ import { useState, useEffect, useRef } from 'react';
                         src={resolveAudioSource(msg)}
                       />
                     ) : (
-                      <div className="my-chat-markdown" style={{ wordBreak: 'break-word' }}>
+                      <div className="my-chat-markdown" style={{ wordBreak: 'break-word', position: 'relative' }}>
                         <ReactMarkdown
                           remarkPlugins={[remarkMath]}
                           rehypePlugins={[rehypeKatex]}
@@ -764,6 +764,22 @@ import { useState, useEffect, useRef } from 'react';
                         >
                           {msg.content || ''}
                         </ReactMarkdown>
+                        {msg.type === 'text' && msg.content && (
+                          <button
+                            className="btn btn-sm btn-light my-copy-btn"
+                            style={{ position: 'absolute', top: 2, right: 2, zIndex: 2 }}
+                            title="Copy message"
+                            aria-label="Copy message"
+                            onClick={() => {
+                              navigator.clipboard.writeText(msg.content);
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" className="bi bi-clipboard" viewBox="0 0 16 16">
+                              <path d="M10 1.5v1a.5.5 0 0 0 .5.5h1A1.5 1.5 0 0 1 13 4.5v9A1.5 1.5 0 0 1 11.5 15h-7A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h1a.5.5 0 0 0 .5-.5v-1A1.5 1.5 0 0 1 7.5 0h1A1.5 1.5 0 0 1 10 1.5zm-1 0A.5.5 0 0 0 8.5 1h-1a.5.5 0 0 0-.5.5v1A.5.5 0 0 0 7.5 3h1a.5.5 0 0 0 .5-.5v-1z"/>
+                              <path d="M3.5 4a.5.5 0 0 0-.5.5v9A.5.5 0 0 0 4.5 14h7a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-7z"/>
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     )}
                     {msg.timestamp && (

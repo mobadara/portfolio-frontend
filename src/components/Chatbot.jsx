@@ -415,6 +415,8 @@ const Chatbot = () => {
 
       try {
         const ws = new WebSocket(wsUrl);
+      try {
+        const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
           if (isMounted) {
@@ -540,23 +542,34 @@ const Chatbot = () => {
           setIsLoading(false);
           clearLoadingTimeout();
           webSocketRef.current = null;
+          // Reconnect logic: try to reconnect if not intentionally closed
+          setTimeout(() => {
+            if (isMounted && document.visibilityState === 'visible') {
+              initializeWebSocket();
+            }
+          }, 1500);
         };
 
         webSocketRef.current = ws;
+
+        // Listen for tab visibility changes to reconnect if needed
+        const handleVisibilityChange = () => {
+          if (document.visibilityState === 'visible' && (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN)) {
+            initializeWebSocket();
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Cleanup listener on unmount
+        return () => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
       } catch {
         if (isMounted) {
           setIsConnected(false);
           setIsConnecting(false);
         }
       }
-    };
-
-    initializeWebSocket();
-
-    return () => {
-      isMounted = false;
-      clearLoadingTimeout();
-      if (webSocketRef.current) {
         webSocketRef.current.close();
         webSocketRef.current = null;
       }
