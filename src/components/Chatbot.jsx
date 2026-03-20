@@ -62,6 +62,7 @@ const Chatbot = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isHumanMode, setIsHumanMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
   const [showHumanForm, setShowHumanForm] = useState(false);
   const [isLeadSubmitting, setIsLeadSubmitting] = useState(false);
@@ -83,6 +84,7 @@ const Chatbot = () => {
   const typingSoundIntervalRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
   const pendingReachSupportTriggerRef = useRef(false);
 
   const suggestedQuestions = [
@@ -171,7 +173,7 @@ const Chatbot = () => {
       oscillator.start();
       oscillator.stop(context.currentTime + duration);
     } catch {
-      // Silent fail for browsers that block autoplay/audio context.
+      // Silent fail
     }
   };
 
@@ -190,7 +192,6 @@ const Chatbot = () => {
       }
 
       const now = context.currentTime;
-
       const osc1 = context.createOscillator();
       const gain1 = context.createGain();
       osc1.type = 'triangle';
@@ -215,7 +216,7 @@ const Chatbot = () => {
       osc2.start(now + 0.04);
       osc2.stop(now + 0.11);
     } catch {
-      // Silent fail for browsers that block autoplay/audio context.
+      // Silent fail
     }
   };
 
@@ -224,24 +225,11 @@ const Chatbot = () => {
     const normalizedCompact = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
     const directTriggers = [
-      'human mode',
-      'human support',
-      'live support',
-      'live chat',
-      'real person',
-      'customer support',
-      'technical support',
-      'support agent',
-      'transfer me',
-      'escalate this',
-      'connect with muyiwa',
-      'connect me with muyiwa',
-      'talk to muyiwa',
-      'speak with muyiwa',
-      'contact muyiwa',
-      'reach muyiwa',
-      'chat with muyiwa',
-      'message muyiwa'
+      'human mode', 'human support', 'live support', 'live chat', 'real person',
+      'customer support', 'technical support', 'support agent', 'transfer me',
+      'escalate this', 'connect with muyiwa', 'connect me with muyiwa',
+      'talk to muyiwa', 'speak with muyiwa', 'contact muyiwa', 'reach muyiwa',
+      'chat with muyiwa', 'message muyiwa'
     ];
 
     if (directTriggers.some((trigger) => normalizedCompact.includes(trigger))) {
@@ -261,6 +249,13 @@ const Chatbot = () => {
     }
   };
 
+  const clearRecordingTimer = () => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
   const startLoadingTimeout = () => {
     clearLoadingTimeout();
     loadingTimeoutRef.current = setTimeout(() => {
@@ -274,6 +269,12 @@ const Chatbot = () => {
         }
       ]);
     }, 40000);
+  };
+
+  const formatRecordingDuration = (seconds = 0) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
   const scrollToBottom = () => {
@@ -296,11 +297,9 @@ const Chatbot = () => {
 
   useEffect(() => {
     if (!leadSubmitStatus || leadSubmitStatus.type === 'pending') return undefined;
-
     const timer = setTimeout(() => {
       setLeadSubmitStatus(null);
     }, 7000);
-
     return () => clearTimeout(timer);
   }, [leadSubmitStatus]);
 
@@ -324,6 +323,7 @@ const Chatbot = () => {
         setIsHumanMode(false);
         setIsRecording(false);
         clearLoadingTimeout();
+        clearRecordingTimer();
         resetHumanSupportForm();
       }
       return nextOpen;
@@ -334,7 +334,6 @@ const Chatbot = () => {
     if (isLoading) {
       if (typingSoundIntervalRef.current) {
         clearInterval(typingSoundIntervalRef.current);
-        typingSoundIntervalRef.current = null;
       }
       playTypingPulse();
       typingSoundIntervalRef.current = setInterval(() => {
@@ -344,7 +343,6 @@ const Chatbot = () => {
       clearInterval(typingSoundIntervalRef.current);
       typingSoundIntervalRef.current = null;
     }
-
     return () => {
       if (typingSoundIntervalRef.current) {
         clearInterval(typingSoundIntervalRef.current);
@@ -353,10 +351,13 @@ const Chatbot = () => {
     };
   }, [isLoading]);
 
-  useEffect(() => () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      clearRecordingTimer();
+    };
   }, []);
 
   useEffect(() => {
@@ -373,20 +374,13 @@ const Chatbot = () => {
 
     const resolveSessionId = async () => {
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-      if (!storedSessionId) {
-        return generateSessionId();
-      }
+      if (!storedSessionId) return generateSessionId();
 
       try {
         const response = await fetch(CHAT_SESSION_STATUS_ENDPOINT(storedSessionId));
-        if (!response.ok) {
-          return storedSessionId;
-        }
-
+        if (!response.ok) return storedSessionId;
         const data = await response.json();
-        if (data?.exists) {
-          return storedSessionId;
-        }
+        if (data?.exists) return storedSessionId;
       } catch {
         return storedSessionId;
       }
@@ -398,7 +392,6 @@ const Chatbot = () => {
 
     const initializeWebSocket = async () => {
       const sessionId = await resolveSessionId();
-
       if (!isMounted) return;
 
       sessionIdRef.current = sessionId;
@@ -467,7 +460,6 @@ const Chatbot = () => {
               if (activeSession) {
                 clearChatStorageForSession(activeSession);
               }
-
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
               sessionIdRef.current = null;
 
@@ -488,7 +480,6 @@ const Chatbot = () => {
                 webSocketRef.current.close();
                 webSocketRef.current = null;
               }
-
               setSocketResetNonce((prev) => prev + 1);
               return;
             }
@@ -540,7 +531,7 @@ const Chatbot = () => {
           setIsLoading(false);
           clearLoadingTimeout();
           webSocketRef.current = null;
-          // Reconnect logic: try to reconnect if not intentionally closed
+          
           setTimeout(() => {
             if (isMounted && document.visibilityState === 'visible') {
               initializeWebSocket();
@@ -549,25 +540,28 @@ const Chatbot = () => {
         };
 
         webSocketRef.current = ws;
-
-        // Listen for tab visibility changes to reconnect if needed
-        const handleVisibilityChange = () => {
-          if (document.visibilityState === 'visible' && (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN)) {
-            initializeWebSocket();
-          }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        // Cleanup listener on unmount
-        return () => {
-          document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
       } catch {
         if (isMounted) {
           setIsConnected(false);
           setIsConnecting(false);
         }
       }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN)) {
+        initializeWebSocket();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    initializeWebSocket();
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearLoadingTimeout();
+      if (webSocketRef.current) {
         webSocketRef.current.close();
         webSocketRef.current = null;
       }
@@ -576,7 +570,6 @@ const Chatbot = () => {
 
   const sendSocketMessage = (payload) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) return false;
-
     try {
       if (typeof payload === 'string') {
         webSocketRef.current.send(payload);
@@ -593,23 +586,12 @@ const Chatbot = () => {
     const sessionId = sessionIdRef.current;
     const parserFriendlyMessage = `Name: ${name} | Email: ${email} | Phone: ${fullPhone}`;
     const transferPayload = {
-      name,
-      user_name: name,
-      requester_name: name,
-      email,
-      user_email: email,
-      phone: fullPhone,
-      phone_number: fullPhone,
-      contact_phone: fullPhone,
-      phone_e164: fullPhone,
-      country_code: countryCode,
-      phone_local: localPhone,
-      message: parserFriendlyMessage,
-      details: detailsMessage,
-      notes: detailsMessage,
-      subject: 'Transfer Request',
-      type: 'request_human',
-      source: 'portfolio-frontend',
+      name, user_name: name, requester_name: name,
+      email, user_email: email,
+      phone: fullPhone, phone_number: fullPhone, contact_phone: fullPhone, phone_e164: fullPhone,
+      country_code: countryCode, phone_local: localPhone,
+      message: parserFriendlyMessage, details: detailsMessage, notes: detailsMessage,
+      subject: 'Transfer Request', type: 'request_human', source: 'portfolio-frontend',
       timestamp: new Date().toISOString()
     };
 
@@ -620,12 +602,9 @@ const Chatbot = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(transferPayload)
         });
-
-        if (response.ok) {
-          return true;
-        }
+        if (response.ok) return true;
       } catch {
-        // fallback below
+        // fallback
       }
     }
 
@@ -634,13 +613,10 @@ const Chatbot = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          email,
-          subject: 'Transfer Request',
+          name, email, subject: 'Transfer Request',
           message: `${parserFriendlyMessage}\n\n${detailsMessage}`
         })
       });
-
       return response.ok;
     } catch {
       return false;
@@ -684,10 +660,7 @@ const Chatbot = () => {
     playChatSound('send');
 
     const wantsHumanSupport = shouldEnableHumanMode(messageText);
-
-    if (wantsHumanSupport) {
-      openHumanSupportForm();
-    }
+    if (wantsHumanSupport) openHumanSupportForm();
 
     if (!isConnected && !wantsHumanSupport) {
       setMessages((prev) => [
@@ -701,22 +674,16 @@ const Chatbot = () => {
       return;
     }
 
-      if (isConnected && sendSocketMessage({
-        type: 'message',
-        content: messageText,
-        role: 'user'
-      })) {
-        setIsLoading(true);
-        startLoadingTimeout();
-      }
+    if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
+      setIsLoading(true);
+      startLoadingTimeout();
+    }
   };
 
   const handleSuggestedQuestion = (question) => {
     if (!isConnected) return;
-
     const normalizedQuestion = String(question || '').toLowerCase();
     pendingReachSupportTriggerRef.current = normalizedQuestion.includes('how can i reach you');
-
     setMessages((prev) => [...prev, { id: getNextMessageId(), text: question, sender: 'user', type: 'text' }]);
     playChatSound('send');
 
@@ -736,15 +703,10 @@ const Chatbot = () => {
     if (humanFormStep === 0) {
       const trimmedName = contactForm.name.trim();
       if (!trimmedName) return;
-
       setMessages((prev) => [
         ...prev,
         { id: getNextMessageId(), text: trimmedName, sender: 'user' },
-        {
-          id: getNextMessageId(),
-          text: "Got it! Now, what's your email address? (e.g., john@example.com)",
-          sender: 'bot'
-        }
+        { id: getNextMessageId(), text: "Got it! Now, what's your email address? (e.g., john@example.com)", sender: 'bot' }
       ]);
       playChatSound('send');
       setHumanFormStep(1);
@@ -757,23 +719,14 @@ const Chatbot = () => {
       if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
         setMessages((prev) => [
           ...prev,
-          {
-            id: getNextMessageId(),
-            text: 'Please enter a valid email address (e.g., john@example.com)',
-            sender: 'bot'
-          }
+          { id: getNextMessageId(), text: 'Please enter a valid email address (e.g., john@example.com)', sender: 'bot' }
         ]);
         return;
       }
-
       setMessages((prev) => [
         ...prev,
         { id: getNextMessageId(), text: trimmedEmail, sender: 'user' },
-        {
-          id: getNextMessageId(),
-          text: "Perfect! Finally, choose your country code and enter your phone number.",
-          sender: 'bot'
-        }
+        { id: getNextMessageId(), text: "Perfect! Finally, choose your country code and enter your phone number.", sender: 'bot' }
       ]);
       playChatSound('send');
       setHumanFormStep(2);
@@ -787,22 +740,13 @@ const Chatbot = () => {
       if (!localPhone) return;
 
       const fullPhone = `${contactForm.countryCode}${localPhone}`;
-
       const detailsMessage = `Human support details:\n- Name: ${trimmedName}\n- Email: ${trimmedEmail}\n- Phone: ${fullPhone}`;
 
       const humanSupportPayload = {
-        type: 'HUMAN_SUPPORT_REQUEST',
-        version: 3,
-        schema: 'human_support_lead',
-        name: trimmedName,
-        email: trimmedEmail,
-        country_code: contactForm.countryCode,
-        phone_local: localPhone,
-        phone: fullPhone,
-        phone_e164: fullPhone,
-        message: detailsMessage,
-        source: 'portfolio-frontend',
-        timestamp: new Date().toISOString()
+        type: 'HUMAN_SUPPORT_REQUEST', version: 3, schema: 'human_support_lead',
+        name: trimmedName, email: trimmedEmail, country_code: contactForm.countryCode,
+        phone_local: localPhone, phone: fullPhone, phone_e164: fullPhone,
+        message: detailsMessage, source: 'portfolio-frontend', timestamp: new Date().toISOString()
       };
 
       const legacyPayload = `HUMAN_SUPPORT_REQUEST\n${detailsMessage}`;
@@ -810,11 +754,7 @@ const Chatbot = () => {
       setMessages((prev) => [
         ...prev,
         { id: getNextMessageId(), text: detailsMessage, sender: 'user' },
-        {
-          id: getNextMessageId(),
-          text: 'Perfect! Your details have been captured. A human support representative will reach out to you shortly. Thank you!',
-          sender: 'bot'
-        }
+        { id: getNextMessageId(), text: 'Perfect! Your details have been captured. A human support representative will reach out to you shortly. Thank you!', sender: 'bot' }
       ]);
       playChatSound('send');
 
@@ -822,12 +762,8 @@ const Chatbot = () => {
       setLeadSubmitStatus({ type: 'pending', text: 'Sending details to support...' });
 
       const leadSaved = await submitHumanSupportLead({
-        name: trimmedName,
-        email: trimmedEmail,
-        countryCode: contactForm.countryCode,
-        localPhone,
-        fullPhone,
-        detailsMessage
+        name: trimmedName, email: trimmedEmail, countryCode: contactForm.countryCode,
+        localPhone, fullPhone, detailsMessage
       });
 
       if (leadSaved) {
@@ -836,107 +772,52 @@ const Chatbot = () => {
         setLeadSubmitStatus({ type: 'error', text: 'Could not confirm delivery. Please try again.' });
         setMessages((prev) => [
           ...prev,
-          {
-            id: getNextMessageId(),
-            text: 'I could not confirm lead delivery to the support inbox. Please submit again or use the contact page.',
-            sender: 'bot'
-          }
+          { id: getNextMessageId(), text: 'I could not confirm lead delivery to the support inbox. Please submit again or use the contact page.', sender: 'bot' }
         ]);
       }
 
       setIsLeadSubmitting(false);
-
-      if (!sendSocketMessage(humanSupportPayload)) {
-        sendSocketMessage(legacyPayload);
-      }
-
+      if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
       setIsHumanMode(true);
-
       resetHumanSupportForm();
     }
   };
 
   const renderHumanFormStep = () => {
     if (!showHumanForm) return null;
-
     return (
       <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3">
         {leadSubmitStatus && (
-          <div
-            className={`alert py-2 px-2 mb-2 small ${
-              leadSubmitStatus.type === 'success'
-                ? 'alert-success'
-                : leadSubmitStatus.type === 'error'
-                  ? 'alert-danger'
-                  : 'alert-info'
-            }`}
-            role="status"
-          >
+          <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
             {leadSubmitStatus.text}
           </div>
         )}
-
         {humanFormStep === 0 && (
           <>
             <small className="d-block mb-2 text-muted">Step 1 of 3</small>
-            <Form.Control
-              className="mb-2"
-              type="text"
-              placeholder="Enter your full name"
-              value={contactForm.name}
-              onChange={(e) => handleContactFieldChange('name', e.target.value)}
-              autoFocus
-            />
-            <Button type="submit" variant="primary" className="w-100" disabled={!contactForm.name.trim()}>
-              Continue
-            </Button>
+            <Form.Control className="mb-2" type="text" placeholder="Enter your full name" value={contactForm.name} onChange={(e) => handleContactFieldChange('name', e.target.value)} autoFocus />
+            <Button type="submit" variant="primary" className="w-100 bg-navy" disabled={!contactForm.name.trim()}>Continue</Button>
           </>
         )}
-
         {humanFormStep === 1 && (
           <>
             <small className="d-block mb-2 text-muted">Step 2 of 3</small>
-            <Form.Control
-              className="mb-2"
-              type="email"
-              placeholder="Enter your email (e.g., john@example.com)"
-              value={contactForm.email}
-              onChange={(e) => handleContactFieldChange('email', e.target.value)}
-              autoFocus
-            />
-            <Button type="submit" variant="primary" className="w-100" disabled={!contactForm.email.trim()}>
-              Next
-            </Button>
+            <Form.Control className="mb-2" type="email" placeholder="Enter your email (e.g., john@example.com)" value={contactForm.email} onChange={(e) => handleContactFieldChange('email', e.target.value)} autoFocus />
+            <Button type="submit" variant="primary" className="w-100 bg-navy" disabled={!contactForm.email.trim()}>Next</Button>
           </>
         )}
-
         {humanFormStep === 2 && (
           <>
             <small className="d-block mb-2 text-muted">Step 3 of 3</small>
             <div className="d-flex gap-2 mb-2">
-              <Form.Select
-                style={{ maxWidth: '48%' }}
-                value={contactForm.countryCode}
-                onChange={(e) => handleContactFieldChange('countryCode', e.target.value)}
-                aria-label="Select country code"
-              >
+              <Form.Select style={{ maxWidth: '48%' }} value={contactForm.countryCode} onChange={(e) => handleContactFieldChange('countryCode', e.target.value)}>
                 {COUNTRY_CODES.map((entry) => (
-                  <option key={entry.code} value={entry.code}>
-                    {entry.label}
-                  </option>
+                  <option key={entry.code} value={entry.code}>{entry.label}</option>
                 ))}
               </Form.Select>
-              <Form.Control
-                type="tel"
-                placeholder="Phone number"
-                value={contactForm.phone}
-                onChange={(e) => handleContactFieldChange('phone', e.target.value)}
-                autoFocus
-              />
+              <Form.Control type="tel" placeholder="Phone number" value={contactForm.phone} onChange={(e) => handleContactFieldChange('phone', e.target.value)} autoFocus />
             </div>
-            <small className="d-block mb-2 text-muted">
-              Selected: {selectedCountry.label}
-            </small>
+            <small className="d-block mb-2 text-muted">Selected: {selectedCountry.label}</small>
             <Button type="submit" variant="success" className="w-100" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
               {isLeadSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
@@ -969,6 +850,7 @@ const Chatbot = () => {
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         stream.getTracks().forEach((track) => track.stop());
         setIsRecording(false);
+        clearRecordingTimer();
 
         if (!blob.size) return;
 
@@ -1006,9 +888,15 @@ const Chatbot = () => {
 
       recorder.start();
       setIsRecording(true);
+      setRecordingSeconds(0);
+      clearRecordingTimer();
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
     } catch {
       setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' });
       setIsRecording(false);
+      clearRecordingTimer();
     }
   };
 
@@ -1020,17 +908,9 @@ const Chatbot = () => {
 
   const handleClearChat = async () => {
     const activeSession = sessionIdRef.current;
-
     if (activeSession) {
       sendSocketMessage({ type: 'clear_chat', session_id: activeSession, timestamp: new Date().toISOString() });
-      try {
-        await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' });
-      } catch {
-        // WebSocket clear event already sent; ignore network fallback failures.
-      }
-    }
-
-    if (activeSession) {
+      try { await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' }); } catch {}
       clearChatStorageForSession(activeSession);
     }
 
@@ -1052,17 +932,16 @@ const Chatbot = () => {
     setIsConnected(false);
     setIsConnecting(true);
     clearLoadingTimeout();
+    clearRecordingTimer();
 
-    if (isOpen) {
-      setSocketResetNonce((prev) => prev + 1);
-    }
+    if (isOpen) setSocketResetNonce((prev) => prev + 1);
   };
 
   return (
     <>
       <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
         <Button
-          className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg"
+          className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg bg-navy"
           onClick={toggleChat}
           aria-label="Toggle Chat"
           title={isOpen ? 'Close chat' : 'Open chat'}
@@ -1070,22 +949,16 @@ const Chatbot = () => {
           {isOpen ? <BiX size={26} /> : <BsChatFill size={22} />}
         </Button>
         <span
-          className={`chatbot-status-dot ${
-            isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'
-          }`}
+          className={`chatbot-status-dot ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`}
           title={isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
         />
       </div>
 
       <div className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}>
         <Card className="h-100 border-0 overflow-hidden d-flex flex-column">
-          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3">
+          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy">
             <div className="d-flex align-items-center gap-2">
-              <span
-                className={`chatbot-status-dot chatbot-status-dot--lg ${
-                  isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'
-                }`}
-              />
+              <span className={`chatbot-status-dot chatbot-status-dot--lg ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`} />
               <div>
                 <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
                 <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'} opacity-90`}>
@@ -1093,12 +966,7 @@ const Chatbot = () => {
                 </small>
               </div>
             </div>
-            <button
-              onClick={toggleChat}
-              className="btn btn-sm text-white p-0 chatbot-close-btn"
-              aria-label="Close chat"
-              type="button"
-            >
+            <button onClick={toggleChat} className="btn btn-sm text-white p-0 chatbot-close-btn" aria-label="Close chat" type="button">
               <BiX size={22} />
             </button>
           </div>
@@ -1108,22 +976,11 @@ const Chatbot = () => {
               <small className="text-muted d-block mb-2">Quick questions:</small>
               <div className="d-flex flex-wrap gap-2">
                 {suggestedQuestions.map((question, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestedQuestion(question)}
-                    disabled={!isConnected}
-                    className="btn btn-sm chatbot-quick-btn text-start text-wrap"
-                    style={{ fontSize: '0.8rem' }}
-                  >
+                  <button key={index} onClick={() => handleSuggestedQuestion(question)} disabled={!isConnected} className="btn btn-sm chatbot-quick-btn text-start text-wrap" style={{ fontSize: '0.8rem' }}>
                     {question}
                   </button>
                 ))}
-                <button
-                  onClick={openHumanSupportForm}
-                  className="btn btn-sm chatbot-transfer-btn text-start text-wrap"
-                  style={{ fontSize: '0.8rem' }}
-                  type="button"
-                >
+                <button onClick={openHumanSupportForm} className="btn btn-sm chatbot-transfer-btn text-start text-wrap" style={{ fontSize: '0.8rem' }} type="button">
                   Transfer to Muyiwa
                 </button>
               </div>
@@ -1131,57 +988,28 @@ const Chatbot = () => {
 
             {messages.map((msg) => (
               <div key={msg.id} className={`d-flex mb-3 gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`}>
-                <div
-                  className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
-                  style={{ maxWidth: '80%', borderRadius: '12px' }}
-                >
+                <div className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`} style={{ maxWidth: '80%', borderRadius: '12px' }}>
                   {msg.type === 'audio' ? (
-                    <audio
-                      controls
-                      preload="metadata"
-                      style={{ width: '220px', maxWidth: '100%' }}
-                      src={resolveAudioSource(msg)}
-                    />
+                    <audio controls preload="metadata" style={{ width: '220px', maxWidth: '100%' }} src={resolveAudioSource(msg)} />
                   ) : (
                     <ReactMarkdown
                       remarkPlugins={[remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                       components={{
                         p: ({ children }) => <p className="mb-2">{children}</p>,
-                        code: ({ inline, children }) =>
-                          inline ? (
-                            <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code>
-                          ) : (
-                            <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2">
-                              <code>{children}</code>
-                            </pre>
-                          ),
+                        code: ({ inline, children }) => inline ? <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code> : <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2"><code>{children}</code></pre>,
                         ul: ({ children }) => <ul className="ps-4 mb-2">{children}</ul>,
                         ol: ({ children }) => <ol className="ps-4 mb-2">{children}</ol>,
                         li: ({ children }) => <li className="mb-1">{children}</li>,
                         a: ({ href, children }) => {
-                        // Intercept the special #transfer link from the AI and render a UI button instead
-                        if (href === '#transfer') {
-                          return (
-                            <button
-                              onClick={(e) => {
-                              e.preventDefault();
-                              openHumanSupportForm();
-                              }}
-                              className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn"
-                              type="button"
-                            >
-                              {children}
-                            </button>
+                          if (href === '#transfer') {
+                            return (
+                              <button onClick={(e) => { e.preventDefault(); openHumanSupportForm(); }} className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn" type="button">
+                                {children}
+                              </button>
                             );
                           }
-
-                        // Standard links
-                          return (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">
-                            {children}
-                            </a>
-                          );
+                          return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">{children}</a>;
                         },
                         strong: ({ children }) => <strong>{children}</strong>,
                         em: ({ children }) => <em>{children}</em>
@@ -1202,73 +1030,97 @@ const Chatbot = () => {
                 </div>
               </div>
             )}
-
             <div ref={messagesEndRef} />
           </Card.Body>
 
-          <div className="card-footer bg-white border-top p-2">
+          <div className="card-footer bg-white p-2 border-top">
             {renderHumanFormStep()}
 
             {!showHumanForm && leadSubmitStatus && (
-              <div
-                className={`alert py-2 px-2 mb-2 small ${
-                  leadSubmitStatus.type === 'success'
-                    ? 'alert-success'
-                    : leadSubmitStatus.type === 'error'
-                      ? 'alert-danger'
-                      : 'alert-info'
-                }`}
-                role="status"
-              >
+              <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
                 {leadSubmitStatus.text}
               </div>
             )}
 
-            {isRecording && (
-              <div className="chat-recording-indicator mb-2">
-                <span className="chat-recording-dot" /> Recording in progress — speak now.
+            <Form onSubmit={handleSend} className="d-flex align-items-center gap-2 position-relative">
+              
+              <div className="flex-grow-1 bg-light rounded-pill d-flex align-items-center px-3" style={{ minHeight: '45px', transition: 'all 0.3s ease' }}>
+                {isRecording ? (
+                  <div className="d-flex align-items-center w-100 text-danger animate__animated animate__fadeIn">
+                    <span 
+                      className="me-2" 
+                      style={{ width: '10px', height: '10px', backgroundColor: '#dc3545', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} 
+                    />
+                    <span className="fw-medium fs-6">{formatRecordingDuration(recordingSeconds)}</span>
+                    <span className="ms-auto small text-muted">Recording...</span>
+                  </div>
+                ) : (
+                  <Form.Control 
+                    type="text" 
+                    placeholder={isConnected ? 'Type a message...' : 'Disconnected...'}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={!isConnected && !isHumanMode}
+                    className="border-0 shadow-none bg-transparent px-0"
+                    style={{ fontSize: '0.95rem' }}
+                  />
+                )}
               </div>
-            )}
 
-            <Form onSubmit={handleSend} className="d-flex gap-2">
-              <Form.Control
-                placeholder={isConnected ? 'Type a message...' : 'Disconnected...'}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend(e);
-                  }
-                }}
-                disabled={false}
-                className="border rounded-lg bg-light chatbot-message-input"
-                style={{ fontSize: '0.9rem', color: '#333' }}
-                rows="1"
-              />
-              {isHumanMode && (
+              {input.trim() && !isRecording ? (
+                <Button 
+                  type="submit" 
+                  variant="primary"
+                  disabled={!isConnected && !isHumanMode}
+                  className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 flex-shrink-0 shadow-sm"
+                  style={{ width: '45px', height: '45px' }}
+                >
+                  <BiSend size={20} />
+                </Button>
+              ) : (
+                isHumanMode && (
+                  <Button
+                    type="button"
+                    variant={isRecording ? 'danger' : 'primary'}
+                    className={`rounded-circle d-flex align-items-center justify-content-center border-0 flex-shrink-0 shadow-sm ${!isRecording ? 'bg-navy' : ''}`}
+                    style={{ 
+                      width: '45px', 
+                      height: '45px', 
+                      transition: 'transform 0.2s ease-in-out', 
+                      transform: isRecording ? 'scale(1.15)' : 'scale(1)' 
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault(); 
+                      startVoiceRecording();
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      stopVoiceRecording();
+                    }}
+                    onClick={(e) => {
+                      if (e.nativeEvent.pointerType === 'mouse' || !e.nativeEvent.pointerType) {
+                        isRecording ? stopVoiceRecording() : startVoiceRecording();
+                      }
+                    }}
+                    title={isRecording ? 'Stop recording' : 'Record voice message'}
+                  >
+                    {isRecording ? <BiStopCircle size={24} /> : <BiMicrophone size={24} />}
+                  </Button>
+                )
+              )}
+              
+              {!isRecording && (
                 <Button
                   type="button"
-                  variant={isRecording ? 'danger' : 'outline-primary'}
-                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                  title={isRecording ? 'Stop recording' : 'Record voice message'}
-                  className="px-2"
+                  variant="outline-secondary"
+                  onClick={handleClearChat}
+                  title="Clear chat"
+                  className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm border-0"
+                  style={{ width: '45px', height: '45px', backgroundColor: '#f8f9fa' }}
                 >
-                  {isRecording ? <BiStopCircle /> : <BiMicrophone />}
+                  <BiTrash size={20} />
                 </Button>
               )}
-              <Button type="submit" variant="primary" disabled={!input.trim()} className="bg-navy border-0 px-3">
-                <BiSend />
-              </Button>
-              <Button
-                type="button"
-                variant="outline-secondary"
-                onClick={handleClearChat}
-                title="Clear chat"
-                className="px-2"
-              >
-                <BiTrash />
-              </Button>
             </Form>
           </div>
         </Card>
