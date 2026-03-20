@@ -1144,11 +1144,30 @@ const Chatbot = () => {
                         ul: ({ children }) => <ul className="ps-4 mb-2">{children}</ul>,
                         ol: ({ children }) => <ol className="ps-4 mb-2">{children}</ol>,
                         li: ({ children }) => <li className="mb-1">{children}</li>,
-                        a: ({ href, children }) => (
-                          <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">
+                        a: ({ href, children }) => {
+                        // Intercept the special #transfer link from the AI and render a UI button instead
+                        if (href === '#transfer') {
+                          return (
+                            <button
+                              onClick={(e) => {
+                              e.preventDefault();
+                              openHumanSupportForm();
+                              }}
+                              className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn"
+                              type="button"
+                            >
+                              {children}
+                            </button>
+                            );
+                          }
+  
+                        // Standard links
+                          return (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">
                             {children}
-                          </a>
-                        ),
+                            </a>
+                          );
+                        },
                         strong: ({ children }) => <strong>{children}</strong>,
                         em: ({ children }) => <em>{children}</em>
                       }}
