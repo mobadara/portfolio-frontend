@@ -844,24 +844,47 @@ const Chatbot = () => {
         />
       </div>
 
-      {/* Fullscreen Modal for Mobile Chat */}
+      {/* Responsive Chat Window: fixed size on desktop, fullscreen on mobile */}
       <div
         className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}
         style={{
           position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          maxWidth: '100vw',
-          maxHeight: '100vh',
+          bottom: '24px',
+          right: '24px',
+          width: '100%',
+          maxWidth: '370px',
+          height: '540px',
+          maxHeight: '80vh',
           zIndex: 1050,
           display: isOpen ? 'flex' : 'none',
           flexDirection: 'column',
-          background: 'rgba(0,0,0,0.12)'
+          background: 'rgba(0,0,0,0.12)',
+          borderRadius: '18px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+          overflow: 'hidden',
         }}
       >
-        <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100" style={{ borderRadius: 0, maxWidth: '100vw' }}>
+        <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100" style={{ borderRadius: 18, maxWidth: '100%' }}>
+                {/* Responsive style for mobile: full screen */}
+                <style>{`
+                  @media (max-width: 600px) {
+                    .chatbot-window {
+                      top: 0 !important;
+                      left: 0 !important;
+                      right: 0 !important;
+                      bottom: 0 !important;
+                      width: 100vw !important;
+                      max-width: 100vw !important;
+                      height: 100vh !important;
+                      max-height: 100vh !important;
+                      border-radius: 0 !important;
+                    }
+                    .chatbot-fab-wrapper {
+                      right: 18px !important;
+                      bottom: 18px !important;
+                    }
+                  }
+                `}</style>
           
           {/* Sticky Header */}
           <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy sticky-top" style={{ minHeight: 60 }}>
