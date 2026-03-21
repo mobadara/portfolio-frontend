@@ -20,7 +20,6 @@
     "react-github-calendar": "^5.0.4",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
-    "react-particles": "^2.12.2",
     "react-router-dom": "^7.13.0",
     "remark-math": "^6.0.0",
     "tsparticles-slim": "^2.12.0"

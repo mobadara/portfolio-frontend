@@ -77,188 +77,234 @@ const Chatbot = () => {
 
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
-  const sessionIdRef = useRef(null);
-  const messageIdRef = useRef(2);
-  const loadingTimeoutRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const typingSoundIntervalRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const recordingChunksRef = useRef([]);
-  const recordingTimerRef = useRef(null);
-  const pendingReachSupportTriggerRef = useRef(false);
+  return (
+    <>
+      {/* Floating Action Button (FAB) */}
+      <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
+        <Button
+          className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg bg-navy"
+          onClick={toggleChat}
+          aria-label="Toggle Chat"
+          title={isOpen ? 'Close chat' : 'Open chat'}
+        >
+          {isOpen ? <BiX size={26} /> : <BsChatFill size={22} />}
+        </Button>
+        <span
+          className={`chatbot-status-dot ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`}
+          title={isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+        />
+      </div>
 
-  const suggestedQuestions = [
-    'What are your key skills?',
-    'Tell me about recent projects',
-    'How can I reach you?'
-  ];
+      {/* Fullscreen Modal for Mobile Chat */}
+      <div
+        className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          maxWidth: '100vw',
+          maxHeight: '100vh',
+          zIndex: 1050,
+          display: isOpen ? 'flex' : 'none',
+          flexDirection: 'column',
+          background: 'rgba(0,0,0,0.12)'
+        }}
+      >
+        <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100" style={{ borderRadius: 0, maxWidth: '100vw' }}>
+          {/* Sticky Header */}
+          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy sticky-top" style={{ minHeight: 60 }}>
+            <div className="d-flex align-items-center gap-2">
+              <span className={`chatbot-status-dot chatbot-status-dot--lg ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`} />
+              <div>
+                <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
+                <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'} opacity-90`}>
+                  {isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+                </small>
+              </div>
+            </div>
+            <button onClick={toggleChat} className="btn btn-sm text-white p-0 chatbot-close-btn" aria-label="Close chat" type="button">
+              <BiX size={22} />
+            </button>
+          </div>
 
-  const selectedCountry = useMemo(
-    () => COUNTRY_CODES.find((item) => item.code === contactForm.countryCode) || COUNTRY_CODES[0],
-    [contactForm.countryCode]
+          {/* Chat Messages Area */}
+          <Card.Body
+            className="chat-messages overflow-auto flex-grow-1 px-2 px-md-3 py-2 py-md-3"
+            style={{
+              background: '#f7f8fa',
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              paddingBottom: 0
+            }}
+          >
+            <div className="quick-questions-sticky mb-2 mb-md-3">
+              <small className="text-muted d-block mb-2">Quick questions:</small>
+              <div className="d-flex flex-wrap gap-2">
+                {suggestedQuestions.map((question, index) => (
+                  <button key={index} onClick={() => handleSuggestedQuestion(question)} disabled={!isConnected} className="btn btn-sm chatbot-quick-btn text-start text-wrap" style={{ fontSize: '0.8rem' }}>
+                    {question}
+                  </button>
+                ))}
+                <button onClick={openHumanSupportForm} className="btn btn-sm chatbot-transfer-btn text-start text-wrap" style={{ fontSize: '0.8rem' }} type="button">
+                  Transfer to Muyiwa
+                </button>
+              </div>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`d-flex gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`}
+                  style={{ width: '100%' }}
+                >
+                  <div
+                    className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
+                    style={{
+                      maxWidth: '90vw',
+                      minWidth: '30px',
+                      borderRadius: 14,
+                      fontSize: '1rem',
+                      wordBreak: 'break-word',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                      marginLeft: msg.sender === 'user' ? 'auto' : 0,
+                      marginRight: msg.sender === 'user' ? 0 : 'auto',
+                    }}
+                  >
+                    {msg.type === 'audio' ? (
+                      <audio controls preload="metadata" style={{ width: '220px', maxWidth: '100%' }} src={resolveAudioSource(msg)} />
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
+                        components={{
+                          p: ({ children }) => <p className="mb-2">{children}</p>,
+                          code: ({ inline, children }) => inline ? <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code> : <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2"><code>{children}</code></pre>,
+                          ul: ({ children }) => <ul className="ps-4 mb-2">{children}</ul>,
+                          ol: ({ children }) => <ol className="ps-4 mb-2">{children}</ol>,
+                          li: ({ children }) => <li className="mb-1">{children}</li>,
+                          a: ({ href, children }) => {
+                            if (href === '#transfer') {/* ...existing code... */}
+                            return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">{children}</a>;
+                          },
+                          strong: ({ children }) => <strong>{children}</strong>,
+                          em: ({ children }) => <em>{children}</em>
+                        }}
+                      >
+                        {msg.text || ''}
+                      </ReactMarkdown>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="d-flex mb-3">
+                  <div className="bg-light text-dark py-2 px-3 rounded-lg d-flex align-items-center gap-2">
+                    <Spinner animation="grow" size="sm" variant="secondary" />
+                    <small>Typing...</small>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          </Card.Body>
+
+          {/* Sticky Footer for Input */}
+          <div className="card-footer bg-white p-2 border-top sticky-bottom" style={{ minHeight: 70, boxShadow: '0 -2px 8px rgba(0,0,0,0.04)' }}>
+            {renderHumanFormStep()}
+
+            {!showHumanForm && leadSubmitStatus && (
+              <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
+                {leadSubmitStatus.text}
+              </div>
+            )}
+
+            <Form onSubmit={handleSend} className="d-flex align-items-center gap-2 position-relative" style={{ width: '100%' }}>
+              <div className="flex-grow-1 bg-light rounded-pill d-flex align-items-center px-3" style={{ minHeight: '45px', transition: 'all 0.3s ease' }}>
+                {isRecording ? (
+                  <div className="d-flex align-items-center w-100 text-danger animate__animated animate__fadeIn">
+                    <span 
+                      className="me-2" 
+                      style={{ width: '10px', height: '10px', backgroundColor: '#dc3545', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} 
+                    />
+                    <span className="fw-medium fs-6">{formatRecordingDuration(recordingSeconds)}</span>
+                    <span className="ms-auto small text-muted">Recording...</span>
+                  </div>
+                ) : (
+                  <Form.Control 
+                    type="text" 
+                    placeholder={isConnected ? 'Type a message...' : 'Disconnected...'}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={!isConnected && !isHumanMode}
+                    className="border-0 shadow-none bg-transparent px-0"
+                    style={{ fontSize: '0.95rem', background: 'transparent' }}
+                  />
+                )}
+              </div>
+
+              {input.trim() && !isRecording ? (
+                <Button 
+                  type="submit" 
+                  variant="primary"
+                  disabled={!isConnected && !isHumanMode}
+                  className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 flex-shrink-0 shadow-sm"
+                  style={{ width: '45px', height: '45px' }}
+                >
+                  <BiSend size={20} />
+                </Button>
+              ) : (
+                isHumanMode && (
+                  <Button
+                    type="button"
+                    variant={isRecording ? 'danger' : 'primary'}
+                    className={`rounded-circle d-flex align-items-center justify-content-center border-0 flex-shrink-0 shadow-sm ${!isRecording ? 'bg-navy' : ''}`}
+                    style={{ 
+                      width: '45px', 
+                      height: '45px', 
+                      transition: 'transform 0.2s ease-in-out', 
+                      transform: isRecording ? 'scale(1.15)' : 'scale(1)' 
+                    }}
+                    onTouchStart={(e) => {
+                      e.preventDefault(); 
+                      startVoiceRecording();
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      stopVoiceRecording();
+                    }}
+                    onClick={(e) => {
+                      if (e.nativeEvent.pointerType === 'mouse' || !e.nativeEvent.pointerType) {/* ...existing code... */}
+                    }}
+                    title={isRecording ? 'Stop recording' : 'Record voice message'}
+                  >
+                    {isRecording ? <BiStopCircle size={24} /> : <BiMicrophone size={24} />}
+                  </Button>
+                )
+              )}
+
+              {!isRecording && (
+                <Button
+                  type="button"
+                  variant="outline-secondary"
+                  onClick={handleClearChat}
+                  title="Clear chat"
+                  className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm border-0"
+                  style={{ width: '45px', height: '45px', backgroundColor: '#f8f9fa' }}
+                >
+                  <BiTrash size={20} />
+                </Button>
+              )}
+            </Form>
+          </div>
+        </Card>
+      </div>
+    </>
   );
-
-  const getNextMessageId = () => {
-    const nextId = messageIdRef.current;
-    messageIdRef.current += 1;
-    return nextId;
-  };
-
-  const loadMessagesForSession = (sessionId) => {
-    const key = getChatMessagesStorageKey(sessionId);
-    const raw = localStorage.getItem(key);
-    if (!raw) return [defaultBotMessage];
-
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-      return [defaultBotMessage];
-    } catch {
-      return [defaultBotMessage];
-    }
-  };
-
-  const persistMessagesForSession = (sessionId, updatedMessages) => {
-    if (!sessionId) return;
-    localStorage.setItem(getChatMessagesStorageKey(sessionId), JSON.stringify(updatedMessages));
-  };
-
-  const resolveAudioSource = (message) => {
-    if (message?.audioData) return message.audioData;
-    if (!message?.audioStorageKey) return '';
-    return localStorage.getItem(message.audioStorageKey) || '';
-  };
-
-  const storeAudioForMessage = (sessionId, messageId, audioData) => {
-    if (!sessionId || !messageId || !audioData) return null;
-    const key = getChatAudioStorageKey(sessionId, messageId);
-    localStorage.setItem(key, audioData);
-    return key;
-  };
-
-  const playChatSound = (type = 'receive') => {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioCtx();
-      }
-
-      const context = audioContextRef.current;
-      if (context.state === 'suspended') {
-        context.resume();
-      }
-
-      const config = {
-        send: { frequency: 620, duration: 0.06 },
-        receive: { frequency: 740, duration: 0.08 },
-        error: { frequency: 280, duration: 0.12 }
-      };
-
-      const { frequency, duration } = config[type] || config.receive;
-      const oscillator = context.createOscillator();
-      const gainNode = context.createGain();
-      oscillator.type = 'sine';
-      oscillator.frequency.value = frequency;
-
-      gainNode.gain.setValueAtTime(0.0001, context.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.05, context.currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(context.destination);
-      oscillator.start();
-      oscillator.stop(context.currentTime + duration);
-    } catch {
-      // Silent fail
-    }
-  };
-
-  const playTypingPulse = () => {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioCtx();
-      }
-
-      const context = audioContextRef.current;
-      if (context.state === 'suspended') {
-        context.resume();
-      }
-
-      const now = context.currentTime;
-      const osc1 = context.createOscillator();
-      const gain1 = context.createGain();
-      osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(900, now);
-      gain1.gain.setValueAtTime(0.0001, now);
-      gain1.gain.exponentialRampToValueAtTime(0.03, now + 0.01);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-      osc1.connect(gain1);
-      gain1.connect(context.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.06);
-
-      const osc2 = context.createOscillator();
-      const gain2 = context.createGain();
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(760, now + 0.04);
-      gain2.gain.setValueAtTime(0.0001, now + 0.04);
-      gain2.gain.exponentialRampToValueAtTime(0.025, now + 0.055);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
-      osc2.connect(gain2);
-      gain2.connect(context.destination);
-      osc2.start(now + 0.04);
-      osc2.stop(now + 0.11);
-    } catch {
-      // Silent fail
-    }
-  };
-
-  const shouldEnableHumanMode = (text = '') => {
-    const normalized = text.toLowerCase();
-    const normalizedCompact = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-
-    const directTriggers = [
-      'human mode', 'human support', 'live support', 'live chat', 'real person',
-      'customer support', 'technical support', 'support agent', 'transfer me',
-      'escalate this', 'connect with muyiwa', 'connect me with muyiwa',
-      'talk to muyiwa', 'speak with muyiwa', 'contact muyiwa', 'reach muyiwa',
-      'chat with muyiwa', 'message muyiwa'
-    ];
-
-    if (directTriggers.some((trigger) => normalizedCompact.includes(trigger))) {
-      return true;
-    }
-
-    const hasConnectVerb = /(connect|talk|speak|chat|contact|reach|transfer|escalate|forward|handoff)/.test(normalizedCompact);
-    const hasHumanTarget = /(human|person|agent|representative|support|operator|muyiwa|owner|admin)/.test(normalizedCompact);
-
-    return hasConnectVerb && hasHumanTarget;
-  };
-
-  const clearLoadingTimeout = () => {
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
-      loadingTimeoutRef.current = null;
-    }
-  };
-
-  const clearRecordingTimer = () => {
-    if (recordingTimerRef.current) {
-      clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = null;
-    }
-  };
-
-  const startLoadingTimeout = () => {
-    clearLoadingTimeout();
-    loadingTimeoutRef.current = setTimeout(() => {
       setIsLoading(false);
       setMessages((prev) => [
         ...prev,
