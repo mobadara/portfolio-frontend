@@ -22,6 +22,7 @@ import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import NotFoundPage from './pages/NotFoundPage';
 import projectsLocalData from './data/projects';
+import axios from 'axios';
 import './App.css';
 
 const SECTION_PATHS = {
@@ -43,7 +44,7 @@ const SECTION_PATHS = {
 function App() {
   const [theme, setTheme] = useState('light');
   const [isLoading, setIsLoading] = useState(true);
-  const [projects, setProjects] = useState(projectsLocalData);
+  const [projects, setProjects] = useState([]);
   const location = useLocation();
 
   /**
@@ -53,21 +54,15 @@ function App() {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const apiBase = import.meta.env.VITE_ADMIN_API_BASE || '/api';
-        const response = await fetch(`${apiBase}/projects`);
-        if (response.ok) {
-          const data = await response.json();
-          const projectList = Array.isArray(data) ? data : data.projects || [];
-          if (projectList.length > 0) {
-            setProjects(projectList);
-          }
-        }
+        const response = await axios.get('https://portfolio-backend-tjq3.onrender.com/api/projects');
+        const data = response.data;
+        const projectList = Array.isArray(data) ? data : data.projects || [];
+        setProjects(projectList);
       } catch (error) {
-        console.warn('Failed to fetch projects from backend, using local data:', error);
-        // Keep using local data as fallback
+        console.warn('Failed to fetch projects from backend:', error);
+        setProjects([]);
       }
     };
-
     fetchProjects();
   }, []);
 
