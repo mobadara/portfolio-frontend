@@ -21,7 +21,7 @@ import AdminContent from './pages/AdminContent';
 import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import NotFoundPage from './pages/NotFoundPage';
-import projectsLocalData from './data/projects';
+// import projectsLocalData from './data/projects';
 import axios from 'axios';
 import './App.css';
 
