@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
+  Toast,
+  ToastContainer,
   Badge,
   Button,
   Card,
@@ -82,6 +84,7 @@ function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   const [users, setUsers] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -378,6 +381,7 @@ function AdminDashboard() {
         setSuccess('Password updated successfully. Use your new password next login.');
       } else {
         setSuccess(`${modalType[0].toUpperCase()}${modalType.slice(1)} ${isEdit ? 'updated' : 'created'} successfully.`);
+        setShowToast(true);
       }
       closeModal();
       if (modalType !== 'password') {
@@ -524,6 +528,14 @@ function AdminDashboard() {
 
   return (
     <div className="admin-dashboard-page">
+      <ToastContainer position="top-end" className="p-3" style={{ zIndex: 2000 }}>
+        <Toast bg="success" show={showToast} onClose={() => setShowToast(false)} delay={3500} autohide>
+          <Toast.Header closeButton={true}>
+            <strong className="me-auto">Success</strong>
+          </Toast.Header>
+          <Toast.Body className="text-white">{success}</Toast.Body>
+        </Toast>
+      </ToastContainer>
       <Container fluid className="py-2 py-md-3 admin-dashboard-wrap">
         <Card className="admin-dashboard-shell border-0 shadow-lg">
           <Card.Body className="p-3">

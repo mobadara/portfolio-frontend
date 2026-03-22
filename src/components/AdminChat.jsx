@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import Modal from 'react-bootstrap/Modal';
   import Card from 'react-bootstrap/Card';
   import Button from 'react-bootstrap/Button';
   import Form from 'react-bootstrap/Form';
@@ -29,6 +30,7 @@ import { useState, useEffect, useRef } from 'react';
     const [sessionInfo, setSessionInfo] = useState(null);
     const [isRecording, setIsRecording] = useState(false)
     const [isDeletingSession, setIsDeletingSession] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [recordingTime, setRecordingTime] = useState(0);
     const webSocketRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -620,10 +622,6 @@ import { useState, useEffect, useRef } from 'react';
 
     const handleDeleteSession = async () => {
       if (!sessionId || isDeletingSession) return;
-
-      const shouldDelete = window.confirm('Delete this cleared chat session permanently?');
-      if (!shouldDelete) return;
-
       setIsDeletingSession(true);
       setError(null);
       try {
@@ -631,11 +629,10 @@ import { useState, useEffect, useRef } from 'react';
           method: 'DELETE',
           headers: withAuthHeaders(token)
         });
-
         if (!response.ok) {
           throw new Error('Failed to delete session.');
         }
-
+        setShowDeleteModal(false);
         onClose();
       } catch (err) {
         setError(err.message || 'Unable to delete session.');
@@ -688,12 +685,28 @@ import { useState, useEffect, useRef } from 'react';
                   <Button
                     size="sm"
                     variant="outline-danger"
-                    onClick={handleDeleteSession}
+                    onClick={() => setShowDeleteModal(true)}
                     disabled={isDeletingSession}
                   >
                     {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
                   </Button>
                 </div>
+                <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                  <Modal.Header closeButton>
+                    <Modal.Title>Delete Chat Session</Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body>
+                    Are you sure you want to permanently delete this cleared chat session?
+                  </Modal.Body>
+                  <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeletingSession}>
+                      Cancel
+                    </Button>
+                    <Button variant="danger" onClick={handleDeleteSession} disabled={isDeletingSession}>
+                      {isDeletingSession ? <Spinner animation="border" size="sm" /> : 'Delete'}
+                    </Button>
+                  </Modal.Footer>
+                </Modal>
               )}
             </div>
           )}

@@ -46,7 +46,7 @@ const ServicesSection = () => (
         </div>
 
         <Row className="g-4">
-          {SERVICES.map(({ title, description, Icon }) => (
+          {SERVICES.map(({ title, description }) => ( 
             <Col lg={4} md={6} key={title}>
               <div className="p-4 h-100 border border-secondary rounded-3 hover-scale bg-opacity-10 bg-white transition">
                 <Icon className="fs-1 text-warning mb-3 d-block" />

@@ -1,24 +1,4 @@
-/**
- * Unified Portfolio Data Structure
- * MongoDB-compatible schema for all portfolio content
- * Can be fetched from a backend API
- */
-
-export const portfolioData = {
-  metadata: {
-    lastUpdated: new Date().toISOString(),
-    version: "2.0.0"
-  },
-  
-  about: {
-    name: "Muyiwa J. Obadara",
-    title: "Senior Data Scientist & AI Engineer",
-    summary: "Building intelligent systems at the intersection of data, code, and innovation.",
-    bio: "Passionate about transforming complex problems into elegant solutions through data science, machine learning, and AI engineering.",
-    image: "https://placehold.co/200x200/001f3f/FFF?text=Profile"
-  },
-  
-  projects: [
+const sampleProjects = [
     {
       _id: "proj_001",
       title: "Sentiment Analysis with BERT",
@@ -148,95 +128,7 @@ export const portfolioData = {
       order: 6,
       featured: false
     }
-  ],
+  ];
   
-  skills: [
-    // Programming Languages
-    { name: "Python", level: 95, category: "Programming Languages", icon: "python" },
-    { name: "JavaScript", level: 88, category: "Programming Languages", icon: "javascript" },
-    { name: "SQL", level: 90, category: "Programming Languages", icon: "database" },
-    
-    // Machine Learning & Data Science
-    { name: "PyTorch", level: 90, category: "Machine Learning", icon: "neural-network" },
-    { name: "Scikit-Learn", level: 92, category: "Machine Learning", icon: "chart-line" },
-    { name: "TensorFlow", level: 85, category: "Machine Learning", icon: "tensorflow" },
-    { name: "Pandas", level: 94, category: "Data Science", icon: "table" },
-    { name: "NumPy", level: 92, category: "Data Science", icon: "calculator" },
-    { name: "Statistics", level: 93, category: "Data Science", icon: "chart-bar" },
-    
-    // AI & LLMs
-    { name: "LLM Integration", level: 89, category: "AI & Automation", icon: "brain" },
-    { name: "OpenAI API", level: 88, category: "AI & Automation", icon: "robot" },
-    { name: "Hugging Face", level: 87, category: "AI & Automation", icon: "hugging-face" },
-    { name: "Prompt Engineering", level: 90, category: "AI & Automation", icon: "wand-magic-sparkles" },
-    
-    // Frontend Development
-    { name: "React", level: 87, category: "Frontend", icon: "react" },
-    { name: "HTML/CSS", level: 90, category: "Frontend", icon: "html5" },
-    { name: "Responsive Design", level: 91, category: "Frontend", icon: "mobile" },
-    
-    // Backend & Cloud
-    { name: "FastAPI", level: 89, category: "Backend", icon: "server" },
-    { name: "Docker", level: 87, category: "Backend", icon: "docker" },
-    { name: "Azure", level: 86, category: "Cloud & DevOps", icon: "azure" },
-    { name: "AWS", level: 84, category: "Cloud & DevOps", icon: "aws" },
-    { name: "PostgreSQL", level: 88, category: "Databases", icon: "database" },
-    { name: "MongoDB", level: 85, category: "Databases", icon: "leaf" },
-    
-    // Product & Leadership
-    { name: "Problem Solving", level: 96, category: "Core Competencies", icon: "lightbulb" },
-    { name: "Communication", level: 93, category: "Core Competencies", icon: "chat" },
-    { name: "Team Leadership", level: 90, category: "Core Competencies", icon: "users" },
-    { name: "System Design", level: 91, category: "Core Competencies", icon: "diagram" }
-  ],
-  
-  services: [
-    {
-      _id: "svc_001",
-      title: "Machine Learning Consulting",
-      description: "Strategic guidance for ML/AI initiatives, model selection, and production deployment.",
-      icon: "brain",
-      order: 1
-    },
-    {
-      _id: "svc_002",
-      title: "Data Engineering",
-      description: "Design and implementation of robust data pipelines and ETL systems.",
-      icon: "cogs",
-      order: 2
-    },
-    {
-      _id: "svc_003",
-      title: "Full-Stack AI Solutions",
-      description: "End-to-end development from data collection to deployment and monitoring.",
-      icon: "rocket",
-      order: 3
-    }
-  ],
-  
-  social: [
-    { platform: "GitHub", url: "https://github.com/mobadara", icon: "github" },
-    { platform: "LinkedIn", url: "https://linkedin.com/in/mobadara", icon: "linkedin" },
-    { platform: "Twitter", url: "https://twitter.com/mobadara", icon: "twitter" },
-    { platform: "Medium", url: "https://medium.com/@mobadara", icon: "medium" }
-  ]
-};
 
-/**
- * Hook to fetch portfolio data from backend
- * In production, this would call a MongoDB API endpoint
- */
-export const usePortfolioData = () => {
-  // TODO: Replace with actual API call when backend is ready
-  // const [data, setData] = useState(null);
-  // const [loading, setLoading] = useState(true);
-  // useEffect(() => {
-  //   fetch(`${API_BASE}/portfolio`)
-  //     .then(r => r.json())
-  //     .then(setData)
-  //     .finally(() => setLoading(false));
-  // }, []);
-  // return { data, loading };
-  
-  return portfolioData;
-};
+  export default sampleProjects;

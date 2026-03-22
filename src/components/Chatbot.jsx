@@ -1,4 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import PhoneInput from 'react-phone-input-2';
+import 'react-phone-input-2/lib/bootstrap.css';
+import { formatTimestamp } from '../utils/adminChatUtils';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
@@ -91,13 +94,11 @@ const Chatbot = () => {
   const suggestedQuestions = [
     'What are your key skills?',
     'Tell me about recent projects',
-    'How can I reach you?'
+    'How can I reach you?',
+    'I have some STEM/CS or data related questions',
   ];
 
-  const selectedCountry = useMemo(
-    () => COUNTRY_CODES.find((item) => item.code === contactForm.countryCode) || COUNTRY_CODES[0],
-    [contactForm.countryCode]
-  );
+
 
   // --- HELPER FUNCTIONS ---
   const getNextMessageId = () => {
@@ -178,7 +179,7 @@ const Chatbot = () => {
       gainNode.connect(context.destination);
       oscillator.start();
       oscillator.stop(context.currentTime + duration);
-    } catch {}
+    } catch { /* ignore audio error */ }
   };
 
   const playTypingPulse = () => {
@@ -213,7 +214,7 @@ const Chatbot = () => {
       gain2.connect(context.destination);
       osc2.start(now + 0.04);
       osc2.stop(now + 0.11);
-    } catch {}
+    } catch { /* ignore typing pulse error */ }
   };
 
   const shouldEnableHumanMode = (text = '') => {
@@ -550,7 +551,7 @@ const Chatbot = () => {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transferPayload)
         });
         if (response.ok) return true;
-      } catch {}
+      } catch { /* ignore WebSocket error */ }
     }
 
     try {
@@ -756,7 +757,7 @@ const Chatbot = () => {
     const activeSession = sessionIdRef.current;
     if (activeSession) {
       sendSocketMessage({ type: 'clear_chat', session_id: activeSession, timestamp: new Date().toISOString() });
-      try { await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' }); } catch {}
+      try { await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' }); } catch { /* ignore clear chat error */ }
       clearChatStorageForSession(activeSession);
     }
 
@@ -810,13 +811,29 @@ const Chatbot = () => {
         {humanFormStep === 2 && (
           <>
             <small className="d-block mb-2 text-muted">Step 3 of 3</small>
-            <div className="d-flex gap-2 mb-2">
-              <Form.Select style={{ maxWidth: '48%' }} value={contactForm.countryCode} onChange={(e) => handleContactFieldChange('countryCode', e.target.value)}>
-                {COUNTRY_CODES.map((entry) => <option key={entry.code} value={entry.code}>{entry.label}</option>)}
-              </Form.Select>
-              <Form.Control type="tel" placeholder="Phone number" value={contactForm.phone} onChange={(e) => handleContactFieldChange('phone', e.target.value)} autoFocus />
+            <div className="mb-2">
+              <PhoneInput
+                country={contactForm.countryCode.replace('+', '') || 'ng'}
+                value={contactForm.countryCode + contactForm.phone}
+                onChange={(value, data) => {
+                  // value is full phone, data has country info
+                  // Extract country code and local phone
+                  const code = data.dialCode ? `+${data.dialCode}` : '';
+                  const local = value.replace(data.dialCode, '').replace(/^\+/, '');
+                  setContactForm((prev) => ({ ...prev, countryCode: code, phone: local }));
+                }}
+                inputClass="w-100"
+                inputStyle={{ width: '100%' }}
+                containerStyle={{ width: '100%' }}
+                disableDropdown={false}
+                enableSearch={true}
+                autoFormat={true}
+                placeholder="Enter phone number"
+                specialLabel=""
+                countryCodeEditable={true}
+                masks={{ ng: '(...) ...-....' }}
+              />
             </div>
-            <small className="d-block mb-2 text-muted">Selected: {selectedCountry.label}</small>
             <Button type="submit" variant="success" className="w-100" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
               {isLeadSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
@@ -863,7 +880,45 @@ const Chatbot = () => {
           boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
           overflow: 'hidden',
         }}
+        tabIndex={-1}
       >
+        {/* Responsive style for mobile: full screen and flex layout for content visibility */}
+        <style>{`
+          @media (max-width: 600px) {
+            .chatbot-window {
+              top: 0 !important;
+              left: 0 !important;
+              right: 0 !important;
+              bottom: 0 !important;
+              width: 100vw !important;
+              max-width: 100vw !important;
+              height: 100dvh !important;
+              max-height: 100dvh !important;
+              border-radius: 0 !important;
+              display: flex !important;
+              flex-direction: column !important;
+            }
+            .chatbot-window .card {
+              height: 100dvh !important;
+              max-height: 100dvh !important;
+              display: flex !important;
+              flex-direction: column !important;
+            }
+            .chat-messages {
+              min-height: 0 !important;
+              max-height: 100% !important;
+              flex: 1 1 0 !important;
+              overflow-y: auto !important;
+              display: flex !important;
+              flex-direction: column !important;
+            }
+            .card-footer {
+              position: sticky !important;
+              bottom: 0 !important;
+              z-index: 2 !important;
+            }
+          }
+        `}</style>
         <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100" style={{ borderRadius: 18, maxWidth: '100%' }}>
                 {/* Responsive style for mobile: full screen */}
                 <style>{`
@@ -968,6 +1023,11 @@ const Chatbot = () => {
                       >
                         {msg.text || ''}
                       </ReactMarkdown>
+                    )}
+                    {msg.timestamp && (
+                      <small className="d-block text-end mt-1 text-muted" style={{ fontSize: '0.78em' }}>
+                        {formatTimestamp(msg.timestamp, false)}
+                      </small>
                     )}
                   </div>
                 </div>
