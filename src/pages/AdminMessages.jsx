@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Form, InputGroup, Spinner, Alert, ListGroup, Badge } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, InputGroup, Spinner, Alert, ListGroup, Badge } from 'react-bootstrap';
+import { useNavigate, Link } from 'react-router-dom';
 import './AdminMessages.css';
 
 /**
@@ -14,7 +14,7 @@ function AdminMessages() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [selectedMessage, setSelectedMessage] = useState(null);
+  // No local detail view, navigation only
 
   useEffect(() => {
     // Check authentication
@@ -178,7 +178,7 @@ function AdminMessages() {
       </Row>
 
       <Row>
-        <Col lg={5} className="mb-4">
+        <Col lg={{ span: 8, offset: 2 }}>
           {/* Messages List */}
           <Card className="messages-list">
             <Card.Header>
@@ -191,26 +191,29 @@ function AdminMessages() {
             <ListGroup variant="flush">
               {filteredMessages.length > 0 ? (
                 filteredMessages.map((msg) => (
-                  <ListGroup.Item
+                  <Link
                     key={msg.id}
-                    className={`message-item ${selectedMessage?.id === msg.id ? 'active' : ''}`}
-                    onClick={() => setSelectedMessage(msg)}
+                    to={`/admin/messages/${msg.id}`}
+                    state={{ message: msg }}
+                    style={{ textDecoration: 'none', color: 'inherit' }}
                   >
-                    <div className="d-flex justify-content-between align-items-start mb-2">
-                      <div>
-                        <h6 className="mb-0">{msg.visitorName}</h6>
-                        <small className="text-muted">{msg.visitorEmail}</small>
+                    <ListGroup.Item className="message-item">
+                      <div className="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                          <h6 className="mb-0">{msg.visitorName}</h6>
+                          <small className="text-muted">{msg.visitorEmail}</small>
+                        </div>
+                        <Badge bg={getStatusBadge(msg.status)}>
+                          {msg.status}
+                        </Badge>
                       </div>
-                      <Badge bg={getStatusBadge(msg.status)}>
-                        {msg.status}
-                      </Badge>
-                    </div>
-                    <p className="mb-1 small">{msg.subject}</p>
-                    <p className="mb-0 text-muted text-truncate small">{msg.preview}</p>
-                    <small className="text-muted mt-2 d-block">
-                      {formatTime(msg.timestamp)}
-                    </small>
-                  </ListGroup.Item>
+                      <p className="mb-1 small">{msg.subject}</p>
+                      <p className="mb-0 text-muted text-truncate small">{msg.preview}</p>
+                      <small className="text-muted mt-2 d-block">
+                        {formatTime(msg.timestamp)}
+                      </small>
+                    </ListGroup.Item>
+                  </Link>
                 ))
               ) : (
                 <div className="p-4 text-center text-muted">
@@ -219,70 +222,6 @@ function AdminMessages() {
               )}
             </ListGroup>
           </Card>
-        </Col>
-
-        <Col lg={7}>
-          {/* Message Details */}
-          {selectedMessage ? (
-            <Card className="message-detail">
-              <Card.Header>
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <h5 className="mb-0">{selectedMessage.subject}</h5>
-                    <small className="text-muted">
-                      From: {selectedMessage.visitorName} ({selectedMessage.visitorEmail})
-                    </small>
-                  </div>
-                  <Badge bg={getStatusBadge(selectedMessage.status)}>
-                    {selectedMessage.status}
-                  </Badge>
-                </div>
-              </Card.Header>
-              <Card.Body>
-                <div className="messages-thread">
-                  {selectedMessage.messages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`message-bubble ${msg.type === 'admin' ? 'admin' : 'visitor'}`}
-                    >
-                      <div className="message-content">
-                        <p>{msg.text}</p>
-                        <small className="text-muted d-block mt-2">
-                          {formatTime(msg.time)}
-                        </small>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <Form.Group className="mt-4">
-                  <Form.Label>Reply</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={4}
-                    placeholder="Type your response..."
-                  />
-                </Form.Group>
-              </Card.Body>
-              <Card.Footer className="bg-light">
-                <div className="d-flex gap-2 justify-content-end">
-                  <Button variant="outline-secondary" size="sm">
-                    Archive
-                  </Button>
-                  <Button variant="primary" size="sm">
-                    Send Reply
-                  </Button>
-                </div>
-              </Card.Footer>
-            </Card>
-          ) : (
-            <Card className="message-detail text-center py-5">
-              <Card.Body>
-                <i className="bi bi-chat-left" style={{ fontSize: '3rem', color: '#ccc' }}></i>
-                <p className="mt-3 text-muted">Select a message to view details</p>
-              </Card.Body>
-            </Card>
-          )}
         </Col>
       </Row>
 

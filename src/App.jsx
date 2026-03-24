@@ -20,6 +20,7 @@ import AdminAnalytics from './pages/AdminAnalytics';
 import AdminContent from './pages/AdminContent';
 import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
+import AdminMessageDetail from './pages/AdminMessageDetail';
 import NotFoundPage from './pages/NotFoundPage';
 // import projectsLocalData from './data/projects';
 import axios from 'axios';
@@ -149,6 +150,7 @@ function App() {
       <Route path="/admin/content" element={<AdminContent />} />
       <Route path="/admin/settings" element={<AdminSettings />} />
       <Route path="/admin/messages" element={<AdminMessages />} />
+      <Route path="/admin/messages/:id" element={<AdminMessageDetail />} />
       <Route path="/admin/chat" element={<AdminChatPage />} />
       <Route path="/admin/chat/:sessionId" element={<AdminChatPage />} />
       <Route path="*" element={<NotFoundPage />} />
