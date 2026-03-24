@@ -78,6 +78,8 @@ const Chatbot = () => {
     phone: ''
   });
   const [humanFormStep, setHumanFormStep] = useState(0);
+  // Track if a session has been created (for human support only)
+  const [hasSession, setHasSession] = useState(false);
 
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
@@ -331,6 +333,7 @@ const Chatbot = () => {
     };
   }, []);
 
+  // Only initialize session/WebSocket if human support is requested
   useEffect(() => {
     if (!isOpen) {
       if (webSocketRef.current) {
@@ -340,7 +343,7 @@ const Chatbot = () => {
       clearLoadingTimeout();
       return undefined;
     }
-
+    if (!hasSession) return;
     let isMounted = true;
     let handleVisibilityChange;
 
@@ -441,6 +444,7 @@ const Chatbot = () => {
                 webSocketRef.current = null;
               }
               setSocketResetNonce((prev) => prev + 1);
+              setHasSession(false);
               return;
             }
 
@@ -482,7 +486,6 @@ const Chatbot = () => {
           setIsLoading(false);
           clearLoadingTimeout();
           webSocketRef.current = null;
-          
           setTimeout(() => {
             if (isMounted && document.visibilityState === 'visible') initializeWebSocket();
           }, 1500);
@@ -515,7 +518,7 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
     };
-  }, [isOpen, socketResetNonce]);
+  }, [isOpen, socketResetNonce, hasSession]);
 
   // --- ACTIONS & HANDLERS ---
   const sendSocketMessage = (payload) => {
@@ -533,7 +536,13 @@ const Chatbot = () => {
   };
 
   const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
-    const sessionId = sessionIdRef.current;
+    if (!hasSession) setHasSession(true);
+    let sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      sessionIdRef.current = sessionId;
+      localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
+    }
     const parserFriendlyMessage = `Name: ${name} | Email: ${email} | Phone: ${fullPhone}`;
     const transferPayload = {
       name, user_name: name, requester_name: name,
@@ -566,7 +575,7 @@ const Chatbot = () => {
   };
 
   const openHumanSupportForm = () => {
-    if (!sessionIdRef.current) sessionIdRef.current = generateSessionId();
+    if (!hasSession) setHasSession(true);
     if (!showHumanForm) {
       setShowHumanForm(true);
       setHumanFormStep(0);
@@ -588,14 +597,13 @@ const Chatbot = () => {
     playChatSound('send');
 
     const wantsHumanSupport = shouldEnableHumanMode(messageText);
-    if (wantsHumanSupport) openHumanSupportForm();
-
-    if (!isConnected && !wantsHumanSupport) {
-      setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Chat is currently offline. You can use the “Transfer to Muyiwa” button below to send your details directly.', sender: 'bot' }]);
+    if (wantsHumanSupport) {
+      openHumanSupportForm();
       return;
     }
 
-    if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
+    // Only send to backend if human mode/session is active
+    if (isConnected && hasSession && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
       setIsLoading(true);
       startLoadingTimeout();
     }

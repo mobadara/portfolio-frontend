@@ -681,32 +681,34 @@ import Modal from 'react-bootstrap/Modal';
                 )}
               </small>
               {sessionInfo.cleared_by_user && (
-                <div className="mt-2 d-flex justify-content-end">
-                  <Button
-                    size="sm"
-                    variant="outline-danger"
-                    onClick={() => setShowDeleteModal(true)}
-                    disabled={isDeletingSession}
-                  >
-                    {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
-                  </Button>
-                </div>
-                <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
-                  <Modal.Header closeButton>
-                    <Modal.Title>Delete Chat Session</Modal.Title>
-                  </Modal.Header>
-                  <Modal.Body>
-                    Are you sure you want to permanently delete this cleared chat session?
-                  </Modal.Body>
-                  <Modal.Footer>
-                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeletingSession}>
-                      Cancel
+                <>
+                  <div className="mt-2 d-flex justify-content-end">
+                    <Button
+                      size="sm"
+                      variant="outline-danger"
+                      onClick={() => setShowDeleteModal(true)}
+                      disabled={isDeletingSession}
+                    >
+                      {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
                     </Button>
-                    <Button variant="danger" onClick={handleDeleteSession} disabled={isDeletingSession}>
-                      {isDeletingSession ? <Spinner animation="border" size="sm" /> : 'Delete'}
-                    </Button>
-                  </Modal.Footer>
-                </Modal>
+                  </div>
+                  <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+                    <Modal.Header closeButton>
+                      <Modal.Title>Delete Chat Session</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                      Are you sure you want to permanently delete this cleared chat session?
+                    </Modal.Body>
+                    <Modal.Footer>
+                      <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeletingSession}>
+                        Cancel
+                      </Button>
+                      <Button variant="danger" onClick={handleDeleteSession} disabled={isDeletingSession}>
+                        {isDeletingSession ? <Spinner animation="border" size="sm" /> : 'Delete'}
+                      </Button>
+                    </Modal.Footer>
+                  </Modal>
+                </>
               )}
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
-import { skillsData } from '../data/skills';
+import skillsData from '../data/skills';
 import './SkillsSection.css';
 
 /**
