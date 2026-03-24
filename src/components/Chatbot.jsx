@@ -554,7 +554,10 @@ const Chatbot = () => {
       subject: 'Transfer Request',
       type: 'request_human',
       source: 'portfolio-frontend',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      user_name: name,
+      user_email: email,
+      user_phone: fullPhone
     };
 
     if (sessionId) {
