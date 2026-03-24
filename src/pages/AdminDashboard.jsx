@@ -147,6 +147,7 @@ function AdminDashboard() {
   }, [token]);
 
   const normalizeList = (data, preferredKey) => {
+    if (!data) return [];
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.[preferredKey])) return data[preferredKey];
     if (Array.isArray(data?.data)) return data.data;
@@ -188,9 +189,10 @@ function AdminDashboard() {
   }, [query, users]);
 
   const filteredMessages = useMemo(() => {
+    const safeMessages = Array.isArray(messages) ? messages : [];
     const q = query.trim().toLowerCase();
-    if (!q) return messages;
-    return messages.filter((item) =>
+    if (!q) return safeMessages;
+    return safeMessages.filter((item) =>
       [item.name, item.email, item.subject, item.message, item.status].some((v) =>
         String(v || '').toLowerCase().includes(q)
       )
