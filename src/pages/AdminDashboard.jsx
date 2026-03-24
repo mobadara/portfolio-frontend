@@ -766,6 +766,7 @@ function AdminDashboard() {
 }
 
 const ResourceTable = ({ type, items, onEdit, onView, onReply, onDelete, emptyText }) => {
+  const navigate = useNavigate();
   if (items.length === 0) {
     return <Alert variant="secondary" className="mb-0">{emptyText}</Alert>;
   }
@@ -785,98 +786,117 @@ const ResourceTable = ({ type, items, onEdit, onView, onReply, onDelete, emptyTe
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
-              <tr key={getItemId(item)}>
-                {type === 'user' && (
-                  <>
-                    <td>{item.username || item.name || 'N/A'}</td>
-                    <td>{item.email || 'N/A'}</td>
-                    <td><Badge bg="secondary">{item.role || 'assistant'}</Badge></td>
-                  </>
-                )}
-                {type === 'message' && (
-                  <>
-                    <td>
-                      <strong>{item.name || 'Unknown'}</strong>
-                      <div className="small text-muted">{item.email || 'No email'}</div>
-                    </td>
-                    <td>{item.subject || String(item.message || '').slice(0, 56)}</td>
-                    <td className="small text-muted">{item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</td>
-                  </>
-                )}
-                {type === 'project' && (
-                  <>
-                    <td>{item.title || 'Untitled'}</td>
-                    <td>{Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || '—'}</td>
-                    <td>{item.featured ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>}</td>
-                  </>
-                )}
-                <td className="text-end">
-                  <div className="d-flex justify-content-end gap-2">
-                    {type === 'message' && onView && (
-                      <Button size="sm" variant="outline-secondary" onClick={() => onView(item)}>
-                        <BiShow />
-                      </Button>
-                    )}
-                    {type === 'message' && onReply && (
-                      <Button size="sm" variant="outline-primary" onClick={() => onReply(item)}>
-                        <BiReply />
-                      </Button>
-                    )}
-                    {onEdit && <Button size="sm" variant="outline-primary" onClick={() => onEdit(type, item)}>Edit</Button>}
-                    {onDelete && (
-                      <Button size="sm" variant="outline-danger" onClick={() => onDelete(type, item)}>
-                        <BiTrash />
-                      </Button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const rowProps = (type === 'message') ? {
+                style: { cursor: 'pointer' },
+                onClick: (e) => {
+                  // Only trigger if not clicking an action button
+                  if (e.target.closest('button')) return;
+                  navigate(`/admin/messages/${getItemId(item)}`, { state: { message: item } });
+                }
+              } : {};
+              return (
+                <tr key={getItemId(item)} {...rowProps}>
+                  {type === 'user' && (
+                    <>
+                      <td>{item.username || item.name || 'N/A'}</td>
+                      <td>{item.email || 'N/A'}</td>
+                      <td><Badge bg="secondary">{item.role || 'assistant'}</Badge></td>
+                    </>
+                  )}
+                  {type === 'message' && (
+                    <>
+                      <td>
+                        <strong>{item.name || 'Unknown'}</strong>
+                        <div className="small text-muted">{item.email || 'No email'}</div>
+                      </td>
+                      <td>{item.subject || String(item.message || '').slice(0, 56)}</td>
+                      <td className="small text-muted">{item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</td>
+                    </>
+                  )}
+                  {type === 'project' && (
+                    <>
+                      <td>{item.title || 'Untitled'}</td>
+                      <td>{Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || '—'}</td>
+                      <td>{item.featured ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>}</td>
+                    </>
+                  )}
+                  <td className="text-end">
+                    <div className="d-flex justify-content-end gap-2">
+                      {type === 'message' && onView && (
+                        <Button size="sm" variant="outline-secondary" onClick={(e) => { e.stopPropagation(); onView(item); }}>
+                          <BiShow />
+                        </Button>
+                      )}
+                      {type === 'message' && onReply && (
+                        <Button size="sm" variant="outline-primary" onClick={(e) => { e.stopPropagation(); onReply(item); }}>
+                          <BiReply />
+                        </Button>
+                      )}
+                      {onEdit && <Button size="sm" variant="outline-primary" onClick={(e) => { e.stopPropagation(); onEdit(type, item); }}>Edit</Button>}
+                      {onDelete && (
+                        <Button size="sm" variant="outline-danger" onClick={(e) => { e.stopPropagation(); onDelete(type, item); }}>
+                          <BiTrash />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       </div>
 
       <div className="d-md-none d-grid gap-2">
-        {items.map((item) => (
-          <Card key={getItemId(item)} className="border-0 admin-mobile-card">
-            <Card.Body className="p-3">
-              {type === 'user' && (
-                <>
-                  <h6 className="mb-1">{item.username || item.name || 'N/A'}</h6>
-                  <p className="mb-2 small text-muted">{item.email || 'No email'}</p>
-                  <Badge bg="secondary">{item.role || 'assistant'}</Badge>
-                </>
-              )}
-              {type === 'message' && (
-                <>
-                  <h6 className="mb-1">{item.subject || 'No subject'}</h6>
-                  <p className="mb-2 small text-muted">{item.name || 'Unknown'} • {item.email || 'No email'}</p>
-                  <p className="mb-2 small">{String(item.message || '').slice(0, 90)}</p>
-                  <small className="text-muted d-block">{item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</small>
-                </>
-              )}
-              {type === 'project' && (
-                <>
-                  <h6 className="mb-1">{item.title || 'Untitled'}</h6>
-                  <p className="mb-2 small text-muted">{Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || '—'}</p>
-                  <Badge bg={item.featured ? 'success' : 'secondary'}>{item.featured ? 'Featured' : 'Standard'}</Badge>
-                </>
-              )}
+        {items.map((item) => {
+          const cardProps = (type === 'message') ? {
+            style: { cursor: 'pointer' },
+            onClick: (e) => {
+              if (e.target.closest('button')) return;
+              navigate(`/admin/messages/${getItemId(item)}`, { state: { message: item } });
+            }
+          } : {};
+          return (
+            <Card key={getItemId(item)} className="border-0 admin-mobile-card" {...cardProps}>
+              <Card.Body className="p-3">
+                {type === 'user' && (
+                  <>
+                    <h6 className="mb-1">{item.username || item.name || 'N/A'}</h6>
+                    <p className="mb-2 small text-muted">{item.email || 'No email'}</p>
+                    <Badge bg="secondary">{item.role || 'assistant'}</Badge>
+                  </>
+                )}
+                {type === 'message' && (
+                  <>
+                    <h6 className="mb-1">{item.subject || 'No subject'}</h6>
+                    <p className="mb-2 small text-muted">{item.name || 'Unknown'} • {item.email || 'No email'}</p>
+                    <p className="mb-2 small">{String(item.message || '').slice(0, 90)}</p>
+                    <small className="text-muted d-block">{item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</small>
+                  </>
+                )}
+                {type === 'project' && (
+                  <>
+                    <h6 className="mb-1">{item.title || 'Untitled'}</h6>
+                    <p className="mb-2 small text-muted">{Array.isArray(item.techStack) ? item.techStack.join(', ') : item.techStack || '—'}</p>
+                    <Badge bg={item.featured ? 'success' : 'secondary'}>{item.featured ? 'Featured' : 'Standard'}</Badge>
+                  </>
+                )}
 
-              <div className="d-flex gap-2 mt-3">
-                {type === 'message' && onView && (
-                  <Button size="sm" variant="outline-secondary" className="flex-fill" onClick={() => onView(item)}>Open</Button>
-                )}
-                {type === 'message' && onReply && (
-                  <Button size="sm" variant="outline-primary" className="flex-fill" onClick={() => onReply(item)}>Reply</Button>
-                )}
-                {onEdit && <Button size="sm" variant="outline-primary" className="flex-fill" onClick={() => onEdit(type, item)}>Edit</Button>}
-                {onDelete && <Button size="sm" variant="outline-danger" className="flex-fill" onClick={() => onDelete(type, item)}>Delete</Button>}
-              </div>
-            </Card.Body>
-          </Card>
-        ))}
+                <div className="d-flex gap-2 mt-3">
+                  {type === 'message' && onView && (
+                    <Button size="sm" variant="outline-secondary" className="flex-fill" onClick={(e) => { e.stopPropagation(); onView(item); }}>Open</Button>
+                  )}
+                  {type === 'message' && onReply && (
+                    <Button size="sm" variant="outline-primary" className="flex-fill" onClick={(e) => { e.stopPropagation(); onReply(item); }}>Reply</Button>
+                  )}
+                  {onEdit && <Button size="sm" variant="outline-primary" className="flex-fill" onClick={(e) => { e.stopPropagation(); onEdit(type, item); }}>Edit</Button>}
+                  {onDelete && <Button size="sm" variant="outline-danger" className="flex-fill" onClick={(e) => { e.stopPropagation(); onDelete(type, item); }}>Delete</Button>}
+                </div>
+              </Card.Body>
+            </Card>
+          );
+        })}
       </div>
     </>
   );
