@@ -76,7 +76,7 @@ function AdminMessageDetail() {
       </Card.Header>
       <Card.Body>
         <div className="messages-thread">
-          {message.messages.map((msg, idx) => (
+          {(Array.isArray(message.messages) ? message.messages : []).map((msg, idx) => (
             <div
               key={idx}
               className={`message-bubble ${msg.type === 'admin' ? 'admin' : 'visitor'}`}
