@@ -1120,14 +1120,29 @@ const Chatbot = () => {
                       <span className="ms-auto small text-muted">Recording...</span>
                     </div>
                   ) : (
-                    <Form.Control 
-                      type="text" 
+                    <Form.Control
+                      type="text"
                       placeholder={isConnected ? 'Type a message...' : 'Disconnected...'}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       disabled={!isConnected && !isHumanMode}
                       className="border-0 shadow-none px-3 py-2"
-                      style={{ fontSize: '1rem', background: 'var(--bs-body-bg, #fff)', color: 'var(--bs-body-color, #212529)', borderRadius: 12, width: '100%' }}
+                      style={{
+                        fontSize: '1rem',
+                        background: 'var(--bs-body-bg, #fff)',
+                        color: 'var(--bs-body-color, #212529)',
+                        borderRadius: 12,
+                        width: '100%',
+                        resize: 'none',
+                        minHeight: '40px',
+                        maxHeight: '40px',
+                        height: '40px',
+                        overflow: 'hidden',
+                        lineHeight: '1.5',
+                        boxSizing: 'border-box',
+                      }}
+                      autoComplete="off"
+                      as={undefined} // force single-line input, not textarea
                     />
                   )}
                 </div>
