@@ -191,29 +191,28 @@ function AdminMessages() {
             <ListGroup variant="flush">
               {filteredMessages.length > 0 ? (
                 filteredMessages.map((msg) => (
-                  <Link
+                  <ListGroup.Item
                     key={msg.id}
-                    to={`/admin/messages/${msg.id}`}
-                    state={{ message: msg }}
-                    style={{ textDecoration: 'none', color: 'inherit' }}
+                    className="message-item"
+                    action
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate(`/admin/messages/${msg.id}`, { state: { message: msg } })}
                   >
-                    <ListGroup.Item className="message-item">
-                      <div className="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                          <h6 className="mb-0">{msg.visitorName}</h6>
-                          <small className="text-muted">{msg.visitorEmail}</small>
-                        </div>
-                        <Badge bg={getStatusBadge(msg.status)}>
-                          {msg.status}
-                        </Badge>
+                    <div className="d-flex justify-content-between align-items-start mb-2">
+                      <div>
+                        <h6 className="mb-0">{msg.visitorName}</h6>
+                        <small className="text-muted">{msg.visitorEmail}</small>
                       </div>
-                      <p className="mb-1 small">{msg.subject}</p>
-                      <p className="mb-0 text-muted text-truncate small">{msg.preview}</p>
-                      <small className="text-muted mt-2 d-block">
-                        {formatTime(msg.timestamp)}
-                      </small>
-                    </ListGroup.Item>
-                  </Link>
+                      <Badge bg={getStatusBadge(msg.status)}>
+                        {msg.status}
+                      </Badge>
+                    </div>
+                    <p className="mb-1 small">{msg.subject}</p>
+                    <p className="mb-0 text-muted text-truncate small">{msg.preview}</p>
+                    <small className="text-muted mt-2 d-block">
+                      {formatTime(msg.timestamp)}
+                    </small>
+                  </ListGroup.Item>
                 ))
               ) : (
                 <div className="p-4 text-center text-muted">
