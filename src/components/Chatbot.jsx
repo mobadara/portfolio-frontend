@@ -11,6 +11,8 @@ import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
@@ -58,6 +60,7 @@ const COUNTRY_CODES = [
 
 const Chatbot = () => {
   // --- STATE & REFS ---
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([defaultBotMessage]);
   const [input, setInput] = useState('');
@@ -333,7 +336,7 @@ const Chatbot = () => {
     };
   }, []);
 
-  // Only initialize session/WebSocket if human support is requested
+  // Restore: Always create session and connect WebSocket for all chats
   useEffect(() => {
     if (!isOpen) {
       if (webSocketRef.current) {
@@ -343,7 +346,6 @@ const Chatbot = () => {
       clearLoadingTimeout();
       return undefined;
     }
-    if (!hasSession) return;
     let isMounted = true;
     let handleVisibilityChange;
 
@@ -543,14 +545,15 @@ const Chatbot = () => {
       sessionIdRef.current = sessionId;
       localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
     }
-    const parserFriendlyMessage = `Name: ${name} | Email: ${email} | Phone: ${fullPhone}`;
     const transferPayload = {
-      name, user_name: name, requester_name: name,
-      email, user_email: email,
-      phone: fullPhone, phone_number: fullPhone, contact_phone: fullPhone, phone_e164: fullPhone,
-      country_code: countryCode, phone_local: localPhone,
-      message: parserFriendlyMessage, details: detailsMessage, notes: detailsMessage,
-      subject: 'Transfer Request', type: 'request_human', source: 'portfolio-frontend',
+      name,
+      email,
+      country_code: countryCode,
+      phone: fullPhone, // E.164 format
+      details: detailsMessage,
+      subject: 'Transfer Request',
+      type: 'request_human',
+      source: 'portfolio-frontend',
       timestamp: new Date().toISOString()
     };
 
@@ -575,7 +578,10 @@ const Chatbot = () => {
   };
 
   const openHumanSupportForm = () => {
-    if (!hasSession) setHasSession(true);
+    if (!hasSession) {
+      setHasSession(true);
+      setIsConnecting(true);
+    }
     if (!showHumanForm) {
       setShowHumanForm(true);
       setHumanFormStep(0);
@@ -602,8 +608,8 @@ const Chatbot = () => {
       return;
     }
 
-    // Only send to backend if human mode/session is active
-    if (isConnected && hasSession && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
+    // Send to backend if connected
+    if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
       setIsLoading(true);
       startLoadingTimeout();
     }
@@ -831,7 +837,7 @@ const Chatbot = () => {
                   setContactForm((prev) => ({ ...prev, countryCode: code, phone: local }));
                 }}
                 inputClass="w-100"
-                inputStyle={{ width: '100%' }}
+                inputStyle={{ width: '100%', color: '#212529', background: '#fff' }}
                 containerStyle={{ width: '100%' }}
                 disableDropdown={false}
                 enableSearch={true}
@@ -977,21 +983,56 @@ const Chatbot = () => {
               paddingBottom: 0
             }}
           >
-            <div className="quick-questions-sticky mb-2 mb-md-3">
-              <small className="text-muted d-block mb-2">Quick questions:</small>
-              <div className="d-flex flex-wrap gap-2">
-                {suggestedQuestions.map((question, index) => (
-                  <button key={index} onClick={() => handleSuggestedQuestion(question)} disabled={!isConnected} className="btn btn-sm chatbot-quick-btn text-start text-wrap" style={{ fontSize: '0.8rem' }}>
-                    {question}
-                  </button>
-                ))}
-                <button onClick={openHumanSupportForm} className="btn btn-sm chatbot-transfer-btn text-start text-wrap" style={{ fontSize: '0.8rem' }} type="button">
-                  Transfer to Muyiwa
-                </button>
-              </div>
+            <div className="quick-questions-drawer mb-2 mb-md-3">
+              <button
+                className="btn btn-link px-0 mb-1"
+                style={{ fontSize: '1rem', color: '#0d6efd', textDecoration: 'none' }}
+                onClick={() => setIsDrawerOpen((open) => !open)}
+                aria-expanded={isDrawerOpen}
+                aria-controls="quick-questions-content"
+              >
+                {isDrawerOpen ? 'Hide Quick Questions ▲' : 'Show Quick Questions ▼'}
+              </button>
+              {isDrawerOpen && (
+                <div id="quick-questions-content">
+                  <small className="text-muted d-block mb-2">Quick questions:</small>
+                  <div className="d-flex flex-wrap gap-2">
+                    {suggestedQuestions.map((question, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          handleSuggestedQuestion(question);
+                          setIsDrawerOpen(false);
+                        }}
+                        disabled={!isConnected}
+                        className="btn btn-sm chatbot-quick-btn text-start text-wrap"
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        openHumanSupportForm();
+                        setIsDrawerOpen(false);
+                      }}
+                      className="btn btn-sm chatbot-transfer-btn text-start text-wrap"
+                      style={{ fontSize: '0.8rem' }}
+                      type="button"
+                    >
+                      Transfer to Muyiwa
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div
+              style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              onClick={() => isDrawerOpen && setIsDrawerOpen(false)}
+              tabIndex={0}
+              onFocus={() => isDrawerOpen && setIsDrawerOpen(false)}
+            >
               {messages.map((msg) => (
                 <div key={msg.id} className={`d-flex gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`} style={{ width: '100%' }}>
                   <div
