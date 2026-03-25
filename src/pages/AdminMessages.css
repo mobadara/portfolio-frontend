@@ -1,3 +1,61 @@
+.message-detail .card-footer .btn {
+  color: #fff;
+  background: #0077be;
+  border: none;
+  margin-left: 0.5rem;
+}
+.message-detail .card-footer .btn:hover, .message-detail .card-footer .btn:focus {
+  background: #005a99;
+  color: #fff;
+}
+.message-detail .card-footer .btn-outline-secondary {
+  background: #7f8c8d;
+  color: #fff;
+  border: none;
+}
+.message-detail .card-footer .btn-outline-secondary:hover, .message-detail .card-footer .btn-outline-secondary:focus {
+  background: #5a6268;
+  color: #fff;
+}
+.message-detail .card-footer .btn-danger {
+  background: #dc3545;
+  color: #fff;
+  border: none;
+}
+.message-detail .card-footer .btn-danger:hover, .message-detail .card-footer .btn-danger:focus {
+  background: #a71d2a;
+  color: #fff;
+}
+.message-detail .card-footer .btn-primary {
+  background: #0077be;
+  color: #fff;
+  border: none;
+}
+.message-detail .card-footer .btn-primary:hover, .message-detail .card-footer .btn-primary:focus {
+  background: #005a99;
+  color: #fff;
+}
+.message-detail .card-footer .btn:active {
+  background: #005a99;
+  color: #fff;
+}
+.message-detail .card-footer .btn:focus {
+  outline: 2px solid #FFD700;
+}
+.message-detail .card-footer .btn .badge {
+  background: #FFD700;
+  color: #222;
+}
+/* Badge contrast fix */
+.badge.bg-warning, .badge.bg-success, .badge.bg-secondary {
+  color: #fff !important;
+}
+@media (max-width: 576px) {
+  .message-detail .card-footer .btn {
+    width: 100%;
+    margin: 0.25rem 0;
+  }
+}
 .admin-messages {
   background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
   min-height: 100vh;
