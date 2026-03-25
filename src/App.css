@@ -1,5 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&display=swap');
 
+/* Github Calendar Modal Scrollable Styles */
+.github-calendar-modal-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+}
+.github-calendar-modal-inner {
+  min-width: 700px;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-x: auto;
+  display: block;
+}
+
 /* --- CHATBOT MOBILE FIXES --- */
 @media (max-width: 600px) {
   .chatbot-window {

@@ -38,20 +38,22 @@ const GithubActivity = ({ theme, isModal = false }) => {
       )}
       
       {isModal && (
-        <div style={{ maxWidth: '100%', overflowX: 'auto' }}>
+        <div className="github-calendar-modal-scroll">
           <div style={{ paddingBottom: '1rem' }}>
             <p className="text-muted text-center">
               My daily commitment to shipping code.
             </p>
           </div>
-          <GitHubCalendar 
-            username="mobadara" 
-            colorScheme={theme === 'dark' ? 'dark' : 'light'}
-            blockSize={14}
-            blockMargin={4}
-            fontSize={14}
-            showWeekdayLabels
-          />
+          <div className="github-calendar-modal-inner">
+            <GitHubCalendar 
+              username="mobadara" 
+              colorScheme={theme === 'dark' ? 'dark' : 'light'}
+              blockSize={14}
+              blockMargin={4}
+              fontSize={14}
+              showWeekdayLabels
+            />
+          </div>
         </div>
       )}
     </>
