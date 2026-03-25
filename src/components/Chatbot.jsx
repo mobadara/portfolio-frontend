@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/bootstrap.css';
 import { formatTimestamp } from '../utils/adminChatUtils';
@@ -12,7 +12,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
@@ -45,19 +44,6 @@ const clearChatStorageForSession = (sessionId) => {
   });
 };
 
-const COUNTRY_CODES = [
-  { code: '+1', label: '🇺🇸 US/CA (+1)' },
-  { code: '+44', label: '🇬🇧 UK (+44)' },
-  { code: '+234', label: '🇳🇬 Nigeria (+234)' },
-  { code: '+91', label: '🇮🇳 India (+91)' },
-  { code: '+971', label: '🇦🇪 UAE (+971)' },
-  { code: '+49', label: '🇩🇪 Germany (+49)' },
-  { code: '+33', label: '🇫🇷 France (+33)' },
-  { code: '+27', label: '🇿🇦 South Africa (+27)' },
-  { code: '+61', label: '🇦🇺 Australia (+61)' },
-  { code: '+81', label: '🇯🇵 Japan (+81)' }
-];
-
 const Chatbot = () => {
   // --- STATE & REFS ---
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -81,7 +67,6 @@ const Chatbot = () => {
     phone: ''
   });
   const [humanFormStep, setHumanFormStep] = useState(0);
-  // Track if a session has been created (for human support only)
   const [hasSession, setHasSession] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -102,8 +87,6 @@ const Chatbot = () => {
     'How can I reach you?',
     'I have some STEM/CS or data related questions',
   ];
-
-
 
   // --- HELPER FUNCTIONS ---
   const getNextMessageId = () => {
@@ -336,7 +319,6 @@ const Chatbot = () => {
     };
   }, []);
 
-  // Restore: Always create session and connect WebSocket for all chats
   useEffect(() => {
     if (!isOpen) {
       if (webSocketRef.current) {
@@ -549,7 +531,7 @@ const Chatbot = () => {
       name,
       email,
       country_code: countryCode,
-      phone: fullPhone, // E.164 format
+      phone: fullPhone,
       details: detailsMessage,
       subject: 'Transfer Request',
       type: 'request_human',
@@ -572,7 +554,7 @@ const Chatbot = () => {
     try {
       const response = await fetch(`${CHAT_API_BASE}${CONTACT_CREATE_ENDPOINT}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, subject: 'Transfer Request', message: `${parserFriendlyMessage}\n\n${detailsMessage}` })
+        body: JSON.stringify({ name, email, subject: 'Transfer Request', message: `Name: ${name} | Email: ${email} | Phone: ${fullPhone}\n\n${detailsMessage}` })
       });
       return response.ok;
     } catch {
@@ -611,7 +593,6 @@ const Chatbot = () => {
       return;
     }
 
-    // Send to backend if connected
     if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
       setIsLoading(true);
       startLoadingTimeout();
@@ -805,7 +786,7 @@ const Chatbot = () => {
   const renderHumanFormStep = () => {
     if (!showHumanForm) return null;
     return (
-      <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3">
+      <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3 w-100">
         {leadSubmitStatus && (
           <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
             {leadSubmitStatus.text}
@@ -815,43 +796,40 @@ const Chatbot = () => {
           <>
             <small className="d-block mb-2 text-muted">Step 1 of 3</small>
             <Form.Control className="mb-2" type="text" placeholder="Enter your full name" value={contactForm.name} onChange={(e) => handleContactFieldChange('name', e.target.value)} autoFocus />
-            <Button type="submit" variant="primary" className="w-100 bg-navy" disabled={!contactForm.name.trim()}>Continue</Button>
+            <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.name.trim()}>Continue</Button>
           </>
         )}
         {humanFormStep === 1 && (
           <>
             <small className="d-block mb-2 text-muted">Step 2 of 3</small>
             <Form.Control className="mb-2" type="email" placeholder="Enter your email (e.g., john@example.com)" value={contactForm.email} onChange={(e) => handleContactFieldChange('email', e.target.value)} autoFocus />
-            <Button type="submit" variant="primary" className="w-100 bg-navy" disabled={!contactForm.email.trim()}>Next</Button>
+            <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.email.trim()}>Next</Button>
           </>
         )}
         {humanFormStep === 2 && (
           <>
             <small className="d-block mb-2 text-muted">Step 3 of 3</small>
-            <div className="mb-2">
+            <div className="mb-2" style={{ color: '#000' }}>
               <PhoneInput
                 country={contactForm.countryCode.replace('+', '') || 'ng'}
                 value={contactForm.countryCode + contactForm.phone}
                 onChange={(value, data) => {
-                  // value is full phone, data has country info
-                  // Extract country code and local phone
                   const code = data.dialCode ? `+${data.dialCode}` : '';
                   const local = value.replace(data.dialCode, '').replace(/^\+/, '');
                   setContactForm((prev) => ({ ...prev, countryCode: code, phone: local }));
                 }}
-                inputClass="w-100"
-                inputStyle={{ width: '100%', color: '#212529', background: '#fff' }}
-                containerStyle={{ width: '100%' }}
+                inputClass="form-control"
+                inputStyle={{ width: '100%', height: '38px', borderRadius: '0.375rem' }}
+                buttonClass="bg-light border-secondary"
+                containerClass="w-100"
                 disableDropdown={false}
                 enableSearch={true}
                 autoFormat={true}
                 placeholder="Enter phone number"
-                specialLabel=""
                 countryCodeEditable={true}
-                masks={{ ng: '(...) ...-....' }}
               />
             </div>
-            <Button type="submit" variant="success" className="w-100" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
+            <Button type="submit" variant="success" className="w-100 bg-navy border-0" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
               {isLeadSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
           </>
@@ -862,7 +840,6 @@ const Chatbot = () => {
 
   return (
     <>
-      {/* Floating Action Button (FAB) */}
       <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
         <Button
           className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg bg-navy"
@@ -878,88 +855,13 @@ const Chatbot = () => {
         />
       </div>
 
-      {/* Responsive Chat Window: fixed size on desktop, fullscreen on mobile */}
       <div
         className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          width: '100%',
-          maxWidth: '370px',
-          height: '540px',
-          maxHeight: '80vh',
-          zIndex: 1050,
-          display: isOpen ? 'flex' : 'none',
-          flexDirection: 'column',
-          background: 'rgba(0,0,0,0.12)',
-          borderRadius: '18px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-          overflow: 'hidden',
-        }}
         tabIndex={-1}
       >
-        {/* Responsive style for mobile: full screen and flex layout for content visibility */}
-        <style>{`
-          @media (max-width: 600px) {
-            .chatbot-window {
-              top: 0 !important;
-              left: 0 !important;
-              right: 0 !important;
-              bottom: 0 !important;
-              width: 100vw !important;
-              max-width: 100vw !important;
-              height: 100dvh !important;
-              max-height: 100dvh !important;
-              border-radius: 0 !important;
-              display: flex !important;
-              flex-direction: column !important;
-            }
-            .chatbot-window .card {
-              height: 100dvh !important;
-              max-height: 100dvh !important;
-              display: flex !important;
-              flex-direction: column !important;
-            }
-            .chat-messages {
-              min-height: 0 !important;
-              max-height: 100% !important;
-              flex: 1 1 0 !important;
-              overflow-y: auto !important;
-              display: flex !important;
-              flex-direction: column !important;
-            }
-            .card-footer {
-              position: sticky !important;
-              bottom: 0 !important;
-              z-index: 2 !important;
-            }
-          }
-        `}</style>
-        <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100" style={{ borderRadius: 18, maxWidth: '100%' }}>
-                {/* Responsive style for mobile: full screen */}
-                <style>{`
-                  @media (max-width: 600px) {
-                    .chatbot-window {
-                      top: 0 !important;
-                      left: 0 !important;
-                      right: 0 !important;
-                      bottom: 0 !important;
-                      width: 100vw !important;
-                      max-width: 100vw !important;
-                      height: 100vh !important;
-                      max-height: 100vh !important;
-                      border-radius: 0 !important;
-                    }
-                    .chatbot-fab-wrapper {
-                      right: 18px !important;
-                      bottom: 18px !important;
-                    }
-                  }
-                `}</style>
+        <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100 bg-transparent">
           
-          {/* Sticky Header */}
-          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy sticky-top" style={{ minHeight: 60 }}>
+          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy flex-shrink-0">
             <div className="d-flex align-items-center gap-2">
               <span className={`chatbot-status-dot chatbot-status-dot--lg ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`} />
               <div>
@@ -974,30 +876,26 @@ const Chatbot = () => {
             </button>
           </div>
 
-          {/* Chat Messages Area */}
           <Card.Body
-            className="chat-messages overflow-auto flex-grow-1 px-2 px-md-3 py-2 py-md-3"
+            className="chat-messages overflow-auto flex-grow-1 px-3 py-3"
             style={{
               background: '#f7f8fa',
-              minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.5rem',
-              paddingBottom: 0
+              gap: '0.5rem'
             }}
           >
-            <div className="quick-questions-drawer mb-2 mb-md-3">
+            <div className="quick-questions-drawer mb-3">
               <button
                 className="btn btn-link px-0 mb-1"
                 style={{ fontSize: '1rem', color: '#0d6efd', textDecoration: 'none' }}
                 onClick={() => setIsDrawerOpen((open) => !open)}
                 aria-expanded={isDrawerOpen}
-                aria-controls="quick-questions-content"
               >
                 {isDrawerOpen ? 'Hide Quick Questions ▲' : 'Show Quick Questions ▼'}
               </button>
               {isDrawerOpen && (
-                <div id="quick-questions-content">
+                <div>
                   <small className="text-muted d-block mb-2">Quick questions:</small>
                   <div className="d-flex flex-wrap gap-2">
                     {suggestedQuestions.map((question, index) => (
@@ -1031,24 +929,20 @@ const Chatbot = () => {
             </div>
 
             <div
-              style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
               onClick={() => isDrawerOpen && setIsDrawerOpen(false)}
-              tabIndex={0}
-              onFocus={() => isDrawerOpen && setIsDrawerOpen(false)}
             >
               {messages.map((msg) => (
                 <div key={msg.id} className={`d-flex gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`} style={{ width: '100%' }}>
                   <div
                     className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
                     style={{
-                      maxWidth: '90vw',
+                      maxWidth: '90%',
                       minWidth: '30px',
                       borderRadius: 14,
                       fontSize: '1rem',
                       wordBreak: 'break-word',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                      marginLeft: msg.sender === 'user' ? 'auto' : 0,
-                      marginRight: msg.sender === 'user' ? 0 : 'auto',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                     }}
                   >
                     {msg.type === 'audio' ? (
@@ -1058,7 +952,7 @@ const Chatbot = () => {
                         remarkPlugins={[remarkMath]}
                         rehypePlugins={[rehypeKatex]}
                         components={{
-                          p: ({ children }) => <p className="mb-2">{children}</p>,
+                          p: ({ children }) => <p className="mb-1">{children}</p>,
                           code: ({ inline, children }) => inline ? <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code> : <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2"><code>{children}</code></pre>,
                           ul: ({ children }) => <ul className="ps-4 mb-2">{children}</ul>,
                           ol: ({ children }) => <ol className="ps-4 mb-2">{children}</ol>,
@@ -1077,7 +971,7 @@ const Chatbot = () => {
                       </ReactMarkdown>
                     )}
                     {msg.timestamp && (
-                      <small className="d-block text-end mt-1 text-muted" style={{ fontSize: '0.78em' }}>
+                      <small className="d-block text-end mt-1 text-muted opacity-75" style={{ fontSize: '0.7em' }}>
                         {formatTimestamp(msg.timestamp, false)}
                       </small>
                     )}
@@ -1096,25 +990,18 @@ const Chatbot = () => {
             </div>
           </Card.Body>
 
-          {/* Sticky Footer for Input */}
-          <div className="card-footer bg-white p-2 border-top sticky-bottom" style={{ minHeight: 70, boxShadow: '0 -2px 8px rgba(0,0,0,0.04)' }}>
+          <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100">
             {renderHumanFormStep()}
 
-            {!showHumanForm && leadSubmitStatus && (
-              <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
-                {leadSubmitStatus.text}
-              </div>
-            )}
-
-            <Form onSubmit={handleSend} className="chatbot-input-form w-100" style={{ width: '100%' }}>
-              <div className="d-flex w-100 align-items-center gap-2" style={{ width: '100%' }}>
+            <Form onSubmit={handleSend} className="chatbot-input-form w-100 m-0">
+              <div className="d-flex w-100 align-items-center gap-2">
                 
-                <div className="flex-grow-1" style={{ width: '100%' }}>
+                <div className="flex-grow-1">
                   {isRecording ? (
-                    <div className="d-flex align-items-center w-100 text-danger animate__animated animate__fadeIn">
+                    <div className="d-flex align-items-center w-100 text-danger animate__animated animate__fadeIn bg-light rounded-pill px-3" style={{ height: '42px' }}>
                       <span 
                         className="me-2" 
-                        style={{ width: '10px', height: '10px', backgroundColor: '#dc3545', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} 
+                        style={{ width: '10px', height: '10px', backgroundColor: '#dc3545', borderRadius: '50%', animation: 'pulse-red 1.5s infinite' }} 
                       />
                       <span className="fw-medium fs-6">{formatRecordingDuration(recordingSeconds)}</span>
                       <span className="ms-auto small text-muted">Recording...</span>
@@ -1126,35 +1013,28 @@ const Chatbot = () => {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       disabled={!isConnected && !isHumanMode}
-                      className="border-0 shadow-none px-3 py-2"
+                      className="border shadow-none px-3"
                       style={{
                         fontSize: '1rem',
                         background: 'var(--bs-body-bg, #fff)',
                         color: 'var(--bs-body-color, #212529)',
-                        borderRadius: 12,
+                        borderRadius: '21px',
+                        height: '42px',
                         width: '100%',
-                        resize: 'none',
-                        minHeight: '40px',
-                        maxHeight: '40px',
-                        height: '40px',
-                        overflow: 'hidden',
-                        lineHeight: '1.5',
-                        boxSizing: 'border-box',
                       }}
                       autoComplete="off"
-                      as={undefined} // force single-line input, not textarea
                     />
                   )}
                 </div>
 
-                <div className="d-flex align-items-center gap-1 flex-shrink-0">
+                <div className="d-flex align-items-center gap-2 flex-shrink-0">
                   {input.trim() && !isRecording ? (
                     <Button 
                       type="submit" 
                       variant="primary"
                       disabled={!isConnected && !isHumanMode}
-                      className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 shadow-sm"
-                      style={{ width: '45px', height: '45px' }}
+                      className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 shadow-sm p-0"
+                      style={{ width: '42px', height: '42px' }}
                     >
                       <BiSend size={20} />
                     </Button>
@@ -1163,16 +1043,10 @@ const Chatbot = () => {
                       <Button
                         type="button"
                         variant={isRecording ? 'danger' : 'primary'}
-                        className={`rounded-circle d-flex align-items-center justify-content-center border-0 shadow-sm ${!isRecording ? 'bg-navy' : ''}`}
-                        style={{ width: '45px', height: '45px', transition: 'transform 0.2s ease-in-out', transform: isRecording ? 'scale(1.15)' : 'scale(1)' }}
-                        onTouchStart={(e) => {
-                          e.preventDefault(); 
-                          startVoiceRecording();
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
-                          stopVoiceRecording();
-                        }}
+                        className={`rounded-circle d-flex align-items-center justify-content-center border-0 shadow-sm p-0 ${!isRecording ? 'bg-navy' : ''}`}
+                        style={{ width: '42px', height: '42px', transition: 'transform 0.2s', transform: isRecording ? 'scale(1.15)' : 'scale(1)' }}
+                        onTouchStart={(e) => { e.preventDefault(); startVoiceRecording(); }}
+                        onTouchEnd={(e) => { e.preventDefault(); stopVoiceRecording(); }}
                         onClick={(e) => {
                           if (e.nativeEvent.pointerType === 'mouse' || !e.nativeEvent.pointerType) {
                             isRecording ? stopVoiceRecording() : startVoiceRecording();
@@ -1188,11 +1062,11 @@ const Chatbot = () => {
                   {!isRecording && (
                     <Button
                       type="button"
-                      variant="outline-secondary"
+                      variant="light"
                       onClick={handleClearChat}
                       title="Clear chat"
-                      className="rounded-circle d-flex align-items-center justify-content-center shadow-sm border-0"
-                      style={{ width: '45px', height: '45px', backgroundColor: '#f8f9fa' }}
+                      className="rounded-circle d-flex align-items-center justify-content-center shadow-sm border p-0 bg-light text-dark"
+                      style={{ width: '42px', height: '42px' }}
                     >
                       <BiTrash size={20} />
                     </Button>

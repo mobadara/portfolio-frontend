@@ -1,130 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;700&display=swap');
 
-/* Github Calendar Modal Scrollable Styles */
-.github-calendar-modal-scroll {
-  width: 100%;
-  overflow-x: auto;
-  padding-bottom: 1rem;
-}
-.github-calendar-modal-inner {
-  min-width: 700px;
-  max-width: 1200px;
-  margin: 0 auto;
-  overflow-x: auto;
-  display: block;
-}
-
-/* --- CHATBOT MOBILE FIXES --- */
-@media (max-width: 600px) {
-  .chatbot-window {
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    max-width: 100vw !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  .chatbot-window .card {
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  .chat-messages {
-    min-height: 0 !important;
-    max-height: 100% !important;
-    flex: 1 1 0 !important;
-    overflow-y: auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  .card-footer, .chatbot-window .card-footer {
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 2 !important;
-    background: #fff !important;
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
-    padding: 0.5rem 0.75rem 0.5rem 0.75rem !important;
-    min-height: 54px !important;
-    height: auto !important;
-    display: flex !important;
-    align-items: center !important;
-    flex-shrink: 0 !important;
-    gap: 0 !important;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  [data-bs-theme="dark"] .card-footer, [data-bs-theme="dark"] .chatbot-window .card-footer {
-    background: var(--navy-blue) !important;
-  }
-  .chatbot-input-form {
-    width: 100%;
-    margin: 0;
-  }
-  .chatbot-input-form .d-flex {
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    width: 100%;
-    gap: 0.25rem;
-    min-height: 44px;
-  }
-  .chatbot-input-form .flex-grow-1 {
-    min-width: 0;
-    flex: 1 1 0 !important;
-    width: 100%;
-    display: flex;
-    align-items: center;
-  }
-  .chatbot-input-form .d-flex > .flex-grow-1 {
-    flex: 1 1 0 !important;
-    min-width: 0;
-  }
-  .chatbot-input-form .d-flex > .d-flex {
-    flex-shrink: 0 !important;
-  }
-  .chatbot-input-form .d-flex .btn {
-    margin-left: 0.15rem;
-    margin-right: 0;
-    padding: 0.45rem 0.6rem !important;
-    min-width: 38px;
-    min-height: 38px;
-    height: 38px;
-    width: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .chatbot-input-form .form-control {
-    min-height: 38px !important;
-    max-height: 38px !important;
-    height: 38px !important;
-    padding: 0.35rem 0.9rem !important;
-    font-size: 1rem;
-    border-radius: 12px;
-    box-sizing: border-box;
-  }
-}
-
+/* --- GLOBAL VARIABLES & LIGHT MODE DEFAULTS --- */
 :root {
-  /* Light Mode Defaults */
   --navy-blue: #001f3f;
   --body-bg: #efefef;
   --section-bg: #ffffff;
   --text-main: #333333;
 }
 
+/* --- DARK MODE OVERRIDES --- */
 [data-bs-theme="dark"] {
-  /* Dark Mode Overrides */
   --navy-blue: #003366; /* Slightly lighter navy for contrast on dark */
   --body-bg: #121212;   /* Very dark grey for background */
   --section-bg: #1e1e1e; /* Dark grey for "white" sections */
   --text-main: #f8f9fa;
 }
 
+/* --- BASE STYLES & RESETS --- */
 html, body {
   overflow-x: hidden;
   width: 100%;
@@ -149,49 +41,43 @@ img, svg, video, canvas {
 body {
   background-color: var(--body-bg);
   color: var(--text-main);
-  transition: background-color 0.3s, color 0.3s; /* Smooth transition */
+  transition: background-color 0.3s, color 0.3s;
 }
 
-/* Update utilities to use variables */
+/* --- UTILITIES --- */
 .bg-navy {
   background-color: var(--navy-blue) !important;
-  color: #fff;
+  color: #fff !important;
 }
 
 .text-navy {
   color: var(--navy-blue) !important;
 }
 
-/* Ensure sections like "About" switch backgrounds properly */
 section.bg-white {
   background-color: var(--section-bg) !important;
   color: var(--text-main);
 }
 
 .card-custom {
-  /* Bootstrap handles card backgrounds automatically in dark mode, 
-     but we add a transition for smoothness */
   transition: transform 0.2s, background-color 0.3s;
   overflow-x: hidden;
 }
 
-/* Global section overflow safety */
 section {
   overflow-x: hidden;
 }
 
-/* ---- Inter-section rhythm ---- */
+/* --- LAYOUT & SECTIONS --- */
 .section-padding {
   padding-top: 5rem;
   padding-bottom: 5rem;
 }
 
-/* Close spacing between adjacent sections */
 section + section {
   margin-top: 0;
 }
 
-/* Utility: add a visual breathing gap between card-shell sections */
 .section-gap {
   height: 2.5rem;
 }
@@ -235,20 +121,18 @@ section + section {
 /* --- NAVBAR TRANSITIONS --- */
 .navbar-custom {
   transition: all 0.4s ease-in-out;
-  padding: 1.5rem 0; /* Taller padding at the top */
+  padding: 1.5rem 0;
 }
 
-/* State 1: At the top (Transparent) */
 .navbar-transparent {
   background-color: transparent !important;
   box-shadow: none;
 }
 
-/* State 2: Scrolled (Solid) */
 .navbar-scrolled {
-  background-color: var(--navy-blue) !important; /* Solid Navy */
+  background-color: var(--navy-blue) !important;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  padding: 0.8rem 0; /* Shrink padding slightly when scrolled */
+  padding: 0.8rem 0;
 }
 
 /* --- TYPOGRAPHY ANIMATIONS --- */
@@ -269,17 +153,17 @@ section + section {
   }
 }
 
-/* Social Icon Hover Effect */
+/* --- BUTTONS & HOVERS --- */
 .hover-warning {
   transition: color 0.3s ease;
 }
 .hover-warning:hover {
-  color: #FFD700 !important; /* Gold/Yellow */
+  color: #FFD700 !important; /* Gold */
 }
 
 /* Fix for dark mode text on icons/buttons */
 [data-bs-theme="dark"] .text-dark {
-  color: #f8f9fa !important; /* Turn dark text white in dark mode */
+  color: #f8f9fa !important; 
 }
 [data-bs-theme="dark"] .btn-outline-dark {
   color: #f8f9fa;
@@ -288,12 +172,6 @@ section + section {
 [data-bs-theme="dark"] .btn-outline-dark:hover {
   color: #000;
   background-color: #f8f9fa;
-}
-
-/* Filter Button Active State */
-.btn.bg-navy {
-  background-color: var(--navy-blue) !important;
-  color: white !important;
 }
 
 .btn-primary,
@@ -310,6 +188,7 @@ section + section {
   background: linear-gradient(135deg, #1f4dbf 0%, #2a63e4 100%) !important;
   border-color: #2a63e4 !important;
 }
+
 .btn-outline-navy {
   color: var(--navy-blue);
   border-color: var(--navy-blue);
@@ -319,7 +198,6 @@ section + section {
   color: white;
 }
 
-/* Service Card Hover Effect */
 .hover-scale {
   transition: transform 0.28s ease, background-color 0.28s ease, box-shadow 0.28s ease;
 }
@@ -348,7 +226,6 @@ section + section {
   background-color: #f8f9fa !important;
   color: #111827 !important;
 }
-
 .contact-form-control::placeholder {
   color: #6b7280 !important;
 }
@@ -357,27 +234,296 @@ section + section {
   background-color: #1f2937 !important;
   color: #f8fafc !important;
 }
-
 [data-bs-theme="dark"] .contact-form-control::placeholder {
   color: #9ca3af !important;
 }
 
-/* Specific hover color for Substack */
 .hover-warning:hover .si-substack {
-    color: #FF6719 !important; /* Substack Orange */
+    color: #FF6719 !important; 
 }
 
-/* Substack Button Hover */
 .newsletter-btn:hover {
-  background-color: #e55b14 !important; /* Slightly darker orange */
+  background-color: #e55b14 !important; 
   border-color: #e55b14 !important;
-  transform: translateY(-2px); /* Subtle lift */
+  transform: translateY(-2px); 
   transition: all 0.2s ease-in-out;
 }
 
-/* --- CHATBOT STYLES --- */
+/* Custom Theme Switch Styling */
+.theme-switch-custom .form-check-input {
+  width: 3em; 
+  height: 1.5em;
+  background-color: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e"); 
+  cursor: pointer;
+}
 
-/* 1. Floating Action Button */
+.theme-switch-custom .form-check-input:checked {
+  background-color: var(--navy-blue);
+  border-color: #FFD700;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23FFD700'/%3e%3c/svg%3e");
+}
+
+.theme-switch-custom .form-check-input:focus {
+  box-shadow: none; 
+  border-color: #FFD700;
+}
+
+/* --- HERO & ABOUT SPECIFICS --- */
+.hero-rotating-title {
+  font-family: 'Fira Code', 'SFMono-Regular', Menlo, Consolas, monospace;
+  min-height: 1.8em; 
+  letter-spacing: 0.02em;
+}
+
+.title-slide {
+  display: inline-block;
+  animation: slideFade 1s ease-in-out;
+  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes slideFade {
+  0% { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(6px); }
+  45% { opacity: 1; transform: translateY(0) scale(1.02); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.hero-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.hero-buttons .btn {
+  flex: 1;
+  min-width: 150px;
+  max-width: 250px;
+}
+
+@media (max-width: 576px) {
+  .hero-buttons {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .hero-buttons .btn {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+.profile-img-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .profile-img-container {
+    max-width: 90%;
+    margin: 0 auto 2rem;
+  }
+}
+
+/* --- GITHUB CALENDAR --- */
+.github-calendar-modal-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+}
+.github-calendar-modal-inner {
+  min-width: 700px;
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-x: auto;
+  display: block;
+}
+
+[data-bs-theme="dark"] .react-activity-calendar {
+    color: #ffffff !important; 
+}
+[data-bs-theme="dark"] .bg-white {
+    background-color: #112240 !important; 
+    border-color: #233554 !important;     
+}
+
+/* --- BRAND LOGO ANIMATIONS --- */
+.brand-logo {
+  color: var(--navy-blue); 
+}
+[data-bs-theme="dark"] .brand-logo {
+  color: #ffffff; 
+}
+
+.logo-path {
+  stroke-dasharray: 200; 
+  stroke-dashoffset: 200; 
+  animation: drawLine 2s ease-out forwards;
+}
+
+.logo-node {
+  animation: nodePulse 2s ease-in-out infinite;
+  transform-origin: center; 
+  transform-box: fill-box;
+}
+
+#node-1 { animation-delay: 1.0s; } 
+#node-2 { animation-delay: 1.4s; }
+#node-3 { animation-delay: 1.8s; }
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes nodePulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: none;
+  }
+  50% {
+    transform: scale(1.3); 
+    filter: url(#glow);    
+  }
+}
+
+/* --- ANIMATED METRIC CIRCLES --- */
+.metric-circle-container {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.metric-content {
+  position: absolute;
+  z-index: 2;
+  color: var(--navy-blue);
+}
+.metric-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg); 
+}
+.metric-track {
+  fill: none;
+  stroke: #e9ecef; 
+  stroke-width: 4;
+}
+.metric-spinner {
+  fill: none;
+  stroke: #FFD700; 
+  stroke-width: 4;
+  stroke-linecap: round; 
+  stroke-dasharray: 100 240;
+  transform-origin: center;
+  animation: spinMetric 3s linear infinite; 
+}
+
+[data-bs-theme="dark"] .metric-track {
+  stroke: rgba(255, 255, 255, 0.08); 
+  fill: var(--navy-blue); 
+}
+[data-bs-theme="dark"] .metric-content h3 {
+  color: #FFD700 !important; 
+}
+[data-bs-theme="dark"] .metric-content small {
+  color: rgba(255, 255, 255, 0.7) !important; 
+}
+
+@keyframes spinMetric {
+  from {
+    stroke-dashoffset: 0;
+    transform: rotate(0deg);
+  }
+  to {
+    stroke-dashoffset: -340; 
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================================================
+   CHATBOT UI & MOBILE RESPONSIVENESS
+   ========================================================================== */
+
+/* --- 1. Base Desktop Chat Window --- */
+.chatbot-window {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  width: 380px;
+  height: 600px;
+  max-height: 80vh;
+  z-index: 9999;
+  border-radius: 18px;
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.chatbot-window.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.chatbot-window .card {
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+/* --- 2. Mobile Fullscreen Override --- */
+@media (max-width: 600px) {
+  .chatbot-window {
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100dvh !important; /* Uses dynamic viewport height to fix bottom bar issues */
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    transform: translateY(100%); /* Slides up from bottom */
+  }
+
+  .chatbot-window.open {
+    transform: translateY(0) !important;
+  }
+
+  .chatbot-window .card {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    height: 100% !important;
+  }
+  
+  .chatbot-fab-wrapper {
+    bottom: 20px !important;
+    right: 20px !important;
+  }
+  
+  /* Hide FAB when chat is open on mobile */
+  .chatbot-fab-wrapper.is-open {
+    display: none !important;
+  }
+
+  .chat-messages {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+  }
+
+  .chatbot-window .card-footer {
+    flex-shrink: 0 !important;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important; /* Safe area for iOS */
+  }
+}
+
+/* --- 3. Floating Action Button --- */
 .chatbot-fab-wrapper {
   position: fixed;
   bottom: 30px;
@@ -391,8 +537,7 @@ section + section {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background-color: var(--navy-blue) !important;
-  border: 2px solid #FFD700 !important; /* Gold border */
+  border: 2px solid #FFD700 !important; 
   z-index: 9999;
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -401,7 +546,7 @@ section + section {
   transform: scale(1.1);
 }
 
-/* Status dot — shared styles */
+/* Status dots */
 .chatbot-status-dot {
   width: 12px;
   height: 12px;
@@ -421,20 +566,9 @@ section + section {
   border-color: rgba(255,255,255,0.3);
 }
 
-.dot-connected {
-  background: #22c55e;
-  animation: pulse-green 2s ease-in-out infinite;
-}
-
-.dot-connecting {
-  background: #eab308;
-  animation: pulse-yellow 1s ease-in-out infinite;
-}
-
-.dot-disconnected {
-  background: #ef4444;
-  animation: none;
-}
+.dot-connected { background: #22c55e; animation: pulse-green 2s ease-in-out infinite; }
+.dot-connecting { background: #eab308; animation: pulse-yellow 1s ease-in-out infinite; }
+.dot-disconnected { background: #ef4444; animation: none; }
 
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
@@ -446,211 +580,11 @@ section + section {
   50%       { box-shadow: 0 0 0 5px rgba(234,179,8,0); }
 }
 
-/* 2. Chat Window Container */
-.chatbot-window {
-  position: fixed;
-  bottom: 100px; /* Sits above the button */
-  right: 15px;
-  width: 350px;
-  height: 450px;
-  z-index: 9999;
-  max-width: calc(100vw - 30px);
-  
-  /* Animation State: Hidden */
-  opacity: 0;
-  transform: translateY(20px) scale(0.95);
-  pointer-events: none; /* Click through when hidden */
-  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-}
-
-/* Animation State: Open */
-.chatbot-window.open {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: all;
-}
-
-/* 3. Enhanced Header Styles */
+/* --- 4. Chat Components --- */
 .chatbot-header {
   background: linear-gradient(135deg, var(--navy-blue) 0%, #001a70 50%, #001a4d 100%);
   color: white;
   border-bottom: 2px solid rgba(255, 215, 0, 0.3);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.chatbot-header > div:first-child {
-  flex: 1;
-  min-width: 0;
-}
-
-.chatbot-header .chatbot-close-btn {
-  margin-left: auto;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chatbot-header::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
-  animation: headerGlow 3s ease-in-out infinite;
-}
-
-@keyframes headerGlow {
-  0%, 100% { transform: translate(0, 0); opacity: 0.3; }
-  50% { transform: translate(10px, 10px); opacity: 0.6; }
-}
-
-.chatbot-avatar-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.chatbot-avatar {
-  width: 45px;
-  height: 45px;
-  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--navy-blue);
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
-  animation: avatarPulse 2s ease-in-out infinite;
-}
-
-@keyframes avatarPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); }
-  50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(255, 215, 0, 0.6); }
-}
-
-.chatbot-status-indicator {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--navy-blue);
-}
-
-.chatbot-status-indicator.connected {
-  background-color: #00ff00;
-  box-shadow: 0 0 8px rgba(0, 255, 0, 0.6);
-  animation: statusPulse 2s ease-in-out infinite;
-}
-
-.chatbot-status-indicator.disconnected {
-  background-color: #ff6b6b;
-}
-
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-.chatbot-header-title {
-  font-size: 1.1rem;
-  color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  letter-spacing: 0.5px;
-}
-
-.chatbot-header-subtitle {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.8);
-  display: block;
-  margin-top: 2px;
-}
-
-.chatbot-close-btn {
-  opacity: 0.7;
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.chatbot-close-btn:hover {
-  opacity: 1;
-  transform: rotate(90deg);
-}
-
-/* Message Avatars */
-.chatbot-message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: bold;
-  color: white;
-  flex-shrink: 0;
-}
-
-.bot-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.admin-avatar {
-  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
-}
-
-.user-avatar {
-  background: linear-gradient(135deg, #001a4d 0%, #003d99 100%);
-}
-
-.avatar-text {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-/* 4. Message Bubbles Helper */
-.rounded-bottom-right-0 {
-  border-bottom-right-radius: 0 !important;
-}
-.rounded-bottom-left-0 {
-  border-bottom-left-radius: 0 !important;
-}
-
-/* Textarea Input Styles */
-.chatbot-input {
-  font-family: inherit;
-  line-height: 1.4;
-}
-
-.chatbot-input:focus {
-  background-color: #f5f5f5 !important;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-}
-
-/* Message Input in Light Mode */
-.chatbot-message-input {
-  color: #333 !important;
-  background-color: #ffffff !important;
-  border: 1px solid #cccccc !important;
-}
-
-.chatbot-message-input::placeholder {
-  color: #666666 !important;
-}
-
-.chatbot-message-input:focus {
-  color: #333 !important;
-  background-color: #ffffff !important;
-  border-color: #0d6efd !important;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
 }
 
 .chatbot-quick-btn {
@@ -659,19 +593,8 @@ section + section {
   color: #0b3d91 !important;
   font-weight: 600;
 }
-
-.chatbot-quick-btn:hover,
-.chatbot-quick-btn:focus {
-  background: rgba(11, 61, 145, 0.16) !important;
-  color: #062a65 !important;
-}
-
-.chatbot-quick-btn:disabled {
-  opacity: 0.55;
-  color: #4b5563 !important;
-  border-color: #9ca3af !important;
-  background: rgba(156, 163, 175, 0.15) !important;
-}
+.chatbot-quick-btn:hover { background: rgba(11, 61, 145, 0.16) !important; color: #062a65 !important; }
+.chatbot-quick-btn:disabled { opacity: 0.55; }
 
 .chatbot-transfer-btn {
   border: 1px solid #0d6efd !important;
@@ -679,22 +602,9 @@ section + section {
   color: #0d6efd !important;
   font-weight: 600;
 }
+.chatbot-transfer-btn:hover { background: rgba(13, 110, 253, 0.2) !important; color: #0a58ca !important; }
 
-.chatbot-transfer-btn:hover,
-.chatbot-transfer-btn:focus {
-  background: rgba(13, 110, 253, 0.2) !important;
-  color: #0a58ca !important;
-}
-
-.chat-recording-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #b91c1c;
-}
-
+/* Recording UI */
 .chat-recording-dot {
   width: 0.55rem;
   height: 0.55rem;
@@ -708,155 +618,54 @@ section + section {
   50% { opacity: 0.45; transform: scale(0.85); }
 }
 
-/* 5. Mobile Responsiveness */
-@media (max-width: 576px) {
-  .chatbot-window {
-    width: 100%;
-    max-width: 100%;
-    height: 100dvh;
-    max-height: 100dvh;
-    right: 0;
-    left: 0;
-    bottom: 0;
-    border-radius: 0;
-    transform: translateY(100%);
-  }
-
-  .chatbot-window.open {
-    transform: translateY(0);
-  }
-
-  .chatbot-window .card,
-  .chatbot-window .card .chatbot-header,
-  .chatbot-window .card .card-footer,
-  .chatbot-window .card .card-body {
-    border-radius: 0 !important;
-  }
-
-  .chatbot-fab-wrapper.is-open {
-    display: none;
-  }
+/* React Phone Input 2 Overrides */
+.react-tel-input .form-control {
+  border: 1px solid #ced4da !important;
+  height: 38px !important;
+}
+.react-tel-input .form-control:focus {
+  border-color: #0d6efd !important;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
 }
 
-/* src/App.css */
-
-/* FIX: In Dark Mode, make 'bg-light' elements dark gray */
+/* --- 5. Chatbot Dark Mode Fixes --- */
 [data-bs-theme="dark"] .bg-light {
-  background-color: #112240 !important; /* A nice dark navy/gray */
+  background-color: #112240 !important; 
   color: #e6f1ff !important;
 }
 
-/* FIX: In Dark Mode, make 'outline-dark' buttons visible (light border/text) */
-[data-bs-theme="dark"] .btn-outline-dark {
-  color: #f8f9fa;
-  border-color: #f8f9fa;
-}
-[data-bs-theme="dark"] .btn-outline-dark:hover {
-  background-color: #f8f9fa;
-  color: #000;
-}
-
-/* FIX: Form Inputs in Dark Mode */
-[data-bs-theme="dark"] .form-control {
-  background-color: #112240; /* Match the section background */
-  border-color: #233554;
-  color: white;
-}
-[data-bs-theme="dark"] .form-control::placeholder {
-  color: #8892b0;
-}
-
-/* Custom Theme Switch Styling */
-.theme-switch-custom .form-check-input {
-  width: 3em; /* Make it slightly wider */
-  height: 1.5em;
-  background-color: transparent;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e"); /* White knob default */
-  cursor: pointer;
-}
-
-/* When checked (Light Mode) - Make knob Gold */
-.theme-switch-custom .form-check-input:checked {
-  background-color: var(--navy-blue);
-  border-color: #FFD700;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23FFD700'/%3e%3c/svg%3e");
-}
-
-/* When unchecked (Dark Mode) - Make knob White/Gray */
-.theme-switch-custom .form-check-input:focus {
-  box-shadow: none; /* Remove blue glow */
-  border-color: #FFD700;
-}
-
-/* --- CHATBOT DARK MODE FIXES --- */
-
-/* 1. Main Chat Window Background */
 [data-bs-theme="dark"] .chatbot-window .card {
   background-color: var(--navy-blue);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Textarea input in dark mode */
-[data-bs-theme="dark"] .chatbot-input {
-  background-color: #112240 !important;
-  color: #e6f1ff !important;
-  border: 1px solid #233554 !important;
-}
-
-[data-bs-theme="dark"] .chatbot-input::placeholder {
-  color: #8892b0 !important;
-}
-
-[data-bs-theme="dark"] .chatbot-input:focus {
-  background-color: #1a3a52 !important;
-  border-color: #667eea !important;
-}
-
-/* Enhanced Header Dark Mode */
 [data-bs-theme="dark"] .chatbot-header {
   background: linear-gradient(135deg, #0a1628 0%, #0f2744 50%, #142d4c 100%);
   border-bottom: 2px solid rgba(255, 215, 0, 0.4);
 }
 
-/* 2. Chat History Area (The scrollable part) */
-[data-bs-theme="dark"] .chat-body {
-  background-color: #0b1a2e !important; /* Very dark navy (almost black) */
+[data-bs-theme="dark"] .chat-messages {
+  background-color: #0b1a2e !important; 
 }
 
-/* 3. The BOT'S Message Bubble */
-/* We override 'bg-white' only inside the chatbot when in dark mode */
-[data-bs-theme="dark"] .chatbot-window .bg-white {
-  background-color: #1e3a5f !important; /* Lighter Navy for contrast */
-  color: #ffffff !important;             /* White text */
-  border-color: #2c4a7c !important;      /* Subtle border */
+[data-bs-theme="dark"] .chatbot-window .bg-light {
+  background-color: #1e3a5f !important; 
+  color: #ffffff !important;             
 }
 
-/* 4. The Footer (Input Area) */
 [data-bs-theme="dark"] .chatbot-window .card-footer {
   background-color: var(--navy-blue) !important;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* 5. The Input Field itself */
 [data-bs-theme="dark"] .chatbot-window .form-control {
-  background-color: #0b1a2e !important;
-  color: white !important;
-}
-
-[data-bs-theme="dark"] .chatbot-message-input {
   background-color: #0b1a2e !important;
   color: white !important;
   border-color: #1e3a5f !important;
 }
 
-[data-bs-theme="dark"] .chatbot-message-input::placeholder {
+[data-bs-theme="dark"] .chatbot-window .form-control::placeholder {
   color: #8892b0 !important;
-}
-
-[data-bs-theme="dark"] .chatbot-message-input:focus {
-  background-color: #0f2844 !important;
-  border-color: #667eea !important;
 }
 
 [data-bs-theme="dark"] .chatbot-quick-btn {
@@ -864,250 +673,23 @@ section + section {
   background: rgba(110, 168, 254, 0.2) !important;
   color: #dbeafe !important;
 }
-
-[data-bs-theme="dark"] .chatbot-quick-btn:hover,
-[data-bs-theme="dark"] .chatbot-quick-btn:focus {
-  background: rgba(110, 168, 254, 0.3) !important;
-  color: #ffffff !important;
-}
+[data-bs-theme="dark"] .chatbot-quick-btn:hover { background: rgba(110, 168, 254, 0.3) !important; color: #ffffff !important; }
 
 [data-bs-theme="dark"] .chatbot-transfer-btn {
   border-color: #86b7fe !important;
   background: rgba(13, 110, 253, 0.28) !important;
   color: #eaf2ff !important;
 }
+[data-bs-theme="dark"] .chatbot-transfer-btn:hover { background: rgba(13, 110, 253, 0.4) !important; color: #ffffff !important; }
 
-[data-bs-theme="dark"] .chatbot-transfer-btn:hover,
-[data-bs-theme="dark"] .chatbot-transfer-btn:focus {
-  background: rgba(13, 110, 253, 0.4) !important;
-  color: #ffffff !important;
+[data-bs-theme="dark"] .react-tel-input .form-control {
+  background-color: #0b1a2e !important;
+  color: white !important;
 }
-
-[data-bs-theme="dark"] .chat-recording-indicator {
-  color: #fca5a5;
+[data-bs-theme="dark"] .react-tel-input .country-list {
+  background-color: #0b1a2e !important;
+  color: white !important;
 }
-
-/* --- ANIMATED METRIC CIRCLES --- */
-
-/* 1. The Container holding SVG and Text together */
-.metric-circle-container {
-  position: relative;
-  width: 130px;
-  height: 130px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 2. The Text Content centered absolutely */
-.metric-content {
-  position: absolute;
-  z-index: 2;
-  /* Ensure text colors match theme */
-  color: var(--navy-blue);
-}
-
-/* 3. The SVG Canvas */
-.metric-svg {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg); /* Start animation at the top center */
-}
-
-/* 4. The Static Background Ring (Gray track) */
-.metric-track {
-  fill: none;
-  stroke: #e9ecef; /* Light gray in light mode */
-  stroke-width: 4;
-}
-
-/* 5. The Animated "Spinning" Ring (Gold) */
-.metric-spinner {
-  fill: none;
-  stroke: #FFD700; /* Gold */
-  stroke-width: 4;
-  stroke-linecap: round; /* Makes the ends of the line rounded */
-  /* Mathematics of the dasharray:
-     Circumference C = 2 * pi * r. Here r=54, so C ≈ 339px.
-     We create a dash of 100px, followed by a gap of 240px.
-  */
-  stroke-dasharray: 100 240;
-  transform-origin: center;
-  animation: spinMetric 3s linear infinite; /* Continuous rotation */
-}
-
-/* --- DARK MODE ADAPTATIONS --- */
-[data-bs-theme="dark"] .metric-track {
-  stroke: rgba(255, 255, 255, 0.08); /* Very subtle track in dark mode */
-  fill: var(--navy-blue); /* Fills the center of the circle with Navy */
-}
-
-[data-bs-theme="dark"] .metric-content h3 {
-  color: #FFD700 !important; /* Gold numbers in dark mode */
-}
-
-[data-bs-theme="dark"] .metric-content small {
-  color: rgba(255, 255, 255, 0.7) !important; /* Lighter text labels */
-}
-
-
-/* --- KEYFRAME ANIMATION --- */
-@keyframes spinMetric {
-  from {
-    stroke-dashoffset: 0;
-    transform: rotate(0deg);
-  }
-  to {
-     /* We rotate the whole circle 360deg to create the spin */
-    stroke-dashoffset: -340; /* Shifts the dash pattern for flow effect */
-    transform: rotate(360deg);
-  }
-}
-
-/* --- LOGO STYLES --- */
-
-/* Light Mode Defaults */
-.brand-logo {
-  color: var(--navy-blue); /* The lines and text will be Navy */
-}
-
-/* Dark Mode Adaptations */
-[data-bs-theme="dark"] .brand-logo {
-  color: #ffffff; /* The lines and text turn White */
-}
-
-/* Optional: subtle pulse animation on the gold nodes */
-.logo-node {
-    animation: pulseGold 3s infinite ease-in-out;
-}
-
-@keyframes pulseGold {
-    0%, 100% { opacity: 1; r: 5; }
-    50% { opacity: 0.8; r: 6; } /* Subtle grow effect */
-}
-
-/* --- LOGO ANIMATION STYLES --- */
-
-/* 1. The Line "Drawing" Animation */
-.logo-path {
-  /* This creates a dashed line where the dash is longer than the path itself */
-  stroke-dasharray: 200; 
-  stroke-dashoffset: 200; /* Hides the line initially */
-  animation: drawLine 2s ease-out forwards;
-}
-
-/* 2. The Nodes "Pulse" Animation */
-.logo-node {
-  /* Apply the animation loop */
-  animation: nodePulse 2s ease-in-out infinite;
-  transform-origin: center; /* Ensures they scale from their own center */
-  transform-box: fill-box;
-}
-
-/* 3. Staggering the Pulse (The "Data Flow" effect) */
-/* Node 1 pulses first, then 2, then 3 */
-#node-1 { animation-delay: 1.0s; } /* Starts after line finishes drawing */
-#node-2 { animation-delay: 1.4s; }
-#node-3 { animation-delay: 1.8s; }
-
-/* --- KEYFRAMES --- */
-
-/* Draws the line from left to right */
-@keyframes drawLine {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* Makes the nodes grow and glow */
-@keyframes nodePulse {
-  0%, 100% {
-    transform: scale(1);
-    filter: none;
-  }
-  50% {
-    transform: scale(1.3); /* Pop up */
-    filter: url(#glow);    /* Activate the SVG glow filter */
-  }
-}
-
-/* Optional: Dark Mode Support */
-[data-bs-theme="dark"] .brand-logo {
-  color: #ffffff;
-}
-[data-bs-theme="light"] .brand-logo {
-  color: var(--navy-blue);
-}
-
-/* Hero rotating title */
-.hero-rotating-title {
-  font-family: 'Fira Code', 'SFMono-Regular', Menlo, Consolas, monospace;
-  min-height: 1.8em; /* reserve space to avoid layout shift */
-  letter-spacing: 0.02em;
-}
-
-.title-slide {
-  display: inline-block;
-  animation: slideFade 1s ease-in-out;
-  text-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-}
-
-@keyframes slideFade {
-  0% { opacity: 0; transform: translateY(14px) scale(0.98); filter: blur(6px); }
-  45% { opacity: 1; transform: translateY(0) scale(1.02); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-}
-/* Hero Buttons Responsive */
-.hero-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1rem;
-}
-
-.hero-buttons .btn {
-  flex: 1;
-  min-width: 150px;
-  max-width: 250px;
-}
-
-@media (max-width: 576px) {
-  .hero-buttons {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .hero-buttons .btn {
-    width: 100%;
-    max-width: 100%;
-  }
-}
-
-/* About Section Image Centering */
-.profile-img-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin: 0 auto;
-}
-
-@media (max-width: 768px) {
-  .profile-img-container {
-    max-width: 90%;
-    margin: 0 auto 2rem;
-  }
-}
-
-/* --- GITHUB CALENDAR FIXES --- */
-[data-bs-theme="dark"] .react-activity-calendar {
-    /* Ensures the text labels (Mon, Tue, Jan, Feb) turn white */
-    color: #ffffff !important; 
-}
-
-/* Change the container background in dark mode */
-[data-bs-theme="dark"] .bg-white {
-    background-color: #112240 !important; /* Navy */
-    border-color: #233554 !important;     /* Lighter border */
+[data-bs-theme="dark"] .react-tel-input .country-list .country:hover {
+  background-color: #1e3a5f !important;
 }
