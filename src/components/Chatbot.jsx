@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import './ChatbotFooterResponsive.css';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
@@ -991,8 +992,8 @@ const Chatbot = () => {
           </Card.Body>
 
           <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100 chatbot-footer-responsive">
-            // Responsive fix for chatbot footer on mobile
-            import './ChatbotFooterResponsive.css';
+            {/* Responsive fix for chatbot footer on mobile */}
+            
             {renderHumanFormStep()}
 
             <Form onSubmit={handleSend} className="chatbot-input-form w-100 m-0">
