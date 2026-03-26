@@ -990,7 +990,9 @@ const Chatbot = () => {
             </div>
           </Card.Body>
 
-          <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100">
+          <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100 chatbot-footer-responsive">
+            // Responsive fix for chatbot footer on mobile
+            import './ChatbotFooterResponsive.css';
             {renderHumanFormStep()}
 
             <Form onSubmit={handleSend} className="chatbot-input-form w-100 m-0">

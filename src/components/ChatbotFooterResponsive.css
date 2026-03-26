@@ -1,0 +1,32 @@
+/* Responsive adjustments for chatbot footer */
+.chatbot-footer-responsive {
+  /* Default styles remain as in JSX */
+}
+
+@media (max-width: 600px) {
+  .chatbot-footer-responsive {
+    padding: 0.5rem 0.5rem !important;
+    min-height: unset !important;
+    max-height: 90px;
+    box-sizing: border-box;
+  }
+  .chatbot-footer-responsive form {
+    margin-bottom: 0;
+  }
+  .chatbot-footer-responsive .d-flex {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .chatbot-footer-responsive input,
+  .chatbot-footer-responsive .form-control {
+    font-size: 0.95rem;
+    height: 38px !important;
+    min-height: 38px !important;
+  }
+  .chatbot-footer-responsive button {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+  }
+}
