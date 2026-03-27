@@ -6,18 +6,16 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
+import { BiMicrophone, BiSend, BiStopCircle, BiX } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import './ChatbotFooterResponsive.css';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
 const CONTACT_CREATE_ENDPOINT = (import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact');
-const CHAT_CLEAR_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/clear`;
 const CHAT_SESSION_STATUS_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/status`;
 const CHATBOT_SESSION_STORAGE_KEY = 'portfolio_chatbot_session_id';
 const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
@@ -32,18 +30,6 @@ const generateSessionId = () => {
 
 const getChatMessagesStorageKey = (sessionId) => `${CHATBOT_MESSAGES_PREFIX}${sessionId}`;
 const getChatAudioStorageKey = (sessionId, messageId) => `${CHATBOT_AUDIO_PREFIX}${sessionId}_${messageId}`;
-
-const clearChatStorageForSession = (sessionId) => {
-  if (!sessionId) return;
-  localStorage.removeItem(getChatMessagesStorageKey(sessionId));
-
-  const audioPrefix = `${CHATBOT_AUDIO_PREFIX}${sessionId}_`;
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith(audioPrefix)) {
-      localStorage.removeItem(key);
-    }
-  });
-};
 
 const Chatbot = () => {
   // --- STATE & REFS ---
@@ -343,7 +329,6 @@ const Chatbot = () => {
       } catch {
         return storedSessionId;
       }
-      clearChatStorageForSession(storedSessionId);
       localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
       return generateSessionId();
     };
@@ -402,15 +387,12 @@ const Chatbot = () => {
               setMessages([defaultBotMessage]);
               setIsHumanMode(false);
               setShowHumanForm(false);
-              setLeadSubmitStatus({ type: 'success', text: 'Chat cleared. Start a new conversation anytime.' });
               clearLoadingTimeout();
               setIsLoading(false);
               return;
             }
 
             if (data?.type === 'session_deleted') {
-              const activeSession = sessionIdRef.current;
-              if (activeSession) clearChatStorageForSession(activeSession);
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
               sessionIdRef.current = null;
 
@@ -418,7 +400,6 @@ const Chatbot = () => {
               setIsHumanMode(false);
               setShowHumanForm(false);
               setInput('');
-              setLeadSubmitStatus({ type: 'success', text: 'Previous chat session was closed by admin. A new session will start now.' });
               clearLoadingTimeout();
               setIsLoading(false);
               setIsConnected(false);
@@ -752,37 +733,6 @@ const Chatbot = () => {
     clearRecordingTimer();
   };
 
-  const handleClearChat = async () => {
-    const activeSession = sessionIdRef.current;
-    if (activeSession) {
-      sendSocketMessage({ type: 'clear_chat', session_id: activeSession, timestamp: new Date().toISOString() });
-      try { await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' }); } catch { /* ignore clear chat error */ }
-      clearChatStorageForSession(activeSession);
-    }
-
-    localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
-    sessionIdRef.current = null;
-
-    if (webSocketRef.current) {
-      webSocketRef.current.close();
-      webSocketRef.current = null;
-    }
-
-    setMessages([defaultBotMessage]);
-    setShowHumanForm(false);
-    setLeadSubmitStatus({ type: 'success', text: 'Chat cleared. A fresh session has started.' });
-    setInput('');
-    setIsHumanMode(false);
-    setIsRecording(false);
-    setIsLoading(false);
-    setIsConnected(false);
-    setIsConnecting(true);
-    clearLoadingTimeout();
-    clearRecordingTimer();
-
-    if (isOpen) setSocketResetNonce((prev) => prev + 1);
-  };
-
   // --- UI RENDERERS ---
   const renderHumanFormStep = () => {
     if (!showHumanForm) return null;
@@ -860,7 +810,7 @@ const Chatbot = () => {
         className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}
         tabIndex={-1}
       >
-        <Card className="h-100 border-0 overflow-hidden d-flex flex-column w-100 bg-transparent">
+        <Card className="h-100 border-0 d-flex flex-column w-100 bg-transparent">
           
           <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy flex-shrink-0">
             <div className="d-flex align-items-center gap-2">
@@ -878,15 +828,16 @@ const Chatbot = () => {
           </div>
 
           <Card.Body
-            className="chat-messages overflow-auto flex-grow-1 px-3 py-3"
+            className="chat-messages flex-grow-1 px-3 py-3"
             style={{
               background: '#f7f8fa',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              overflowY: 'auto'
             }}
           >
-            <div className="quick-questions-drawer mb-3">
+            <div className="quick-questions-drawer mb-3 flex-shrink-0">
               <button
                 className="btn btn-link px-0 mb-1"
                 style={{ fontSize: '1rem', color: '#0d6efd', textDecoration: 'none' }}
@@ -930,7 +881,7 @@ const Chatbot = () => {
             </div>
 
             <div
-              style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
               onClick={() => isDrawerOpen && setIsDrawerOpen(false)}
             >
               {messages.map((msg) => (
@@ -991,9 +942,7 @@ const Chatbot = () => {
             </div>
           </Card.Body>
 
-          <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100 chatbot-footer-responsive">
-            {/* Responsive fix for chatbot footer on mobile */}
-            
+          <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100">
             {renderHumanFormStep()}
 
             <Form onSubmit={handleSend} className="chatbot-input-form w-100 m-0">
@@ -1060,19 +1009,6 @@ const Chatbot = () => {
                         {isRecording ? <BiStopCircle size={24} /> : <BiMicrophone size={24} />}
                       </Button>
                     )
-                  )}
-                  
-                  {!isRecording && (
-                    <Button
-                      type="button"
-                      variant="light"
-                      onClick={handleClearChat}
-                      title="Clear chat"
-                      className="rounded-circle d-flex align-items-center justify-content-center shadow-sm border p-0 bg-light text-dark"
-                      style={{ width: '42px', height: '42px' }}
-                    >
-                      <BiTrash size={20} />
-                    </Button>
                   )}
                 </div>
               </div>
