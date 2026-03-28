@@ -66,6 +66,7 @@ const PortfolioSection = ({ projects = [] }) => {
                 className={`project-card h-100 ${touchedCard === project._id ? 'touched' : ''}`}
                 onTouchStart={() => handleCardTouchStart(project._id)}
                 onTouchEnd={() => setTouchedCard(null)}
+                style={{ background: 'var(--section-bg, #fff)', color: 'var(--text-main, #212529)' }}
               >
                 {/* Image Container with Floating Links */}
                 <div className="project-image-wrapper position-relative overflow-hidden">
@@ -133,12 +134,20 @@ const PortfolioSection = ({ projects = [] }) => {
           ))}
         </Row>
 
+
         {/* Empty State */}
         {filteredProjects.length === 0 && (
           <div className="text-center py-5">
             <p className="text-muted">No projects found in this category.</p>
           </div>
         )}
+
+        {/* View All Projects Link */}
+        <div className="text-center mt-5">
+          <a href="/projects" className="btn btn-primary btn-lg px-4 shadow-sm" style={{ fontWeight: 500 }}>
+            View all projects
+          </a>
+        </div>
         </div>
       </Container>
 

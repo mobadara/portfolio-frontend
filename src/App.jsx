@@ -22,6 +22,7 @@ import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import AdminMessageDetail from './pages/AdminMessageDetail';
 import NotFoundPage from './pages/NotFoundPage';
+import AllProjects from './pages/AllProjects';
 // import projectsLocalData from './data/projects';
 import axios from 'axios';
 import './App.css';
@@ -144,6 +145,7 @@ function App() {
       <Route path="/blog" element={homeContent} />
       <Route path="/services" element={homeContent} />
       <Route path="/contact" element={homeContent} />
+      <Route path="/projects" element={<AllProjects projects={projects} />} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/analytics" element={<AdminAnalytics />} />
