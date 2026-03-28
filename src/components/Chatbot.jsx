@@ -81,11 +81,11 @@ const Chatbot = () => {
   const getNextMessageId = () => {
     const nextId = messageIdRef.current;
     messageIdRef.current += 1;
-    return nextId;
-  };
-
+          const parsed = JSON.parse(raw); 
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed; 
+          return [defaultBotMessage]; 
   const loadMessagesForSession = (sessionId) => {
-    const key = getChatMessagesStorageKey(sessionId);
+          return [defaultBotMessage]; 
     const raw = localStorage.getItem(key);
     if (!raw) return [defaultBotMessage];
     try {
@@ -123,8 +123,8 @@ const Chatbot = () => {
   };
 
   const formatRecordingDuration = (seconds = 0) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+          setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' }); 
+          setIsRecording(false); 
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
