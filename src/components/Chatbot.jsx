@@ -500,43 +500,13 @@ const Chatbot = () => {
       } else {
         webSocketRef.current.send(JSON.stringify(payload));
       }
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
-    if (!hasSession) setHasSession(true);
-    let sessionId = sessionIdRef.current;
-    if (!sessionId) {
-      sessionId = generateSessionId();
-      sessionIdRef.current = sessionId;
-      localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
-    }
-    const transferPayload = {
-      name,
-      email,
-      country_code: countryCode,
-      phone: fullPhone,
-      details: detailsMessage,
-      subject: 'Transfer Request',
-      type: 'request_human',
-      source: 'portfolio-frontend',
-      timestamp: new Date().toISOString(),
-      user_name: name,
-      user_email: email,
-      user_phone: fullPhone
-    };
-
-    if (sessionId) {
-      try {
-        const response = await fetch(CHAT_REQUEST_HUMAN_ENDPOINT(sessionId), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transferPayload)
-        });
-        if (response.ok) return true;
-      } catch { /* ignore WebSocket error */ }
-    }
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      clearRecordingTimer();
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((prev) => prev + 1), 1000);
+    } catch (e) {
+      setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' });
+      setIsRecording(false);
 
     try {
       const response = await fetch(`${CHAT_API_BASE}${CONTACT_CREATE_ENDPOINT}`, {
