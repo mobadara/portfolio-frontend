@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import AIPlayground from './components/AIPlayground';
 import AboutSection from './components/AboutSection';
@@ -47,7 +47,9 @@ function App() {
   const [theme, setTheme] = useState('light');
   const [isLoading, setIsLoading] = useState(true);
   const [projects, setProjects] = useState([]);
+  const [routeLoading, setRouteLoading] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate ? useNavigate() : null;
 
   /**
    * Fetch projects from backend API
@@ -93,14 +95,17 @@ function App() {
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
   useEffect(() => {
+    setRouteLoading(true);
     const sectionId = SECTION_PATHS[location.pathname];
     if (!sectionId || location.pathname.startsWith('/admin')) {
+      setRouteLoading(false);
       return;
     }
 
     const scrollToSection = () => {
       const targetSection = document.getElementById(sectionId);
       if (!targetSection) {
+        setRouteLoading(false);
         return;
       }
 
@@ -113,6 +118,7 @@ function App() {
         top: scrollTop,
         behavior: 'smooth'
       });
+      setTimeout(() => setRouteLoading(false), 400);
     };
 
     const timer = setTimeout(scrollToSection, 40);
@@ -121,12 +127,12 @@ function App() {
 
   const homeContent = (
     <>
-      <LoadingAnimation isLoading={isLoading} />
+      <LoadingAnimation isLoading={isLoading || routeLoading} />
       <NavigationBar theme={theme} onToggleTheme={toggleTheme} />
       <HeroSection />
       <AboutSection theme={theme} />
       <SkillsSection />
-      <PortfolioSection projects={projects} />
+      <PortfolioSection projects={projects} setRouteLoading={setRouteLoading} />
       <ServicesSection />
       <AIPlayground />
       <BlogSection />
@@ -145,7 +151,7 @@ function App() {
       <Route path="/blog" element={homeContent} />
       <Route path="/services" element={homeContent} />
       <Route path="/contact" element={homeContent} />
-      <Route path="/projects" element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} />} />
+      <Route path="/projects" element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} setRouteLoading={setRouteLoading} />} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/analytics" element={<AdminAnalytics />} />
