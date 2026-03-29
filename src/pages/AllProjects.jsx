@@ -7,17 +7,18 @@ import { FaGithub, FaExternalLinkAlt, FaYoutube } from 'react-icons/fa';
 import '../App.css';
 
 
-const AllProjects = ({ projects = [] }) => {
+const AllProjects = ({ projects = [], theme = 'light', onToggleTheme }) => {
   const [touchedCard, setTouchedCard] = useState(null);
   const handleCardTouchStart = (projectId) => {
     setTouchedCard(projectId);
   };
   return (
     <>
-      <NavigationBar />
-      <div className="container py-5" style={{ minHeight: '60vh' }}>
-        <h2 className="mb-4 fw-bold text-center">All Projects</h2>
-        <div className="row g-4">
+      <NavigationBar theme={theme} onToggleTheme={onToggleTheme} />
+        <main className="bg-navy text-white" style={{ minHeight: '100vh', width: '100%', paddingTop: '90px' }}>
+        <div className="container py-5" style={{ background: 'transparent' }}>
+          <h2 className="mb-4 fw-bold text-center" style={{ background: 'transparent' }}>All Projects</h2>
+          <div className="row g-4">
           {projects.map((project, idx) => (
             <div className="col-md-6 col-lg-4 mb-2 d-flex" key={project._id || idx}>
               <div
@@ -94,7 +95,8 @@ const AllProjects = ({ projects = [] }) => {
             <p className="text-muted">No projects found.</p>
           </div>
         )}
-      </div>
+        </div>
+      </main>
       <FooterSection />
 
       {/* Portfolio Card Styles */}
@@ -111,8 +113,9 @@ const AllProjects = ({ projects = [] }) => {
         .project-card:hover,
         .project-card.touched {
           border-color: rgba(0, 31, 63, 0.3);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-          transform: translateY(-4px);
+          box-shadow: 0 12px 32px 0 rgba(0, 31, 63, 0.22), 0 2px 8px 0 rgba(0,0,0,0.10);
+          transform: translateY(-8px);
+          z-index: 2;
         }
         .project-image-wrapper {
           position: relative;

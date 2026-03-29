@@ -145,7 +145,7 @@ function App() {
       <Route path="/blog" element={homeContent} />
       <Route path="/services" element={homeContent} />
       <Route path="/contact" element={homeContent} />
-      <Route path="/projects" element={<AllProjects projects={projects} />} />
+      <Route path="/projects" element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} />} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/analytics" element={<AdminAnalytics />} />
