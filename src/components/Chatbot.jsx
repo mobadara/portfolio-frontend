@@ -55,8 +55,6 @@ const Chatbot = () => {
   });
   const [humanFormStep, setHumanFormStep] = useState(0);
   const [hasSession, setHasSession] = useState(false);
-  // Store last human support details for session reuse
-  const lastHumanSupportDetailsRef = useRef(null);
 
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
@@ -81,11 +79,11 @@ const Chatbot = () => {
   const getNextMessageId = () => {
     const nextId = messageIdRef.current;
     messageIdRef.current += 1;
-          const parsed = JSON.parse(raw); 
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed; 
-          return [defaultBotMessage]; 
+    return nextId;
+  };
+
   const loadMessagesForSession = (sessionId) => {
-          return [defaultBotMessage]; 
+    const key = getChatMessagesStorageKey(sessionId);
     const raw = localStorage.getItem(key);
     if (!raw) return [defaultBotMessage];
     try {
@@ -123,8 +121,8 @@ const Chatbot = () => {
   };
 
   const formatRecordingDuration = (seconds = 0) => {
-          setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' }); 
-          setIsRecording(false); 
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
@@ -253,9 +251,6 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
-        // Always reset to bot mode when chat is opened
-        setIsHumanMode(false);
-        setShowHumanForm(false);
       } else {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
@@ -500,13 +495,43 @@ const Chatbot = () => {
       } else {
         webSocketRef.current.send(JSON.stringify(payload));
       }
-      setIsRecording(true);
-      setRecordingSeconds(0);
-      clearRecordingTimer();
-      recordingTimerRef.current = setInterval(() => setRecordingSeconds((prev) => prev + 1), 1000);
-    } catch (e) {
-      setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' });
-      setIsRecording(false);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
+    if (!hasSession) setHasSession(true);
+    let sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      sessionIdRef.current = sessionId;
+      localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
+    }
+    const transferPayload = {
+      name,
+      email,
+      country_code: countryCode,
+      phone: fullPhone,
+      details: detailsMessage,
+      subject: 'Transfer Request',
+      type: 'request_human',
+      source: 'portfolio-frontend',
+      timestamp: new Date().toISOString(),
+      user_name: name,
+      user_email: email,
+      user_phone: fullPhone
+    };
+
+    if (sessionId) {
+      try {
+        const response = await fetch(CHAT_REQUEST_HUMAN_ENDPOINT(sessionId), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transferPayload)
+        });
+        if (response.ok) return true;
+      } catch { /* ignore WebSocket error */ }
+    }
 
     try {
       const response = await fetch(`${CHAT_API_BASE}${CONTACT_CREATE_ENDPOINT}`, {
@@ -523,16 +548,6 @@ const Chatbot = () => {
     if (!hasSession) {
       setHasSession(true);
       setIsConnecting(true);
-    }
-    // If we have previous human support details for this session, skip recapture
-    if (lastHumanSupportDetailsRef.current && hasSession) {
-      setIsHumanMode(true);
-      setShowHumanForm(false);
-      setMessages((prev) => [
-        ...prev,
-        { id: getNextMessageId(), text: 'You are now connected to human support. A representative will reach out if available.', sender: 'bot' }
-      ]);
-      return;
     }
     if (!showHumanForm) {
       setShowHumanForm(true);
@@ -623,90 +638,81 @@ const Chatbot = () => {
       const fullPhone = `${contactForm.countryCode}${localPhone}`;
       const detailsMessage = `Human support details:\n- Name: ${trimmedName}\n- Email: ${trimmedEmail}\n- Phone: ${fullPhone}`;
 
-      const handleHumanFormSubmit = async (e) => {
-        e.preventDefault();
-
-        if (humanFormStep === 0) {
-          const trimmedName = contactForm.name.trim();
-          if (!trimmedName) return;
-          setMessages((prev) => [
-            ...prev,
-            { id: getNextMessageId(), text: trimmedName, sender: 'user' },
-            { id: getNextMessageId(), text: "Got it! Now, what's your email address? (e.g., john@example.com)", sender: 'bot' }
-          ]);
-          playChatSound('send');
-          setHumanFormStep(1);
-          return;
-        }
-
-        if (humanFormStep === 1) {
-          const trimmedEmail = contactForm.email.trim();
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
-            setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Please enter a valid email address (e.g., john@example.com)', sender: 'bot' }]);
-            return;
-          }
-          setMessages((prev) => [
-            ...prev,
-            { id: getNextMessageId(), text: trimmedEmail, sender: 'user' },
-            { id: getNextMessageId(), text: "Perfect! Finally, choose your country code and enter your phone number.", sender: 'bot' }
-          ]);
-          playChatSound('send');
-          setHumanFormStep(2);
-          return;
-        }
-
-        if (humanFormStep === 2) {
-          const trimmedName = contactForm.name.trim();
-          const trimmedEmail = contactForm.email.trim();
-          const localPhone = contactForm.phone.replace(/[^\d]/g, '');
-          if (!localPhone) return;
-
-          const fullPhone = `${contactForm.countryCode}${localPhone}`;
-          const detailsMessage = `Human support details:\n- Name: ${trimmedName}\n- Email: ${trimmedEmail}\n- Phone: ${fullPhone}`;
-
-          const humanSupportPayload = {
-            type: 'HUMAN_SUPPORT_REQUEST', version: 3, schema: 'human_support_lead',
-            name: trimmedName, email: trimmedEmail, country_code: contactForm.countryCode,
-            phone_local: localPhone, phone: fullPhone, phone_e164: fullPhone,
-            message: detailsMessage, source: 'portfolio-frontend', timestamp: new Date().toISOString()
-          };
-          const legacyPayload = `HUMAN_SUPPORT_REQUEST\n${detailsMessage}`;
-
-          setMessages((prev) => [
-            ...prev,
-            { id: getNextMessageId(), text: detailsMessage, sender: 'user' },
-            { id: getNextMessageId(), text: 'Perfect! Your details have been captured. A human support representative will reach out to you shortly. Thank you!', sender: 'bot' }
-          ]);
-          playChatSound('send');
-
-          setIsLeadSubmitting(true);
-          setLeadSubmitStatus({ type: 'pending', text: 'Sending details to support...' });
-
-          const leadSaved = await submitHumanSupportLead({ name: trimmedName, email: trimmedEmail, countryCode: contactForm.countryCode, localPhone, fullPhone, detailsMessage });
-
-          if (leadSaved) {
-            setLeadSubmitStatus({ type: 'success', text: 'Details sent successfully.' });
-          } else {
-            setLeadSubmitStatus({ type: 'error', text: 'Could not confirm delivery. Please try again.' });
-            setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'I could not confirm lead delivery to the support inbox. Please submit again or use the contact page.', sender: 'bot' }]);
-          }
-
-          setIsLeadSubmitting(false);
-          if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
-          setIsHumanMode(true);
-          // Store details for session reuse
-          lastHumanSupportDetailsRef.current = {
-            name: trimmedName,
-            email: trimmedEmail,
-            countryCode: contactForm.countryCode,
-            phone: localPhone,
-            fullPhone,
-            detailsMessage
-          };
-          resetHumanSupportForm();
-        }
+      const humanSupportPayload = {
+        type: 'HUMAN_SUPPORT_REQUEST', version: 3, schema: 'human_support_lead',
+        name: trimmedName, email: trimmedEmail, country_code: contactForm.countryCode,
+        phone_local: localPhone, phone: fullPhone, phone_e164: fullPhone,
+        message: detailsMessage, source: 'portfolio-frontend', timestamp: new Date().toISOString()
       };
+      const legacyPayload = `HUMAN_SUPPORT_REQUEST\n${detailsMessage}`;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: getNextMessageId(), text: detailsMessage, sender: 'user' },
+        { id: getNextMessageId(), text: 'Perfect! Your details have been captured. A human support representative will reach out to you shortly. Thank you!', sender: 'bot' }
+      ]);
+      playChatSound('send');
+
+      setIsLeadSubmitting(true);
+      setLeadSubmitStatus({ type: 'pending', text: 'Sending details to support...' });
+
+      const leadSaved = await submitHumanSupportLead({ name: trimmedName, email: trimmedEmail, countryCode: contactForm.countryCode, localPhone, fullPhone, detailsMessage });
+
+      if (leadSaved) {
+        setLeadSubmitStatus({ type: 'success', text: 'Details sent successfully.' });
+      } else {
+        setLeadSubmitStatus({ type: 'error', text: 'Could not confirm delivery. Please try again.' });
+        setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'I could not confirm lead delivery to the support inbox. Please submit again or use the contact page.', sender: 'bot' }]);
+      }
+
+      setIsLeadSubmitting(false);
+      if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
+      setIsHumanMode(true);
+      resetHumanSupportForm();
+    }
+  };
+
+  const startVoiceRecording = async () => {
+    if (!isHumanMode || isRecording) return;
+    if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setLeadSubmitStatus({ type: 'error', text: 'Voice recording is not supported in this browser.' });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recordingChunksRef.current = [];
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        clearRecordingTimer();
+
+        if (!blob.size) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
+          if (!audioBase64) return;
+
+          const messageId = getNextMessageId();
+          const sessionId = sessionIdRef.current;
+          const audioStorageKey = storeAudioForMessage(sessionId, messageId, audioBase64);
+
+          setMessages((prev) => [
+            ...prev,
+            { id: messageId, sender: 'user', type: 'audio', mimeType: blob.type || 'audio/webm', audioStorageKey, timestamp: new Date().toISOString() }
+          ]);
+
+          sendSocketMessage({ type: 'audio', audio_base64: audioBase64, mime_type: blob.type || 'audio/webm', duration_seconds: null, timestamp: new Date().toISOString() });
+        };
         reader.readAsDataURL(blob);
       };
 
@@ -718,189 +724,185 @@ const Chatbot = () => {
     } catch {
       setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' });
       setIsRecording(false);
-      useEffect(() => {
-        if (!isOpen) {
-          if (webSocketRef.current) {
-            webSocketRef.current.close();
-            webSocketRef.current = null;
-          }
-          clearLoadingTimeout();
-          return undefined;
-        }
-        let isMounted = true;
-        let handleVisibilityChange;
+      clearRecordingTimer();
+    }
+  };
 
-        const resolveSessionId = async () => {
-          const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-          if (!storedSessionId) return generateSessionId();
-          try {
-            const response = await fetch(CHAT_SESSION_STATUS_ENDPOINT(storedSessionId));
-            if (!response.ok) return storedSessionId;
-            const data = await response.json();
-            if (data?.exists) return storedSessionId;
-          } catch {
-            return storedSessionId;
-          }
-          localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
-          // If session is deleted, clear last human support details
-          lastHumanSupportDetailsRef.current = null;
-          return generateSessionId();
-        };
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+    clearRecordingTimer();
+  };
 
-        const initializeWebSocket = async () => {
-          const sessionId = await resolveSessionId();
-          if (!isMounted) return;
+  // --- UI RENDERERS ---
+  const renderHumanFormStep = () => {
+    if (!showHumanForm) return null;
+    return (
+      <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3 w-100">
+        {leadSubmitStatus && (
+          <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
+            {leadSubmitStatus.text}
+          </div>
+        )}
+        {humanFormStep === 0 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 1 of 3</small>
+            <Form.Control className="mb-2" type="text" placeholder="Enter your full name" value={contactForm.name} onChange={(e) => handleContactFieldChange('name', e.target.value)} autoFocus />
+            <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.name.trim()}>Continue</Button>
+          </>
+        )}
+        {humanFormStep === 1 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 2 of 3</small>
+            <Form.Control className="mb-2" type="email" placeholder="Enter your email (e.g., john@example.com)" value={contactForm.email} onChange={(e) => handleContactFieldChange('email', e.target.value)} autoFocus />
+            <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.email.trim()}>Next</Button>
+          </>
+        )}
+        {humanFormStep === 2 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 3 of 3</small>
+            <div className="mb-2" style={{ color: '#000' }}>
+              <PhoneInput
+                country={contactForm.countryCode.replace('+', '') || 'ng'}
+                value={contactForm.countryCode + contactForm.phone}
+                onChange={(value, data) => {
+                  const code = data.dialCode ? `+${data.dialCode}` : '';
+                  const local = value.replace(data.dialCode, '').replace(/^\+/, '');
+                  setContactForm((prev) => ({ ...prev, countryCode: code, phone: local }));
+                }}
+                inputClass="form-control"
+                inputStyle={{ width: '100%', height: '38px', borderRadius: '0.375rem' }}
+                buttonClass="bg-light border-secondary"
+                containerClass="w-100"
+                disableDropdown={false}
+                enableSearch={true}
+                autoFormat={true}
+                placeholder="Enter phone number"
+                countryCodeEditable={true}
+              />
+            </div>
+            <Button type="submit" variant="success" className="w-100 bg-navy border-0" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
+              {isLeadSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </>
+        )}
+      </Form>
+    );
+  };
 
-          sessionIdRef.current = sessionId;
-          localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
+  return (
+    <>
+      <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
+        <Button
+          className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg bg-navy"
+          onClick={toggleChat}
+          aria-label="Toggle Chat"
+          title={isOpen ? 'Close chat' : 'Open chat'}
+        >
+          {isOpen ? <BiX size={26} /> : <BsChatFill size={22} />}
+        </Button>
+        <span
+          className={`chatbot-status-dot ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`}
+          title={isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+        />
+      </div>
 
-          const restoredMessages = loadMessagesForSession(sessionId);
-          setMessages(restoredMessages);
+      <div
+        className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}
+        tabIndex={-1}
+      >
+        <Card className="h-100 border-0 d-flex flex-column w-100 bg-transparent">
+          
+          <div className="chatbot-header d-flex align-items-center justify-content-between p-3 gap-3 bg-navy flex-shrink-0">
+            <div className="d-flex align-items-center gap-2">
+              <span className={`chatbot-status-dot chatbot-status-dot--lg ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`} />
+              <div>
+                <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
+                <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'} opacity-90`}>
+                  {isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+                </small>
+              </div>
+            </div>
+            <button onClick={toggleChat} className="btn btn-sm text-white p-0 chatbot-close-btn" aria-label="Close chat" type="button">
+              <BiX size={22} />
+            </button>
+          </div>
 
-          const maxId = restoredMessages.reduce((acc, item) => Math.max(acc, Number(item?.id || 0)), 0);
-          messageIdRef.current = Math.max(maxId + 1, 2);
+          <Card.Body
+            className="chat-messages flex-grow-1 px-3 py-3"
+            style={{
+              background: '#f7f8fa',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              overflowY: 'auto'
+            }}
+          >
+            <div className="quick-questions-drawer mb-3 flex-shrink-0">
+              <button
+                className="btn btn-link px-0 mb-1"
+                style={{ fontSize: '1rem', color: '#0d6efd', textDecoration: 'none' }}
+                onClick={() => setIsDrawerOpen((open) => !open)}
+                aria-expanded={isDrawerOpen}
+              >
+                {isDrawerOpen ? 'Hide Quick Questions ▲' : 'Show Quick Questions ▼'}
+              </button>
+              {isDrawerOpen && (
+                <div>
+                  <small className="text-muted d-block mb-2">Quick questions:</small>
+                  <div className="d-flex flex-wrap gap-2">
+                    {suggestedQuestions.map((question, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          handleSuggestedQuestion(question);
+                          setIsDrawerOpen(false);
+                        }}
+                        disabled={!isConnected}
+                        className="btn btn-sm chatbot-quick-btn text-start text-wrap"
+                        style={{ fontSize: '0.8rem' }}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => {
+                        openHumanSupportForm();
+                        setIsDrawerOpen(false);
+                      }}
+                      className="btn btn-sm chatbot-transfer-btn text-start text-wrap"
+                      style={{ fontSize: '0.8rem' }}
+                      type="button"
+                    >
+                      Transfer to Muyiwa
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-          const wsBase = CHAT_API_BASE.replace(/^http/, 'ws');
-          const wsUrl = `${wsBase}/chat/${sessionId}`;
-
-          try {
-            const ws = new WebSocket(wsUrl);
-
-            ws.onopen = () => {
-              if (isMounted) {
-                setIsConnected(true);
-                setIsConnecting(false);
-              }
-            };
-
-            ws.onmessage = (event) => {
-              if (!isMounted) return;
-              try {
-                const data = JSON.parse(event.data);
-                if (data?.type === 'audio' && data.audio_base64) {
-                  const nextId = getNextMessageId();
-                  const activeSession = sessionIdRef.current;
-                  const audioStorageKey = storeAudioForMessage(activeSession, nextId, data.audio_base64);
-                  const sender = data.role === 'admin' ? 'admin' : 'bot';
-
-                  setMessages((prev) => [
-                    ...prev,
-                    {
-                      id: nextId, sender, type: 'audio', mimeType: data.mime_type || 'audio/webm',
-                      audioStorageKey, timestamp: data.timestamp || new Date().toISOString()
-                    }
-                  ]);
-                  setIsHumanMode(true);
-                  setIsLoading(false);
-                  clearLoadingTimeout();
-                  playChatSound('receive');
-                  return;
-                }
-
-                if (data?.type === 'session_cleared') {
-                  setMessages([defaultBotMessage]);
-                  setIsHumanMode(false);
-                  setShowHumanForm(false);
-                  clearLoadingTimeout();
-                  setIsLoading(false);
-                  return;
-                }
-
-                if (data?.type === 'session_deleted') {
-                  localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
-                  sessionIdRef.current = null;
-                  // Clear last human support details if session deleted
-                  lastHumanSupportDetailsRef.current = null;
-
-                  setMessages([defaultBotMessage]);
-                  setIsHumanMode(false);
-                  setShowHumanForm(false);
-                  setInput('');
-                  clearLoadingTimeout();
-                  setIsLoading(false);
-                  setIsConnected(false);
-                  setIsConnecting(true);
-
-                  if (webSocketRef.current) {
-                    webSocketRef.current.close();
-                    webSocketRef.current = null;
-                  }
-                  setSocketResetNonce((prev) => prev + 1);
-                  setHasSession(false);
-                  return;
-                }
-
-                const content = data.content || data.message || event.data;
-                const sender = data.role === 'admin' ? 'admin' : 'bot';
-                setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
-
-                if (sender === 'admin') setIsHumanMode(true);
-
-                if (pendingReachSupportTriggerRef.current && sender === 'bot') {
-                  pendingReachSupportTriggerRef.current = false;
-                  setShowHumanForm(true);
-                  setHumanFormStep(0);
-                  setLeadSubmitStatus(null);
-                  setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Sure — I can connect you to human support. Please enter your details step by step below.', sender: 'bot' }]);
-                }
-              } catch {
-                setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot', type: 'text' }]);
-              }
-
-              setIsLoading(false);
-              clearLoadingTimeout();
-              playChatSound('receive');
-            };
-
-            ws.onerror = () => {
-              if (!isMounted) return;
-              setIsConnected(false);
-              setIsConnecting(false);
-              setIsLoading(false);
-              clearLoadingTimeout();
-              playChatSound('error');
-            };
-
-            ws.onclose = () => {
-              if (!isMounted) return;
-              setIsConnected(false);
-              setIsConnecting(false);
-              setIsLoading(false);
-              clearLoadingTimeout();
-              webSocketRef.current = null;
-              setTimeout(() => {
-                if (isMounted && document.visibilityState === 'visible') initializeWebSocket();
-              }, 1500);
-            };
-
-            webSocketRef.current = ws;
-          } catch {
-            if (isMounted) {
-              setIsConnected(false);
-              setIsConnecting(false);
-            }
-          }
-        };
-
-        handleVisibilityChange = () => {
-          if (document.visibilityState === 'visible' && (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN)) {
-            initializeWebSocket();
-          }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        initializeWebSocket();
-
-        return () => {
-          isMounted = false;
-          document.removeEventListener('visibilitychange', handleVisibilityChange);
-          clearLoadingTimeout();
-          if (webSocketRef.current) {
-            webSocketRef.current.close();
-            webSocketRef.current = null;
-          }
-        };
-      }, [isOpen, socketResetNonce, hasSession]);
+            <div
+              style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+              onClick={() => isDrawerOpen && setIsDrawerOpen(false)}
+            >
+              {messages.map((msg) => (
+                <div key={msg.id} className={`d-flex gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`} style={{ width: '100%' }}>
+                  <div
+                    className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
+                    style={{
+                      maxWidth: '90%',
+                      minWidth: '30px',
+                      borderRadius: 14,
+                      fontSize: '1rem',
+                      wordBreak: 'break-word',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                    }}
+                  >
+                    {msg.type === 'audio' ? (
+                      <audio controls preload="metadata" style={{ width: '220px', maxWidth: '100%' }} src={resolveAudioSource(msg)} />
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
                         components={{
                           p: ({ children }) => <p className="mb-1">{children}</p>,
                           code: ({ inline, children }) => inline ? <code className="bg-secondary bg-opacity-25 px-2 py-1 rounded">{children}</code> : <pre className="bg-secondary bg-opacity-25 p-2 rounded overflow-auto my-2"><code>{children}</code></pre>,
