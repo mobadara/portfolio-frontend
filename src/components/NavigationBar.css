@@ -83,6 +83,13 @@
   }
 }
 
+/* Navbar Container */
+.navbar-custom {
+  transition: all 0.4s ease-in-out;
+  padding: 1.5rem 0;
+  z-index: 1030; /* Explicitly lock the stacking context */
+}
+
 /* Navbar Brand */
 .navbar-brand-custom {
   transition: all 0.3s ease;
@@ -119,11 +126,12 @@
   white-space: nowrap;
 }
 
+/* --- THE Z-INDEX FIX --- */
 .mobile-menu-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
-  z-index: 1035;
+  z-index: 1025; /* LOWER than Navbar (1030) so links remain clickable */
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
@@ -239,33 +247,13 @@
   animation: navLinkSlide 0.5s ease-out backwards;
 }
 
-.navbar-collapse .nav-link-custom:nth-child(1) {
-  animation-delay: 0.1s;
-}
-
-.navbar-collapse .nav-link-custom:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.navbar-collapse .nav-link-custom:nth-child(3) {
-  animation-delay: 0.2s;
-}
-
-.navbar-collapse .nav-link-custom:nth-child(4) {
-  animation-delay: 0.25s;
-}
-
-.navbar-collapse .nav-link-custom:nth-child(5) {
-  animation-delay: 0.3s;
-}
-
-.navbar-collapse .nav-link-custom:nth-child(6) {
-  animation-delay: 0.35s;
-}
-
-.navbar-collapse .nav-link-custom:nth-child(7) {
-  animation-delay: 0.4s;
-}
+.navbar-collapse .nav-link-custom:nth-child(1) { animation-delay: 0.1s; }
+.navbar-collapse .nav-link-custom:nth-child(2) { animation-delay: 0.15s; }
+.navbar-collapse .nav-link-custom:nth-child(3) { animation-delay: 0.2s; }
+.navbar-collapse .nav-link-custom:nth-child(4) { animation-delay: 0.25s; }
+.navbar-collapse .nav-link-custom:nth-child(5) { animation-delay: 0.3s; }
+.navbar-collapse .nav-link-custom:nth-child(6) { animation-delay: 0.35s; }
+.navbar-collapse .nav-link-custom:nth-child(7) { animation-delay: 0.4s; }
 
 /* Navbar Toggle Button */
 .navbar-toggle-custom {

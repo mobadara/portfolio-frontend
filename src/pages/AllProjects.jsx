@@ -1,25 +1,25 @@
 
 import React, { useState } from 'react';
-import NavigationBar from '../components/NavigationBar';
-import FooterSection from '../components/FooterSection';
+// import NavigationBar from '../components/NavigationBar';
+// import FooterSection from '../components/FooterSection';
 import Badge from 'react-bootstrap/Badge';
 import { FaGithub, FaExternalLinkAlt, FaYoutube } from 'react-icons/fa';
 import '../App.css';
 
 
-const AllProjects = ({ projects = [], theme = 'light', onToggleTheme, setRouteLoading }) => {
+const AllProjects = ({ projects = [] }) => {
   const [touchedCard, setTouchedCard] = useState(null);
   const handleCardTouchStart = (projectId) => {
     setTouchedCard(projectId);
   };
-  const handleInternalLinkClick = (e, href) => {
-    if (setRouteLoading && href && href.startsWith('/')) {
-      setRouteLoading(true);
-    }
-  };
+  // const handleInternalLinkClick = (e, href) => {
+  //   if (setRouteLoading && href && href.startsWith('/')) {
+  //     setRouteLoading(true);
+  //   }
+  // };
   return (
     <>
-      <NavigationBar theme={theme} onToggleTheme={onToggleTheme} />
+      {/* <NavigationBar theme={theme} onToggleTheme={onToggleTheme} /> */}
       <main className="bg-navy text-white" style={{ minHeight: '100vh', width: '100%', paddingTop: '90px' }}>
         <div className="container py-5" style={{ background: 'transparent' }}>
           <h2 className="mb-4 fw-bold text-center" style={{ background: 'transparent' }}>All Projects</h2>
@@ -47,7 +47,6 @@ const AllProjects = ({ projects = [], theme = 'light', onToggleTheme, setRouteLo
                           rel="noreferrer"
                           className="project-link-icon"
                           title="View on GitHub"
-                          onClick={() => setRouteLoading && setRouteLoading(true)}
                         >
                           <FaGithub size={28} />
                         </a>
@@ -59,7 +58,6 @@ const AllProjects = ({ projects = [], theme = 'light', onToggleTheme, setRouteLo
                           rel="noreferrer"
                           className="project-link-icon"
                           title="View Live"
-                          onClick={() => setRouteLoading && setRouteLoading(true)}
                         >
                           <FaExternalLinkAlt size={24} />
                         </a>
@@ -71,7 +69,6 @@ const AllProjects = ({ projects = [], theme = 'light', onToggleTheme, setRouteLo
                           rel="noreferrer"
                           className="project-link-icon"
                           title="Watch on YouTube"
-                          onClick={() => setRouteLoading && setRouteLoading(true)}
                         >
                           <FaYoutube size={28} />
                         </a>
@@ -105,7 +102,7 @@ const AllProjects = ({ projects = [], theme = 'light', onToggleTheme, setRouteLo
         )}
         </div>
       </main>
-      <FooterSection />
+      {/* <FooterSection /> */}
 
       {/* Portfolio Card Styles */}
       <style jsx>{`

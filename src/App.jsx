@@ -1,19 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import AIPlayground from './components/AIPlayground';
-import AboutSection from './components/AboutSection';
-import Chatbot from './components/Chatbot';
-import ContactSection from './components/ContactSection';
-import FooterSection from './components/FooterSection';
+import axios from 'axios';
+import './App.css';
+
+// Layout & Global Components
+import Layout from './components/Layout';
+
+// Page Sections (Home)
 import HeroSection from './components/HeroSection';
-import NavigationBar from './components/NavigationBar';
-import BlogSection from './components/BlogSection';
+import AboutSection from './components/AboutSection';
+import SkillsSection from './components/SkillsSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
-import SkillsSection from './components/SkillsSection';
-import AdminChatPage from './components/AdminChatPage';
-import LoadingAnimation from './components/LoadingAnimation';
+import AIPlayground from './components/AIPlayground';
+import BlogSection from './components/BlogSection';
+import ContactSection from './components/ContactSection';
+
+// Pages
+import AllProjects from './pages/AllProjects';
+import NotFoundPage from './pages/NotFoundPage';
+
+// Admin Pages
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAnalytics from './pages/AdminAnalytics';
@@ -21,11 +29,7 @@ import AdminContent from './pages/AdminContent';
 import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import AdminMessageDetail from './pages/AdminMessageDetail';
-import NotFoundPage from './pages/NotFoundPage';
-import AllProjects from './pages/AllProjects';
-// import projectsLocalData from './data/projects';
-import axios from 'axios';
-import './App.css';
+import AdminChatPage from './components/AdminChatPage';
 
 const SECTION_PATHS = {
   '/': 'home',
@@ -49,11 +53,10 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [routeLoading, setRouteLoading] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate ? useNavigate() : null;
+
 
   /**
    * Fetch projects from backend API
-   * Falls back to local data if API is unavailable
    */
   useEffect(() => {
     const fetchProjects = async () => {
@@ -72,7 +75,6 @@ function App() {
 
   /**
    * Sync theme state with document theme attribute
-   * This allows Bootstrap and CSS custom properties to react to theme changes
    */
   useEffect(() => {
     document.documentElement.setAttribute('data-bs-theme', theme);
@@ -84,25 +86,24 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 2500); // Show loading for 2.5 seconds
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, []);
 
-  /**
-   * Toggle between light and dark theme modes
-   */
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
+  // Scroll Interceptor for single-page links
   useEffect(() => {
-    setRouteLoading(true);
     const sectionId = SECTION_PATHS[location.pathname];
-    if (!sectionId || location.pathname.startsWith('/admin')) {
-      setRouteLoading(false);
+    
+    if (!sectionId || location.pathname.startsWith('/admin') || location.pathname === '/projects') {
+      setTimeout(() => setRouteLoading(false), 0);
       return;
     }
 
     const scrollToSection = () => {
+      setRouteLoading(true);
       const targetSection = document.getElementById(sectionId);
       if (!targetSection) {
         setRouteLoading(false);
@@ -125,10 +126,9 @@ function App() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
+  // Cleaned up homeContent (No layout elements here anymore)
   const homeContent = (
     <>
-      <LoadingAnimation isLoading={isLoading || routeLoading} />
-      <NavigationBar theme={theme} onToggleTheme={toggleTheme} />
       <HeroSection />
       <AboutSection theme={theme} />
       <SkillsSection />
@@ -137,21 +137,30 @@ function App() {
       <AIPlayground />
       <BlogSection />
       <ContactSection />
-      <FooterSection />
-      <Chatbot />
     </>
   );
 
   return (
     <Routes>
-      <Route path="/" element={homeContent} />
-      <Route path="/about" element={homeContent} />
-      <Route path="/skills" element={homeContent} />
-      <Route path="/portfolio" element={homeContent} />
-      <Route path="/blog" element={homeContent} />
-      <Route path="/services" element={homeContent} />
-      <Route path="/contact" element={homeContent} />
-      <Route path="/projects" element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} setRouteLoading={setRouteLoading} />} />
+      {/* PUBLIC ROUTES WRAPPED IN LAYOUT */}
+      <Route element={<Layout theme={theme} onToggleTheme={toggleTheme} isLoading={isLoading || routeLoading} />}>
+        {/* Scrollable Single-Page Routes */}
+        <Route path="/" element={homeContent} />
+        <Route path="/about" element={homeContent} />
+        <Route path="/skills" element={homeContent} />
+        <Route path="/portfolio" element={homeContent} />
+        <Route path="/blog" element={homeContent} />
+        <Route path="/services" element={homeContent} />
+        <Route path="/contact" element={homeContent} />
+        
+        {/* Distinct Pages */}
+        <Route 
+          path="/projects" 
+          element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} setRouteLoading={setRouteLoading} />} 
+        />
+      </Route>
+
+      {/* ADMIN ROUTES (No Public Header/Footer) */}
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/analytics" element={<AdminAnalytics />} />
@@ -161,6 +170,7 @@ function App() {
       <Route path="/admin/messages/:id" element={<AdminMessageDetail />} />
       <Route path="/admin/chat" element={<AdminChatPage />} />
       <Route path="/admin/chat/:sessionId" element={<AdminChatPage />} />
+      
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

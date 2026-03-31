@@ -27,7 +27,8 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
   // Determine active section from location when navigating via links
   useEffect(() => {
     const matched = Object.entries(SECTION_ROUTE_MAP).find(([, path]) => path === location.pathname);
-    if (matched) setActiveSection(matched[0]);
+    if (matched && matched[0] !== activeSection) setActiveSection(matched[0]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   // IntersectionObserver: update activeSection as sections scroll in/out
@@ -102,7 +103,10 @@ const NavigationBar = ({ theme, onToggleTheme }) => {
     return () => observer.disconnect();
   }, [location.pathname]);
 
-  const closeMenu = () => setExpanded(false);
+  const closeMenu = () => {
+    setExpanded(false);
+    document.body.style.overflow = ''; // Force immediate restore to prevent scroll-lock bugs on navigation
+  };
 
   return (
     <>

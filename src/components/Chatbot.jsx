@@ -41,7 +41,6 @@ const Chatbot = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isHumanMode, setIsHumanMode] = useState(false);
-  const [wasSession, setWasSession] = useState(false); // Track if session existed before close
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
@@ -252,12 +251,6 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
-        // If session exists, reset to bot mode
-        const sessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-        if (sessionId) {
-          setIsHumanMode(false);
-          setShowHumanForm(false);
-        }
       } else {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
@@ -552,9 +545,6 @@ const Chatbot = () => {
   };
 
   const openHumanSupportForm = () => {
-    // Only allow if no session exists
-    const sessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-    if (sessionId) return;
     if (!hasSession) {
       setHasSession(true);
       setIsConnecting(true);
@@ -581,11 +571,8 @@ const Chatbot = () => {
 
     const wantsHumanSupport = shouldEnableHumanMode(messageText);
     if (wantsHumanSupport) {
-      const sessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-      if (!sessionId) {
-        openHumanSupportForm();
-        return;
-      }
+      openHumanSupportForm();
+      return;
     }
 
     if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
@@ -701,10 +688,105 @@ const Chatbot = () => {
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) recordingChunksRef.current.push(event.data);
       };
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      setLeadSubmitStatus({ type: 'error', text: 'Could not access microphone. Please ensure you have granted permission.' });
+
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        clearRecordingTimer();
+
+        if (!blob.size) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
+          if (!audioBase64) return;
+
+          const messageId = getNextMessageId();
+          const sessionId = sessionIdRef.current;
+          const audioStorageKey = storeAudioForMessage(sessionId, messageId, audioBase64);
+
+          setMessages((prev) => [
+            ...prev,
+            { id: messageId, sender: 'user', type: 'audio', mimeType: blob.type || 'audio/webm', audioStorageKey, timestamp: new Date().toISOString() }
+          ]);
+
+          sendSocketMessage({ type: 'audio', audio_base64: audioBase64, mime_type: blob.type || 'audio/webm', duration_seconds: null, timestamp: new Date().toISOString() });
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      clearRecordingTimer();
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((prev) => prev + 1), 1000);
+    } catch {
+      setLeadSubmitStatus({ type: 'error', text: 'Microphone access was denied.' });
+      setIsRecording(false);
+      clearRecordingTimer();
     }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+    clearRecordingTimer();
+  };
+
+  // --- UI RENDERERS ---
+  const renderHumanFormStep = () => {
+    if (!showHumanForm) return null;
+    return (
+      <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3 w-100">
+        {leadSubmitStatus && (
+          <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
+            {leadSubmitStatus.text}
+          </div>
+        )}
+        {humanFormStep === 0 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 1 of 3</small>
+            <Form.Control className="mb-2" type="text" placeholder="Enter your full name" value={contactForm.name} onChange={(e) => handleContactFieldChange('name', e.target.value)} autoFocus />
+            <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.name.trim()}>Continue</Button>
+          </>
+        )}
+        {humanFormStep === 1 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 2 of 3</small>
+            <Form.Control className="mb-2" type="email" placeholder="Enter your email (e.g., john@example.com)" value={contactForm.email} onChange={(e) => handleContactFieldChange('email', e.target.value)} autoFocus />
+            <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.email.trim()}>Next</Button>
+          </>
+        )}
+        {humanFormStep === 2 && (
+          <>
+            <small className="d-block mb-2 text-muted">Step 3 of 3</small>
+            <div className="mb-2" style={{ color: '#000' }}>
+              <PhoneInput
+                country={contactForm.countryCode.replace('+', '') || 'ng'}
+                value={contactForm.countryCode + contactForm.phone}
+                onChange={(value, data) => {
+                  const code = data.dialCode ? `+${data.dialCode}` : '';
+                  const local = value.replace(data.dialCode, '').replace(/^\+/, '');
+                  setContactForm((prev) => ({ ...prev, countryCode: code, phone: local }));
+                }}
+                inputClass="form-control"
+                inputStyle={{ width: '100%', height: '38px', borderRadius: '0.375rem' }}
+                buttonClass="bg-light border-secondary"
+                containerClass="w-100"
+                disableDropdown={false}
+                enableSearch={true}
+                autoFormat={true}
+                placeholder="Enter phone number"
+                countryCodeEditable={true}
+              />
+            </div>
+            <Button type="submit" variant="success" className="w-100 bg-navy border-0" disabled={!contactForm.phone.trim() || isLeadSubmitting}>
+              {isLeadSubmitting ? 'Submitting...' : 'Submit'}
+            </Button>
+          </>
+        )}
+      </Form>
+    );
   };
 
   return (
@@ -784,8 +866,7 @@ const Chatbot = () => {
                     ))}
                     <button
                       onClick={() => {
-                        const sessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-                        if (!sessionId) openHumanSupportForm();
+                        openHumanSupportForm();
                         setIsDrawerOpen(false);
                       }}
                       className="btn btn-sm chatbot-transfer-btn text-start text-wrap"
@@ -830,7 +911,7 @@ const Chatbot = () => {
                           li: ({ children }) => <li className="mb-1">{children}</li>,
                           a: ({ href, children }) => {
                             if (href === '#transfer') {
-                              return <button onClick={(e) => { e.preventDefault(); const sessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY); if (!sessionId) openHumanSupportForm(); }} className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn" type="button">{children}</button>;
+                              return <button onClick={(e) => { e.preventDefault(); openHumanSupportForm(); }} className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn" type="button">{children}</button>;
                             }
                             return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">{children}</a>;
                           },
