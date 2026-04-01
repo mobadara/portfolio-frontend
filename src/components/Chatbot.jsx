@@ -5,7 +5,6 @@ import { formatTimestamp } from '../utils/adminChatUtils';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
-import Spinner from 'react-bootstrap/Spinner';
 import Modal from 'react-bootstrap/Modal';
 import { BiMicrophone, BiSend, BiStopCircle, BiX } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
@@ -22,6 +21,7 @@ const CHATBOT_SESSION_STORAGE_KEY = 'portfolio_chatbot_session_id';
 const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
 const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
 const CHATBOT_LEAD_SUBMITTED_KEY = 'portfolio_chatbot_lead_submitted';
+const CHATBOT_LEAD_DETAILS_KEY = 'portfolio_chatbot_lead_details';
 const defaultBotMessage = { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
 
 const generateSessionId = () => {
@@ -42,7 +42,10 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isHumanMode, setIsHumanMode] = useState(false); // Strictly defaults to AI mode
+  
+  // Accurately restore human mode state on reload so the UI doesn't wait for bot replies infinitely
+  const [isHumanMode, setIsHumanMode] = useState(() => localStorage.getItem(CHATBOT_LEAD_SUBMITTED_KEY) === 'true');
+  
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
@@ -56,16 +59,17 @@ const Chatbot = () => {
     phone: ''
   });
   const [humanFormStep, setHumanFormStep] = useState(0);
+  const [hasSession, setHasSession] = useState(false);
   const [awaitingTransferConfirmation, setAwaitingTransferConfirmation] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-
+  
+  const lastHumanSupportDetailsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
   const messageIdRef = useRef(2);
   const loadingTimeoutRef = useRef(null);
   const audioContextRef = useRef(null);
-  const typingSoundIntervalRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -160,41 +164,6 @@ const Chatbot = () => {
     } catch { /* ignore audio error */ }
   };
 
-  const playTypingPulse = () => {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!audioContextRef.current) audioContextRef.current = new AudioCtx();
-      const context = audioContextRef.current;
-      if (context.state === 'suspended') context.resume();
-
-      const now = context.currentTime;
-      const osc1 = context.createOscillator();
-      const gain1 = context.createGain();
-      osc1.type = 'triangle';
-      osc1.frequency.setValueAtTime(900, now);
-      gain1.gain.setValueAtTime(0.0001, now);
-      gain1.gain.exponentialRampToValueAtTime(0.03, now + 0.01);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
-      osc1.connect(gain1);
-      gain1.connect(context.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.06);
-
-      const osc2 = context.createOscillator();
-      const gain2 = context.createGain();
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(760, now + 0.04);
-      gain2.gain.setValueAtTime(0.0001, now + 0.04);
-      gain2.gain.exponentialRampToValueAtTime(0.025, now + 0.055);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
-      osc2.connect(gain2);
-      gain2.connect(context.destination);
-      osc2.start(now + 0.04);
-      osc2.stop(now + 0.11);
-    } catch { /* ignore typing pulse error */ }
-  };
-
   const shouldEnableHumanMode = (text = '') => {
     const normalized = text.toLowerCase();
     const normalizedCompact = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -233,7 +202,7 @@ const Chatbot = () => {
           sender: 'bot'
         }
       ]);
-    }, 40000);
+    }, 15000); // Reduced timeout to prevent infinite hanging
   };
 
   const scrollToBottom = () => {
@@ -254,15 +223,12 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
-        // Force back to AI mode visually every time they open the chat
-        setIsHumanMode(false);
         setShowHumanForm(false);
         setAwaitingTransferConfirmation(false);
       } else {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
         setIsLoading(false);
-        setIsHumanMode(false);
         setIsRecording(false);
         clearLoadingTimeout();
         clearRecordingTimer();
@@ -273,7 +239,7 @@ const Chatbot = () => {
   };
 
   // --- USE EFFECTS ---
-  useEffect(scrollToBottom, [messages, isOpen]);
+  useEffect(scrollToBottom, [messages, isOpen, isLoading]);
 
   useEffect(() => {
     if (!leadSubmitStatus || leadSubmitStatus.type === 'pending') return undefined;
@@ -286,23 +252,6 @@ const Chatbot = () => {
     if (!sessionId) return;
     persistMessagesForSession(sessionId, messages);
   }, [messages]);
-
-  useEffect(() => {
-    if (isLoading) {
-      if (typingSoundIntervalRef.current) clearInterval(typingSoundIntervalRef.current);
-      playTypingPulse();
-      typingSoundIntervalRef.current = setInterval(() => playTypingPulse(), 900);
-    } else if (typingSoundIntervalRef.current) {
-      clearInterval(typingSoundIntervalRef.current);
-      typingSoundIntervalRef.current = null;
-    }
-    return () => {
-      if (typingSoundIntervalRef.current) {
-        clearInterval(typingSoundIntervalRef.current);
-        typingSoundIntervalRef.current = null;
-      }
-    };
-  }, [isLoading]);
 
   useEffect(() => {
     return () => {
@@ -327,6 +276,13 @@ const Chatbot = () => {
 
     const resolveSessionId = async () => {
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
+      
+      // Load saved details if they exist
+      const savedDetails = localStorage.getItem(CHATBOT_LEAD_DETAILS_KEY);
+      if (savedDetails) {
+        try { lastHumanSupportDetailsRef.current = JSON.parse(savedDetails); } catch {}
+      }
+
       if (!storedSessionId) return generateSessionId();
       
       try {
@@ -334,6 +290,7 @@ const Chatbot = () => {
         if (!response.ok) return storedSessionId; 
         const data = await response.json();
         if (data?.exists) {
+          setHasSession(true);
           return storedSessionId;
         }
       } catch {
@@ -343,6 +300,10 @@ const Chatbot = () => {
       // Clear data if backend rejected the session
       localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
       localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+      localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
+      setIsHumanMode(false);
+      lastHumanSupportDetailsRef.current = null;
+      setHasSession(false);
       return generateSessionId();
     };
 
@@ -408,7 +369,9 @@ const Chatbot = () => {
             if (data?.type === 'session_deleted') {
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
               localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+              localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
               sessionIdRef.current = null;
+              lastHumanSupportDetailsRef.current = null;
 
               setMessages([defaultBotMessage]);
               setIsHumanMode(false);
@@ -424,12 +387,15 @@ const Chatbot = () => {
                 webSocketRef.current = null;
               }
               setSocketResetNonce((prev) => prev + 1);
+              setHasSession(false);
               return;
             }
 
             const content = data.content || data.message || event.data;
             const sender = data.role === 'admin' ? 'admin' : 'bot';
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
+
+            if (sender === 'admin') setIsHumanMode(true);
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
               pendingReachSupportTriggerRef.current = false;
@@ -510,6 +476,7 @@ const Chatbot = () => {
   };
 
   const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
+    if (!hasSession) setHasSession(true);
     let sessionId = sessionIdRef.current;
     
     if (!sessionId) {
@@ -554,7 +521,6 @@ const Chatbot = () => {
   };
 
   const openHumanSupportForm = () => {
-    // Check if the user has already submitted the form for this session via localStorage
     const hasSubmittedLead = localStorage.getItem(CHATBOT_LEAD_SUBMITTED_KEY) === 'true';
     const activeSession = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
     
@@ -599,8 +565,11 @@ const Chatbot = () => {
     }
 
     if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
-      setIsLoading(true);
-      startLoadingTimeout();
+      // ONLY trigger bot typing animation if we are NOT in human mode
+      if (!isHumanMode) {
+        setIsLoading(true);
+        startLoadingTimeout();
+      }
     }
   };
 
@@ -612,8 +581,10 @@ const Chatbot = () => {
     playChatSound('send');
 
     if (sendSocketMessage(question)) {
-      setIsLoading(true);
-      startLoadingTimeout();
+      if (!isHumanMode) {
+        setIsLoading(true);
+        startLoadingTimeout();
+      }
     }
   };
 
@@ -692,8 +663,19 @@ const Chatbot = () => {
       if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
       setIsHumanMode(true);
       
-      // Record successful submission in local storage to persist across reloads
+      const payloadDetails = {
+        name: trimmedName,
+        email: trimmedEmail,
+        countryCode: contactForm.countryCode,
+        phone: localPhone,
+        fullPhone,
+        detailsMessage
+      };
+      
       localStorage.setItem(CHATBOT_LEAD_SUBMITTED_KEY, 'true');
+      localStorage.setItem(CHATBOT_LEAD_DETAILS_KEY, JSON.stringify(payloadDetails));
+      lastHumanSupportDetailsRef.current = payloadDetails;
+      
       resetHumanSupportForm();
     }
   };
@@ -769,7 +751,9 @@ const Chatbot = () => {
 
     localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
     localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+    localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
     sessionIdRef.current = null;
+    lastHumanSupportDetailsRef.current = null;
 
     if (webSocketRef.current) {
       webSocketRef.current.close();
@@ -861,6 +845,28 @@ const Chatbot = () => {
 
   return (
     <>
+      <style>{`
+        .typing-indicator {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 6px 10px;
+        }
+        .typing-indicator span {
+          width: 6px;
+          height: 6px;
+          background-color: #888;
+          border-radius: 50%;
+          animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1); }
+        }
+      `}</style>
+      
       <div className={`chatbot-fab-wrapper ${isOpen ? 'is-open' : ''}`}>
         <Button
           className="chatbot-fab d-flex align-items-center justify-content-center shadow-lg bg-navy"
@@ -887,7 +893,7 @@ const Chatbot = () => {
               <span className={`chatbot-status-dot chatbot-status-dot--lg ${isConnecting ? 'dot-connecting' : isConnected ? 'dot-connected' : 'dot-disconnected'}`} />
               <div>
                 <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
-                <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'} opacity-90`}>
+                <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success fw-bold' : 'text-danger'} opacity-90`}>
                   {isConnecting ? 'Connecting…' : isConnected ? (isHumanMode ? 'Connected to human' : 'Connected to bot') : 'Offline'}
                 </small>
               </div>
@@ -914,11 +920,11 @@ const Chatbot = () => {
                 onClick={() => setIsDrawerOpen((open) => !open)}
                 aria-expanded={isDrawerOpen}
               >
-                {isDrawerOpen ? 'Hide Quick Questions ▲' : 'Show Quick Questions ▼'}
+                {isDrawerOpen ? 'Hide Quick Actions ▲' : 'Show Quick Actions ▼'}
               </button>
               {isDrawerOpen && (
                 <div>
-                  <small className="text-muted d-block mb-2">Quick questions:</small>
+                  <small className="text-muted d-block mb-2">Quick actions:</small>
                   <div className="d-flex flex-wrap gap-2">
                     {suggestedQuestions.map((question, index) => (
                       <button
@@ -945,6 +951,19 @@ const Chatbot = () => {
                     >
                       Transfer to Muyiwa
                     </button>
+                    {(hasSession || isHumanMode) && (
+                      <button
+                        onClick={() => {
+                          setShowClearConfirmModal(true);
+                          setIsDrawerOpen(false);
+                        }}
+                        className="btn btn-sm btn-outline-danger text-start text-wrap"
+                        style={{ fontSize: '0.8rem' }}
+                        type="button"
+                      >
+                        Clear Session
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -983,15 +1002,19 @@ const Chatbot = () => {
                             if (href === '#transfer') {
                               return <button onClick={(e) => { e.preventDefault(); openHumanSupportForm(); }} className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn" type="button">{children}</button>;
                             }
-                            // --- Intercept the confirmation links ---
+                            // --- Resend the email notification if they click continue ---
                             if (href === '#continue-transfer') {
                               return (
                                 <button 
-                                  onClick={(e) => { 
+                                  onClick={async (e) => { 
                                     e.preventDefault(); 
                                     setAwaitingTransferConfirmation(false);
                                     setIsHumanMode(true);
                                     setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Excellent. You are now connected. Please wait while a representative joins the chat.', sender: 'bot' }]);
+                                    
+                                    if (lastHumanSupportDetailsRef.current) {
+                                      await submitHumanSupportLead(lastHumanSupportDetailsRef.current);
+                                    }
                                   }} 
                                   className="btn btn-sm btn-success mt-2 mb-1 d-block w-100" 
                                   type="button"
@@ -1031,11 +1054,16 @@ const Chatbot = () => {
                   </div>
                 </div>
               ))}
+              
+              {/* REVAMPED TYPICAL ANIMATION */}
               {isLoading && (
                 <div className="d-flex mb-3">
-                  <div className="bg-light text-dark py-2 px-3 rounded-lg d-flex align-items-center gap-2">
-                    <Spinner animation="grow" size="sm" variant="secondary" />
-                    <small>Typing...</small>
+                  <div className="bg-light py-2 px-3 rounded-lg d-flex align-items-center" style={{ borderRadius: 14 }}>
+                    <div className="typing-indicator">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
                   </div>
                 </div>
               )}
