@@ -6,6 +6,7 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
+import Modal from 'react-bootstrap/Modal';
 import { BiMicrophone, BiSend, BiStopCircle, BiX } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
@@ -40,7 +41,7 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isHumanMode, setIsHumanMode] = useState(false);
+  const [isHumanMode, setIsHumanMode] = useState(false); // Defaults to AI mode on reload
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
@@ -55,7 +56,11 @@ const Chatbot = () => {
   });
   const [humanFormStep, setHumanFormStep] = useState(0);
   const [hasSession, setHasSession] = useState(false);
-
+  const [awaitingTransferConfirmation, setAwaitingTransferConfirmation] = useState(false);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  
+  // Store last human support details for session reuse
+  const lastHumanSupportDetailsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -251,6 +256,9 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
+        // Reset visually to AI mode, preserving the session ID
+        setIsHumanMode(false);
+        setShowHumanForm(false);
       } else {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
@@ -330,6 +338,7 @@ const Chatbot = () => {
         return storedSessionId;
       }
       localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+      lastHumanSupportDetailsRef.current = null;
       return generateSessionId();
     };
 
@@ -395,6 +404,7 @@ const Chatbot = () => {
             if (data?.type === 'session_deleted') {
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
               sessionIdRef.current = null;
+              lastHumanSupportDetailsRef.current = null;
 
               setMessages([defaultBotMessage]);
               setIsHumanMode(false);
@@ -422,10 +432,7 @@ const Chatbot = () => {
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
               pendingReachSupportTriggerRef.current = false;
-              setShowHumanForm(true);
-              setHumanFormStep(0);
-              setLeadSubmitStatus(null);
-              setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Sure — I can connect you to human support. Please enter your details step by step below.', sender: 'bot' }]);
+              openHumanSupportForm(); 
             }
           } catch {
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot', type: 'text' }]);
@@ -484,7 +491,7 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
     };
-  }, [isOpen, socketResetNonce, hasSession]);
+  }, [isOpen, socketResetNonce]);
 
   // --- ACTIONS & HANDLERS ---
   const sendSocketMessage = (payload) => {
@@ -504,11 +511,13 @@ const Chatbot = () => {
   const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
     if (!hasSession) setHasSession(true);
     let sessionId = sessionIdRef.current;
+    
     if (!sessionId) {
       sessionId = generateSessionId();
       sessionIdRef.current = sessionId;
       localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
     }
+
     const transferPayload = {
       name,
       email,
@@ -549,6 +558,21 @@ const Chatbot = () => {
       setHasSession(true);
       setIsConnecting(true);
     }
+    
+    // Logic: Do we already have their details from a previous transfer in this session?
+    if (lastHumanSupportDetailsRef.current && hasSession) {
+      setAwaitingTransferConfirmation(true);
+      setMessages((prev) => [
+        ...prev,
+        { 
+          id: getNextMessageId(), 
+          text: 'You already have an active session. Would you like to **continue** waiting for Muyiwa, or **clear** the session and re-enter your details?\n\n[Continue Session](#continue-transfer)  |  [Clear Session](#clear-transfer)', 
+          sender: 'bot' 
+        }
+      ]);
+      return;
+    }
+
     if (!showHumanForm) {
       setShowHumanForm(true);
       setHumanFormStep(0);
@@ -668,6 +692,16 @@ const Chatbot = () => {
       setIsLeadSubmitting(false);
       if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
       setIsHumanMode(true);
+      
+      // Store details for session reuse
+      lastHumanSupportDetailsRef.current = {
+        name: trimmedName,
+        email: trimmedEmail,
+        countryCode: contactForm.countryCode,
+        phone: localPhone,
+        fullPhone,
+        detailsMessage
+      };
       resetHumanSupportForm();
     }
   };
@@ -733,33 +767,76 @@ const Chatbot = () => {
     clearRecordingTimer();
   };
 
+  const handleClearChat = async () => {
+    const activeSession = sessionIdRef.current;
+    if (activeSession) {
+      sendSocketMessage({ type: 'clear_chat', session_id: activeSession, timestamp: new Date().toISOString() });
+      try { await fetch(CHAT_CLEAR_ENDPOINT(activeSession), { method: 'POST' }); } catch { /* ignore clear chat error */ }
+      clearChatStorageForSession(activeSession);
+    }
+
+    localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+    sessionIdRef.current = null;
+
+    if (webSocketRef.current) {
+      webSocketRef.current.close();
+      webSocketRef.current = null;
+    }
+
+    setMessages([defaultBotMessage]);
+    setShowHumanForm(false);
+    setLeadSubmitStatus({ type: 'success', text: 'Chat cleared. A fresh session has started.' });
+    setInput('');
+    setIsHumanMode(false);
+    setIsRecording(false);
+    setIsLoading(false);
+    setIsConnected(false);
+    setIsConnecting(true);
+    clearLoadingTimeout();
+    clearRecordingTimer();
+
+    if (isOpen) setSocketResetNonce((prev) => prev + 1);
+  };
+
   // --- UI RENDERERS ---
   const renderHumanFormStep = () => {
     if (!showHumanForm) return null;
     return (
       <Form onSubmit={handleHumanFormSubmit} className="human-form mb-3 w-100">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <small className="text-muted fw-bold mb-0">Step {humanFormStep + 1} of 3</small>
+          <button 
+            type="button" 
+            className="btn-close" 
+            style={{ fontSize: '0.75rem' }} 
+            onClick={() => {
+              setShowHumanForm(false);
+              setAwaitingTransferConfirmation(false);
+            }}
+            aria-label="Close form"
+          />
+        </div>
+
         {leadSubmitStatus && (
           <div className={`alert py-2 px-2 mb-2 small ${leadSubmitStatus.type === 'success' ? 'alert-success' : leadSubmitStatus.type === 'error' ? 'alert-danger' : 'alert-info'}`} role="status">
             {leadSubmitStatus.text}
           </div>
         )}
+
         {humanFormStep === 0 && (
           <>
-            <small className="d-block mb-2 text-muted">Step 1 of 3</small>
             <Form.Control className="mb-2" type="text" placeholder="Enter your full name" value={contactForm.name} onChange={(e) => handleContactFieldChange('name', e.target.value)} autoFocus />
             <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.name.trim()}>Continue</Button>
           </>
         )}
         {humanFormStep === 1 && (
           <>
-            <small className="d-block mb-2 text-muted">Step 2 of 3</small>
             <Form.Control className="mb-2" type="email" placeholder="Enter your email (e.g., john@example.com)" value={contactForm.email} onChange={(e) => handleContactFieldChange('email', e.target.value)} autoFocus />
             <Button type="submit" variant="primary" className="w-100 bg-navy border-0" disabled={!contactForm.email.trim()}>Next</Button>
           </>
         )}
         {humanFormStep === 2 && (
           <>
-            <small className="d-block mb-2 text-muted">Step 3 of 3</small>
             <div className="mb-2" style={{ color: '#000' }}>
               <PhoneInput
                 country={contactForm.countryCode.replace('+', '') || 'ng'}
@@ -913,6 +990,37 @@ const Chatbot = () => {
                             if (href === '#transfer') {
                               return <button onClick={(e) => { e.preventDefault(); openHumanSupportForm(); }} className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn" type="button">{children}</button>;
                             }
+                            // --- Intercept the confirmation links ---
+                            if (href === '#continue-transfer') {
+                              return (
+                                <button 
+                                  onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    setAwaitingTransferConfirmation(false);
+                                    setIsHumanMode(true);
+                                    setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Excellent. You are now connected. Please wait while a representative joins the chat.', sender: 'bot' }]);
+                                  }} 
+                                  className="btn btn-sm btn-success mt-2 mb-1 d-block w-100" 
+                                  type="button"
+                                >
+                                  {children}
+                                </button>
+                              );
+                            }
+                            if (href === '#clear-transfer') {
+                              return (
+                                <button 
+                                  onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    setShowClearConfirmModal(true);
+                                  }} 
+                                  className="btn btn-sm btn-outline-danger mt-2 mb-1 d-block w-100" 
+                                  type="button"
+                                >
+                                  {children}
+                                </button>
+                              );
+                            }
                             return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary">{children}</a>;
                           },
                           strong: ({ children }) => <strong>{children}</strong>,
@@ -964,7 +1072,7 @@ const Chatbot = () => {
                       placeholder={isConnected ? 'Type a message...' : 'Disconnected...'}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      disabled={!isConnected && !isHumanMode}
+                      disabled={(!isConnected && !isHumanMode) || awaitingTransferConfirmation}
                       className="border shadow-none px-3"
                       style={{
                         fontSize: '1rem',
@@ -984,7 +1092,7 @@ const Chatbot = () => {
                     <Button 
                       type="submit" 
                       variant="primary"
-                      disabled={!isConnected && !isHumanMode}
+                      disabled={(!isConnected && !isHumanMode) || awaitingTransferConfirmation}
                       className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 shadow-sm p-0"
                       style={{ width: '42px', height: '42px' }}
                     >
@@ -995,6 +1103,7 @@ const Chatbot = () => {
                       <Button
                         type="button"
                         variant={isRecording ? 'danger' : 'primary'}
+                        disabled={awaitingTransferConfirmation}
                         className={`rounded-circle d-flex align-items-center justify-content-center border-0 shadow-sm p-0 ${!isRecording ? 'bg-navy' : ''}`}
                         style={{ width: '42px', height: '42px', transition: 'transform 0.2s', transform: isRecording ? 'scale(1.15)' : 'scale(1)' }}
                         onTouchStart={(e) => { e.preventDefault(); startVoiceRecording(); }}
@@ -1016,6 +1125,30 @@ const Chatbot = () => {
           </div>
         </Card>
       </div>
+
+      {/* Clear Session Confirmation Modal */}
+      <Modal show={showClearConfirmModal} onHide={() => setShowClearConfirmModal(false)} centered style={{ zIndex: 99999 }}>
+        <Modal.Header closeButton>
+          <Modal.Title>Clear Session</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Are you sure you want to clear your current session and chat history? You will need to enter your details again.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowClearConfirmModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={async () => {
+            setShowClearConfirmModal(false);
+            setAwaitingTransferConfirmation(false);
+            await handleClearChat();
+            setTimeout(() => openHumanSupportForm(), 500); // Reopen the form cleanly
+          }}>
+            Clear Session
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
     </>
   );
 };
