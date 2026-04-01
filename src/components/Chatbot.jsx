@@ -42,7 +42,7 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isHumanMode, setIsHumanMode] = useState(false); // ALWAYS defaults to AI on mount/reload
+  const [isHumanMode, setIsHumanMode] = useState(false); // Strictly defaults to AI mode
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
@@ -56,10 +56,9 @@ const Chatbot = () => {
     phone: ''
   });
   const [humanFormStep, setHumanFormStep] = useState(0);
-  const [hasSession, setHasSession] = useState(false);
   const [awaitingTransferConfirmation, setAwaitingTransferConfirmation] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -255,9 +254,10 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
-        // Force back to AI mode visually
+        // Force back to AI mode visually every time they open the chat
         setIsHumanMode(false);
         setShowHumanForm(false);
+        setAwaitingTransferConfirmation(false);
       } else {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
@@ -334,16 +334,15 @@ const Chatbot = () => {
         if (!response.ok) return storedSessionId; 
         const data = await response.json();
         if (data?.exists) {
-          setHasSession(true);
           return storedSessionId;
         }
       } catch {
         return storedSessionId;
       }
       
+      // Clear data if backend rejected the session
       localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
       localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
-      setHasSession(false);
       return generateSessionId();
     };
 
@@ -410,7 +409,7 @@ const Chatbot = () => {
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
               localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
               sessionIdRef.current = null;
-              
+
               setMessages([defaultBotMessage]);
               setIsHumanMode(false);
               setShowHumanForm(false);
@@ -425,16 +424,12 @@ const Chatbot = () => {
                 webSocketRef.current = null;
               }
               setSocketResetNonce((prev) => prev + 1);
-              setHasSession(false);
               return;
             }
 
             const content = data.content || data.message || event.data;
             const sender = data.role === 'admin' ? 'admin' : 'bot';
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
-
-            // If an admin genuinely replies, flip it to human mode so the user can send voice notes back
-            if (sender === 'admin') setIsHumanMode(true);
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
               pendingReachSupportTriggerRef.current = false;
@@ -497,7 +492,7 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
     };
-  }, [isOpen, socketResetNonce]); // REMOVED hasSession to fix the infinite connecting loop!
+  }, [isOpen, socketResetNonce]);
 
   // --- ACTIONS & HANDLERS ---
   const sendSocketMessage = (payload) => {
@@ -515,7 +510,6 @@ const Chatbot = () => {
   };
 
   const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
-    if (!hasSession) setHasSession(true);
     let sessionId = sessionIdRef.current;
     
     if (!sessionId) {
@@ -560,22 +554,18 @@ const Chatbot = () => {
   };
 
   const openHumanSupportForm = () => {
-    if (!hasSession) {
-      setHasSession(true);
-      setIsConnecting(true);
-    }
-    
     // Check if the user has already submitted the form for this session via localStorage
     const hasSubmittedLead = localStorage.getItem(CHATBOT_LEAD_SUBMITTED_KEY) === 'true';
+    const activeSession = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
     
-    if (hasSubmittedLead && hasSession) {
+    if (hasSubmittedLead && activeSession) {
       setAwaitingTransferConfirmation(true);
-      setShowHumanForm(false); // Ensure form hides if active
+      setShowHumanForm(false); 
       setMessages((prev) => [
         ...prev,
         { 
           id: getNextMessageId(), 
-          text: 'You already have an active session. Would you like to **continue** waiting for Muyiwa, or **clear** the session and re-enter your details?\n\n[Continue Session](#continue-transfer)  |  [Clear Session](#clear-transfer)', 
+          text: 'You already have an active session. Would you like to **continue** waiting for Muyiwa, or **clear** the session and start over?\n\n[Continue Session](#continue-transfer)  |  [Clear Session](#clear-transfer)', 
           sender: 'bot' 
         }
       ]);
@@ -702,7 +692,7 @@ const Chatbot = () => {
       if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
       setIsHumanMode(true);
       
-      // Record successful submission in local storage for persistence across reloads
+      // Record successful submission in local storage to persist across reloads
       localStorage.setItem(CHATBOT_LEAD_SUBMITTED_KEY, 'true');
       resetHumanSupportForm();
     }
@@ -1145,7 +1135,7 @@ const Chatbot = () => {
             setShowClearConfirmModal(false);
             setAwaitingTransferConfirmation(false);
             await handleClearChat();
-            setTimeout(() => openHumanSupportForm(), 500); // Reopen the form cleanly
+            setTimeout(() => openHumanSupportForm(), 500); 
           }}>
             Clear Session
           </Button>
