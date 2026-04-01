@@ -21,6 +21,7 @@ const CHAT_SESSION_STATUS_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${ses
 const CHATBOT_SESSION_STORAGE_KEY = 'portfolio_chatbot_session_id';
 const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
 const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
+const CHATBOT_LEAD_SUBMITTED_KEY = 'portfolio_chatbot_lead_submitted';
 const defaultBotMessage = { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
 
 const generateSessionId = () => {
@@ -41,7 +42,7 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [isHumanMode, setIsHumanMode] = useState(false); // Defaults to AI mode on reload
+  const [isHumanMode, setIsHumanMode] = useState(false); // ALWAYS defaults to AI on mount/reload
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
@@ -59,8 +60,6 @@ const Chatbot = () => {
   const [awaitingTransferConfirmation, setAwaitingTransferConfirmation] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   
-  // Store last human support details for session reuse
-  const lastHumanSupportDetailsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -256,7 +255,7 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
-        // Reset visually to AI mode, preserving the session ID
+        // Force back to AI mode visually
         setIsHumanMode(false);
         setShowHumanForm(false);
       } else {
@@ -329,16 +328,22 @@ const Chatbot = () => {
     const resolveSessionId = async () => {
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
       if (!storedSessionId) return generateSessionId();
+      
       try {
         const response = await fetch(CHAT_SESSION_STATUS_ENDPOINT(storedSessionId));
-        if (!response.ok) return storedSessionId;
+        if (!response.ok) return storedSessionId; 
         const data = await response.json();
-        if (data?.exists) return storedSessionId;
+        if (data?.exists) {
+          setHasSession(true);
+          return storedSessionId;
+        }
       } catch {
         return storedSessionId;
       }
+      
       localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
-      lastHumanSupportDetailsRef.current = null;
+      localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+      setHasSession(false);
       return generateSessionId();
     };
 
@@ -403,9 +408,9 @@ const Chatbot = () => {
 
             if (data?.type === 'session_deleted') {
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+              localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
               sessionIdRef.current = null;
-              lastHumanSupportDetailsRef.current = null;
-
+              
               setMessages([defaultBotMessage]);
               setIsHumanMode(false);
               setShowHumanForm(false);
@@ -428,6 +433,7 @@ const Chatbot = () => {
             const sender = data.role === 'admin' ? 'admin' : 'bot';
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
 
+            // If an admin genuinely replies, flip it to human mode so the user can send voice notes back
             if (sender === 'admin') setIsHumanMode(true);
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
@@ -491,7 +497,7 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
     };
-  }, [isOpen, socketResetNonce]);
+  }, [isOpen, socketResetNonce]); // REMOVED hasSession to fix the infinite connecting loop!
 
   // --- ACTIONS & HANDLERS ---
   const sendSocketMessage = (payload) => {
@@ -559,9 +565,12 @@ const Chatbot = () => {
       setIsConnecting(true);
     }
     
-    // Logic: Do we already have their details from a previous transfer in this session?
-    if (lastHumanSupportDetailsRef.current && hasSession) {
+    // Check if the user has already submitted the form for this session via localStorage
+    const hasSubmittedLead = localStorage.getItem(CHATBOT_LEAD_SUBMITTED_KEY) === 'true';
+    
+    if (hasSubmittedLead && hasSession) {
       setAwaitingTransferConfirmation(true);
+      setShowHumanForm(false); // Ensure form hides if active
       setMessages((prev) => [
         ...prev,
         { 
@@ -693,15 +702,8 @@ const Chatbot = () => {
       if (!sendSocketMessage(humanSupportPayload)) sendSocketMessage(legacyPayload);
       setIsHumanMode(true);
       
-      // Store details for session reuse
-      lastHumanSupportDetailsRef.current = {
-        name: trimmedName,
-        email: trimmedEmail,
-        countryCode: contactForm.countryCode,
-        phone: localPhone,
-        fullPhone,
-        detailsMessage
-      };
+      // Record successful submission in local storage for persistence across reloads
+      localStorage.setItem(CHATBOT_LEAD_SUBMITTED_KEY, 'true');
       resetHumanSupportForm();
     }
   };
@@ -776,6 +778,7 @@ const Chatbot = () => {
     }
 
     localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+    localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
     sessionIdRef.current = null;
 
     if (webSocketRef.current) {
@@ -895,7 +898,7 @@ const Chatbot = () => {
               <div>
                 <h6 className="mb-0 fw-600 text-white lh-1">Chat Support</h6>
                 <small className={`lh-1 ${isConnecting ? 'text-warning' : isConnected ? 'text-success' : 'text-danger'} opacity-90`}>
-                  {isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
+                  {isConnecting ? 'Connecting…' : isConnected ? (isHumanMode ? 'Connected to human' : 'Connected to bot') : 'Offline'}
                 </small>
               </div>
             </div>
