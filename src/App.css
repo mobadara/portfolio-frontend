@@ -433,13 +433,18 @@ section + section {
   50% { opacity: 0.45; transform: scale(0.85); }
 }
 
+/* Fix Phone Input Text Color */
 .react-tel-input .form-control {
   border: 1px solid #ced4da !important;
   height: 38px !important;
+  color: #212529 !important; /* Force dark text in light mode */
+  background-color: #ffffff !important; /* Force white background */
 }
 .react-tel-input .form-control:focus {
   border-color: #0d6efd !important;
   box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+  color: #212529 !important;
+  background-color: #ffffff !important;
 }
 
 /* --- Chatbot Dark Mode --- */
@@ -508,6 +513,16 @@ section + section {
   background-color: #1e3a5f !important;
 }
 
+.react-tel-input .country-list .country:hover{
+  color: #212529;
+}
+
+/* Ensure Dark Mode remains correct */
+[data-bs-theme="dark"] .react-tel-input .form-control,
+[data-bs-theme="dark"] .react-tel-input .form-control:focus {
+  background-color: #0b1a2e !important;
+  color: #ffffff !important;
+}
 
 /* --- ANIMATED METRIC CIRCLES --- */
 .metric-circle-container {

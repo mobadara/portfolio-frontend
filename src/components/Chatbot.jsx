@@ -22,7 +22,7 @@ const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
 const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
 const CHATBOT_LEAD_SUBMITTED_KEY = 'portfolio_chatbot_lead_submitted';
 const CHATBOT_LEAD_DETAILS_KEY = 'portfolio_chatbot_lead_details';
-const defaultBotMessage = { id: 1, text: "Hi! I'm AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
+const defaultBotMessage = { id: 1, text: "Hi! I'm Muyiwa\'s AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
 
 const generateSessionId = () => {
   const timestamp = Date.now().toString();
@@ -42,10 +42,7 @@ const Chatbot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  
-  // Accurately restore human mode state on reload so the UI doesn't wait for bot replies infinitely
-  const [isHumanMode, setIsHumanMode] = useState(() => localStorage.getItem(CHATBOT_LEAD_SUBMITTED_KEY) === 'true');
-  
+  const [isHumanMode, setIsHumanMode] = useState(false); // Strictly defaults to AI mode
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [socketResetNonce, setSocketResetNonce] = useState(0);
@@ -62,14 +59,14 @@ const Chatbot = () => {
   const [hasSession, setHasSession] = useState(false);
   const [awaitingTransferConfirmation, setAwaitingTransferConfirmation] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-  
-  const lastHumanSupportDetailsRef = useRef(null);
+
   const messagesEndRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
   const messageIdRef = useRef(2);
   const loadingTimeoutRef = useRef(null);
   const audioContextRef = useRef(null);
+  const typingSoundIntervalRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
@@ -198,11 +195,11 @@ const Chatbot = () => {
         ...prev,
         {
           id: getNextMessageId(),
-          text: 'Response timed out. The server may be slow or the connection was lost. Please try again or contact support.',
+          text: 'The AI is taking longer than expected. If you were previously waiting for a human agent, your message may be queued for them. You can wait, or click "Clear Session" from the Quick Actions menu to restart the chat.',
           sender: 'bot'
         }
       ]);
-    }, 15000); // Reduced timeout to prevent infinite hanging
+    }, 12000); // Shorter timeout for better UX
   };
 
   const scrollToBottom = () => {
@@ -223,12 +220,15 @@ const Chatbot = () => {
         setLeadSubmitStatus(null);
         setIsConnected(false);
         setIsConnecting(true);
+        // Force back to AI mode visually every time they open the chat
+        setIsHumanMode(false);
         setShowHumanForm(false);
         setAwaitingTransferConfirmation(false);
       } else {
         setLeadSubmitStatus(null);
         setIsConnecting(false);
         setIsLoading(false);
+        setIsHumanMode(false);
         setIsRecording(false);
         clearLoadingTimeout();
         clearRecordingTimer();
@@ -276,13 +276,6 @@ const Chatbot = () => {
 
     const resolveSessionId = async () => {
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
-      
-      // Load saved details if they exist
-      const savedDetails = localStorage.getItem(CHATBOT_LEAD_DETAILS_KEY);
-      if (savedDetails) {
-        try { lastHumanSupportDetailsRef.current = JSON.parse(savedDetails); } catch {}
-      }
-
       if (!storedSessionId) return generateSessionId();
       
       try {
@@ -301,8 +294,6 @@ const Chatbot = () => {
       localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
       localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
       localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
-      setIsHumanMode(false);
-      lastHumanSupportDetailsRef.current = null;
       setHasSession(false);
       return generateSessionId();
     };
@@ -371,7 +362,6 @@ const Chatbot = () => {
               localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
               localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
               sessionIdRef.current = null;
-              lastHumanSupportDetailsRef.current = null;
 
               setMessages([defaultBotMessage]);
               setIsHumanMode(false);
@@ -395,6 +385,7 @@ const Chatbot = () => {
             const sender = data.role === 'admin' ? 'admin' : 'bot';
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: content, sender, type: 'text' }]);
 
+            // If an admin replies, we switch to human mode instantly
             if (sender === 'admin') setIsHumanMode(true);
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
@@ -565,7 +556,7 @@ const Chatbot = () => {
     }
 
     if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
-      // ONLY trigger bot typing animation if we are NOT in human mode
+      // Trigger typing animation ONLY if we expect a bot response
       if (!isHumanMode) {
         setIsLoading(true);
         startLoadingTimeout();
@@ -672,9 +663,9 @@ const Chatbot = () => {
         detailsMessage
       };
       
+      // Save data securely in localStorage to persist across reloads
       localStorage.setItem(CHATBOT_LEAD_SUBMITTED_KEY, 'true');
       localStorage.setItem(CHATBOT_LEAD_DETAILS_KEY, JSON.stringify(payloadDetails));
-      lastHumanSupportDetailsRef.current = payloadDetails;
       
       resetHumanSupportForm();
     }
@@ -749,11 +740,11 @@ const Chatbot = () => {
       clearChatStorageForSession(activeSession);
     }
 
+    // Completely wipe session data
     localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
     localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
     localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
     sessionIdRef.current = null;
-    lastHumanSupportDetailsRef.current = null;
 
     if (webSocketRef.current) {
       webSocketRef.current.close();
@@ -845,25 +836,27 @@ const Chatbot = () => {
 
   return (
     <>
+      {/* Modern Bouncing Dots Typing Animation */}
       <style>{`
-        .typing-indicator {
+        .modern-typing-indicator {
           display: flex;
           align-items: center;
-          gap: 4px;
-          padding: 6px 10px;
+          justify-content: center;
+          gap: 6px;
+          padding: 10px 14px;
         }
-        .typing-indicator span {
-          width: 6px;
-          height: 6px;
-          background-color: #888;
+        .modern-typing-indicator span {
+          width: 8px;
+          height: 8px;
+          background-color: #6c757d;
           border-radius: 50%;
-          animation: bounce 1.4s infinite ease-in-out both;
+          animation: modernBounce 1.4s infinite ease-in-out both;
         }
-        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes bounce {
-          0%, 80%, 100% { transform: scale(0); }
-          40% { transform: scale(1); }
+        .modern-typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .modern-typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes modernBounce {
+          0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+          40% { transform: scale(1); opacity: 1; }
         }
       `}</style>
       
@@ -951,7 +944,8 @@ const Chatbot = () => {
                     >
                       Transfer to Muyiwa
                     </button>
-                    {(hasSession || isHumanMode) && (
+                    {/* Clear Session Button - Always visible if they have history */}
+                    {(messages.length > 1 || hasSession) && (
                       <button
                         onClick={() => {
                           setShowClearConfirmModal(true);
@@ -1002,7 +996,7 @@ const Chatbot = () => {
                             if (href === '#transfer') {
                               return <button onClick={(e) => { e.preventDefault(); openHumanSupportForm(); }} className="btn btn-sm btn-primary mt-2 mb-1 d-block chatbot-transfer-btn" type="button">{children}</button>;
                             }
-                            // --- Resend the email notification if they click continue ---
+                            // --- Resend the email notification securely ---
                             if (href === '#continue-transfer') {
                               return (
                                 <button 
@@ -1012,8 +1006,13 @@ const Chatbot = () => {
                                     setIsHumanMode(true);
                                     setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Excellent. You are now connected. Please wait while a representative joins the chat.', sender: 'bot' }]);
                                     
-                                    if (lastHumanSupportDetailsRef.current) {
-                                      await submitHumanSupportLead(lastHumanSupportDetailsRef.current);
+                                    // Fetch details and immediately resend lead
+                                    const savedDetails = localStorage.getItem(CHATBOT_LEAD_DETAILS_KEY);
+                                    if (savedDetails) {
+                                      try {
+                                        const parsedDetails = JSON.parse(savedDetails);
+                                        await submitHumanSupportLead(parsedDetails);
+                                      } catch(err) {}
                                     }
                                   }} 
                                   className="btn btn-sm btn-success mt-2 mb-1 d-block w-100" 
@@ -1055,11 +1054,11 @@ const Chatbot = () => {
                 </div>
               ))}
               
-              {/* REVAMPED TYPICAL ANIMATION */}
+              {/* REVAMPED TYPING ANIMATION */}
               {isLoading && (
                 <div className="d-flex mb-3">
-                  <div className="bg-light py-2 px-3 rounded-lg d-flex align-items-center" style={{ borderRadius: 14 }}>
-                    <div className="typing-indicator">
+                  <div className="bg-light text-dark rounded-lg" style={{ borderRadius: 14 }}>
+                    <div className="modern-typing-indicator">
                       <span></span>
                       <span></span>
                       <span></span>
@@ -1153,7 +1152,7 @@ const Chatbot = () => {
           <Modal.Title>Clear Session</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Are you sure you want to clear your current session and chat history? You will need to enter your details again.
+          Are you sure you want to clear your current session and chat history? You will need to enter your details again to speak with human support.
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowClearConfirmModal(false)}>
