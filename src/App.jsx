@@ -13,7 +13,6 @@ import AboutSection from './components/AboutSection';
 import SkillsSection from './components/SkillsSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
-import AIPlayground from './components/AIPlayground';
 import BlogSection from './components/BlogSection';
 import ContactSection from './components/ContactSection';
 
@@ -30,6 +29,9 @@ import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import AdminMessageDetail from './pages/AdminMessageDetail';
 import AdminChatPage from './components/AdminChatPage';
+
+// Live Project Pages
+import FinBERT from './pages/projects/FinBERT';
 
 const SECTION_PATHS = {
   '/': 'home',
@@ -134,7 +136,7 @@ function App() {
       <SkillsSection />
       <PortfolioSection projects={projects} setRouteLoading={setRouteLoading} />
       <ServicesSection />
-      <AIPlayground />
+      {/* <AIPlayground /> */}
       <BlogSection />
       <ContactSection />
     </>
@@ -170,6 +172,9 @@ function App() {
       <Route path="/admin/messages/:id" element={<AdminMessageDetail />} />
       <Route path="/admin/chat" element={<AdminChatPage />} />
       <Route path="/admin/chat/:sessionId" element={<AdminChatPage />} />
+
+      {/* Live Projects Demos */}
+      <Route path="/projects/sentiment-analysis-with-bert" element={<FinBERT />} />
       
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
