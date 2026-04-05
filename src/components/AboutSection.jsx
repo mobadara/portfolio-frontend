@@ -40,7 +40,7 @@ const AboutSection = ({ theme }) => {
               </h1>
 
               <p className="about-description">
-                I'm <strong>Muyiwa J. Obadara</strong>, a curious researcher, Data Scientist, and AI Engineer building intelligent systems that transform complex problems into scalable, production-grade solutions. With a foundational background in Physics from the University of Ibadan, I specialize in designing end-to-end AI pipelines, cloud architecture, and automation that drive meaningful, real-world impact.
+                My name is <strong>Muyiwa J. Obadara</strong>. I am a research-oriented Data Scientist and AI Engineer with expertise in crafting intelligent algorithms that convert difficult challenges into robust, production-ready solutions. My professional career began with a solid foundation in physics at the University of Ibadan, Nigeria.
               </p>
 
               <p className="about-description">
