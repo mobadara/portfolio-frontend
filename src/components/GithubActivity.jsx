@@ -76,7 +76,7 @@ const GithubActivity = ({ theme, isModal = false }) => {
               showWeekdayLabels
             />
             {/* Added html prop here too */}
-            <Tooltip id="react-tooltip" html />
+            <Tooltip id="react-tooltip" renderContent={() => "My GitHub Activity"} />
           </div>
         </div>
       )}
