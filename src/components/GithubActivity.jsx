@@ -2,7 +2,26 @@ import { GitHubCalendar } from 'react-github-calendar';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
+import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css'; // Added CSS import
 
+/**
+ * Displays GitHub contribution activity with a calendar visualization.
+ * * Renders either a full-page section or a modal view of GitHub contributions
+ * depending on the `isModal` prop. Uses the GitHubCalendar component to display
+ * a contribution graph for the specified GitHub user.
+ * * @component
+ * @param {Object} props - Component props
+ * @param {string} props.theme - The current theme ('dark' or 'light') that determines the calendar color scheme
+ * @param {boolean} [props.isModal=false] - If true, renders a modal/compact version; if false, renders a full section
+ * @returns {JSX.Element} A React component displaying GitHub contributions
+ * * @example
+ * // Full page section view
+ * <GithubActivity theme="light" />
+ * * @example
+ * // Modal view
+ * <GithubActivity theme="dark" isModal={true} />
+ */
 const GithubActivity = ({ theme, isModal = false }) => {
   return (
     <>
@@ -22,21 +41,24 @@ const GithubActivity = ({ theme, isModal = false }) => {
             <Row className="justify-content-center">
               <Col lg={10} className="d-flex justify-content-center">
                 <div className="border p-4 rounded-3 shadow-sm bg-white" style={{ maxWidth: '100%', overflowX: 'auto' }}>
-                  <GitHubCalendar 
-                    username="mobadara" 
+                  <GitHubCalendar
+                    username="mobadara"
                     colorScheme={theme === 'dark' ? 'dark' : 'light'}
                     blockSize={14}
                     blockMargin={4}
                     fontSize={14}
                     showWeekdayLabels
+                  // tooltipPosition is handled by react-tooltip now, so you can remove it from here if you want
                   />
+                  {/* Added html prop to render the text formatting correctly */}
+                  <Tooltip id="react-tooltip" />
                 </div>
               </Col>
             </Row>
           </Container>
         </section>
       )}
-      
+
       {isModal && (
         <div className="github-calendar-modal-scroll">
           <div style={{ paddingBottom: '1rem' }}>
@@ -45,14 +67,16 @@ const GithubActivity = ({ theme, isModal = false }) => {
             </p>
           </div>
           <div className="github-calendar-modal-inner">
-            <GitHubCalendar 
-              username="mobadara" 
+            <GitHubCalendar
+              username="mobadara"
               colorScheme={theme === 'dark' ? 'dark' : 'light'}
               blockSize={14}
               blockMargin={4}
               fontSize={14}
               showWeekdayLabels
             />
+            {/* Added html prop here too */}
+            <Tooltip id="react-tooltip" html />
           </div>
         </div>
       )}

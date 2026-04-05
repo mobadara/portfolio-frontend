@@ -5,6 +5,8 @@ import Col from 'react-bootstrap/Col';
 import Modal from 'react-bootstrap/Modal';
 import GithubActivity from './GithubActivity';
 import './AboutSection.css';
+import portrait from '../assets/portrait.png';
+
 
 const AboutSection = ({ theme }) => {
   const [showGithubModal, setShowGithubModal] = useState(false);
@@ -19,8 +21,8 @@ const AboutSection = ({ theme }) => {
             <div className="profile-card animate-slide-in-left">
               <div className="profile-image-wrapper">
                 <img
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=600&fit=crop"
-                  alt="Muyiwa J. Obadara sitting with Mac"
+                  src={portrait}
+                  alt="Muyiwa J. Obadara Portrait"
                   className="profile-image"
                 />
                 <div className="profile-image-overlay"></div>
@@ -42,11 +44,11 @@ const AboutSection = ({ theme }) => {
               </p>
 
               <p className="about-description">
-                Beyond writing clean, efficient code, I am deeply committed to tech leadership and community growth. Drawing from my roots as a Mathematics and Physics educator, I actively guide the next generation of tech professionals. I currently serve as an AI/ML Fellow at the Tech4Dev Developers Foundry and a Volunteer Data Science Mentor and Research Assistant at MedicsInTech.
+                Apart from crafting concise code, I am passionate about tech leadership and community building. Leveraging my background in teaching Mathematics and Physics, I mentor the future leaders of technology. I currently hold positions as a Fellow in AI/ML at the Tech4Dev Developers Foundry and a Data Science Mentor and Research Assistant at MedicsInTech.
               </p>
 
               <p className="about-description">
-                I believe that great software is born from clarity of thought. When I'm not building machine learning models or deploying APIs, you'll find me exploring cutting-edge AI technologies, optimizing workflows with LLMs, or unwinding by playing the piano.
+                To my mind, amazing software comes from clear thinking. In my downtime from creating machine learning models or APIs, I’m constantly researching novel AI techniques, improving processes using LLMs, or simply relaxing by playing the piano.
               </p>
 
               {/* Social Links */}
@@ -61,7 +63,7 @@ const AboutSection = ({ theme }) => {
                   <i className="bi bi-github"></i>
                 </a>
                 <a 
-                  href="https://linkedin.com/in/muyiwa-obadara" 
+                  href="https://linkedin.com/in/obadara-m" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="social-link linkedin-link"
@@ -70,7 +72,7 @@ const AboutSection = ({ theme }) => {
                   <i className="bi bi-linkedin"></i>
                 </a>
                 <a 
-                  href="https://twitter.com/mobadara" 
+                  href="https://twitter.com/m_obadara" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="social-link twitter-link"
