@@ -136,7 +136,6 @@ function App() {
       <SkillsSection />
       <PortfolioSection projects={projects} setRouteLoading={setRouteLoading} />
       <ServicesSection />
-      {/* <AIPlayground /> */}
       <BlogSection />
       <ContactSection />
     </>

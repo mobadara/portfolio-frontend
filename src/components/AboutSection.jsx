@@ -40,15 +40,15 @@ const AboutSection = ({ theme }) => {
               </h1>
 
               <p className="about-description">
-                My name is <strong>Muyiwa J. Obadara</strong>. I am a research-oriented Data Scientist and AI Engineer with expertise in crafting intelligent algorithms that convert difficult challenges into robust, production-ready solutions. My professional career began with a solid foundation in physics at the University of Ibadan, Nigeria.
+                I'm <strong>Muyiwa J. Obadara</strong>, a curious researcher, Data Scientist, and AI Engineer building intelligent systems that transform complex problems into scalable, production-grade solutions. With a foundational background in Physics from the University of Ibadan, I specialize in designing end-to-end AI pipelines, cloud architecture, and automation that drive meaningful, real-world impact.
               </p>
 
               <p className="about-description">
-                Apart from crafting concise code, I am passionate about tech leadership and community building. Leveraging my background in teaching Mathematics and Physics, I mentor the future leaders of technology. I currently hold positions as a Fellow in AI/ML at the Tech4Dev Developers Foundry and a Data Science Mentor and Research Assistant at MedicsInTech.
+                Beyond writing clean, efficient code, I am deeply committed to tech leadership and community growth. Drawing from my roots as a Mathematics and Physics educator, I actively guide the next generation of tech professionals. I currently serve as an AI/ML Fellow at the Tech4Dev Developers Foundry and a Volunteer Data Science Mentor and Research Assistant at MedicsInTech.
               </p>
 
               <p className="about-description">
-                To my mind, amazing software comes from clear thinking. In my downtime from creating machine learning models or APIs, I’m constantly researching novel AI techniques, improving processes using LLMs, or simply relaxing by playing the piano.
+                I believe that great software is born from clarity of thought. When I'm not building machine learning models or deploying APIs, you'll find me exploring cutting-edge AI technologies, optimizing workflows with LLMs, or unwinding by playing the piano.
               </p>
 
               {/* Social Links */}
@@ -63,7 +63,7 @@ const AboutSection = ({ theme }) => {
                   <i className="bi bi-github"></i>
                 </a>
                 <a 
-                  href="https://linkedin.com/in/obadara-m" 
+                  href="https://linkedin.com/in/muyiwa-obadara" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="social-link linkedin-link"
@@ -72,7 +72,7 @@ const AboutSection = ({ theme }) => {
                   <i className="bi bi-linkedin"></i>
                 </a>
                 <a 
-                  href="https://twitter.com/m_obadara" 
+                  href="https://twitter.com/mobadara" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="social-link twitter-link"
@@ -107,14 +107,15 @@ const AboutSection = ({ theme }) => {
       </Container>
 
       {/* GitHub Activity Modal */}
-      <Modal 
+      <Modal
         show={showGithubModal} 
         onHide={() => setShowGithubModal(false)}
         size="lg"
         className="github-modal"
         centered
+        data-bs-theme={theme === 'dark' ? 'dark' : 'light'}
       >
-        <Modal.Header className="border-0 pb-0">
+        <Modal.Header className="border-0 pb-0" style={{ backgroundColor: 'var(--body-bg)', color: 'var(--text-color)' }}>
           <Modal.Title className="fw-bold">
             <i className="bi bi-github me-2"></i>GitHub Contributions
           </Modal.Title>
@@ -125,7 +126,7 @@ const AboutSection = ({ theme }) => {
             aria-label="Close"
           ></button>
         </Modal.Header>
-        <Modal.Body className="pt-0">
+        <Modal.Body className="pt-0" style={{ backgroundColor: 'var(--body-bg)', color: 'var(--text-color)' }}>
           <GithubActivity theme={theme} isModal={true} />
         </Modal.Body>
       </Modal>

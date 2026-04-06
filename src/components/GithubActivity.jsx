@@ -1,4 +1,5 @@
-import { GitHubCalendar } from 'react-github-calendar';
+import React from 'react';
+import { GitHubCalendar } from 'react-github-calendar'; // Changed to default import
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -41,16 +42,21 @@ const GithubActivity = ({ theme, isModal = false }) => {
             <Row className="justify-content-center">
               <Col lg={10} className="d-flex justify-content-center">
                 <div className="border p-4 rounded-3 shadow-sm bg-white" style={{ maxWidth: '100%', overflowX: 'auto' }}>
-                  <GitHubCalendar
-                    username="mobadara"
+                  <GitHubCalendar 
+                    username="mobadara" 
                     colorScheme={theme === 'dark' ? 'dark' : 'light'}
                     blockSize={14}
                     blockMargin={4}
                     fontSize={14}
                     showWeekdayLabels
-                  // tooltipPosition is handled by react-tooltip now, so you can remove it from here if you want
+                    renderBlock={(block, activity) => 
+                      React.cloneElement(block, {
+                        'data-tooltip-id': 'react-tooltip',
+                        'data-tooltip-content': activity.count ? `${activity.count} contributions on ${activity.date}` : 'No contributions',
+                        style: { ...block.props.style, cursor: 'pointer' }
+                      })
+                    }
                   />
-                  {/* Added html prop to render the text formatting correctly */}
                   <Tooltip id="react-tooltip" />
                 </div>
               </Col>
@@ -58,7 +64,7 @@ const GithubActivity = ({ theme, isModal = false }) => {
           </Container>
         </section>
       )}
-
+      
       {isModal && (
         <div className="github-calendar-modal-scroll">
           <div style={{ paddingBottom: '1rem' }}>
@@ -67,16 +73,22 @@ const GithubActivity = ({ theme, isModal = false }) => {
             </p>
           </div>
           <div className="github-calendar-modal-inner">
-            <GitHubCalendar
-              username="mobadara"
+            <GitHubCalendar 
+              username="mobadara" 
               colorScheme={theme === 'dark' ? 'dark' : 'light'}
               blockSize={14}
               blockMargin={4}
               fontSize={14}
               showWeekdayLabels
+              renderBlock={(block, activity) => 
+                React.cloneElement(block, {
+                  'data-tooltip-id': 'react-tooltip',
+                  'data-tooltip-content': activity.count ? `${activity.count} contributions on ${activity.date}` : 'No contributions',
+                  style: { ...block.props.style, cursor: 'pointer' }
+                })
+              }
             />
-            {/* Added html prop here too */}
-            <Tooltip id="react-tooltip" renderContent={() => "My GitHub Activity"} />
+            <Tooltip id="react-tooltip" />
           </div>
         </div>
       )}
