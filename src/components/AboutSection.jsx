@@ -83,30 +83,31 @@ const AboutSection = ({ theme }) => {
               </div>
 
               {/* Action Buttons */}
-              <div className="action-buttons">
-                <a 
-                  href="/resume.pdf" 
-                  download
-                  className="btn btn-primary btn-download"
-                >
-                  <i className="bi bi-download me-2"></i>
-                  Download Resume
-                </a>
-                <button 
-                  className="btn btn-outline-primary btn-github-activity"
-                  onClick={() => setShowGithubModal(true)}
-                >
-                  <i className="bi bi-github me-2"></i>
-                  View GitHub Activity
-                </button>
-              </div>
-            </div>
-          </Col>
-        </Row>
-        </div>
-      </Container>
+                      <div className="action-buttons">
+                      <a 
+                        href="/src/assets/resume.pdf" 
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary btn-download"
+                      >
+                        <i className="bi bi-download me-2"></i>
+                        Download Resume
+                      </a>
+                      <button 
+                        className="btn btn-outline-primary btn-github-activity"
+                        onClick={() => setShowGithubModal(true)}
+                      >
+                        <i className="bi bi-github me-2"></i>
+                        View GitHub Activity
+                      </button>
+                      </div>
+                    </div>
+                    </Col>
+                  </Row>
+                  </div>
+                  </Container>
 
-      {/* GitHub Activity Modal */}
+                  {/* GitHub Activity Modal */}
       <Modal
         show={showGithubModal} 
         onHide={() => setShowGithubModal(false)}
