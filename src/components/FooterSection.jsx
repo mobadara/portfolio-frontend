@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import { contactDetails, socialLinks } from '../data/siteContact';
 import './FooterSection.css';
+import resumePdf from '../assets/resume.pdf';
 
 const NAV_LINKS = [
   { to: '/',          label: 'Home',      Icon: FaHome },
@@ -60,7 +61,7 @@ const FooterSection = () => (
           <h6 className="footer-heading">Resources</h6>
           <ul className="footer-links">
             <li>
-              <a href="/resume.pdf" download className="footer-link">
+              <a href={resumePdf} download className="footer-link">
                 <FaDownload className="footer-link-icon" /> Download Resume
               </a>
             </li>

@@ -18,6 +18,7 @@ import ContactSection from './components/ContactSection';
 
 // Pages
 import AllProjects from './pages/AllProjects';
+import ResumePage from './pages/ResumePage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Admin Pages
@@ -159,6 +160,7 @@ function App() {
           path="/projects" 
           element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} setRouteLoading={setRouteLoading} />} 
         />
+        <Route path="/resume" element={<ResumePage />} />
       </Route>
 
       {/* ADMIN ROUTES (No Public Header/Footer) */}

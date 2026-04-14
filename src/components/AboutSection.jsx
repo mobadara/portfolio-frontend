@@ -3,6 +3,7 @@ import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Modal from 'react-bootstrap/Modal';
+import { Link } from 'react-router-dom';
 import GithubActivity from './GithubActivity';
 import './AboutSection.css';
 import portrait from '../assets/portrait.png';
@@ -83,31 +84,30 @@ const AboutSection = ({ theme }) => {
               </div>
 
               {/* Action Buttons */}
-                      <div className="action-buttons">
-                      <a 
-                        href="/src/assets/resume.pdf" 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-primary btn-download"
-                      >
-                        <i className="bi bi-download me-2"></i>
-                        Download Resume
-                      </a>
-                      <button 
-                        className="btn btn-outline-primary btn-github-activity"
-                        onClick={() => setShowGithubModal(true)}
-                      >
-                        <i className="bi bi-github me-2"></i>
-                        View GitHub Activity
-                      </button>
-                      </div>
-                    </div>
-                    </Col>
-                  </Row>
-                  </div>
-                  </Container>
+              <div className="action-buttons">
+                <Link 
+                  to="/resume"
+                  className="btn btn-primary btn-download"
+                >
+                  <i className="bi bi-file-earmark-text me-2"></i>
+                  View Resume
+                </Link>
+                
+                <button 
+                  className="btn btn-outline-primary btn-github-activity"
+                  onClick={() => setShowGithubModal(true)}
+                >
+                  <i className="bi bi-github me-2"></i>
+                  View GitHub Activity
+                </button>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </div>
+    </Container>
 
-                  {/* GitHub Activity Modal */}
+      {/* GitHub Activity Modal */}
       <Modal
         show={showGithubModal} 
         onHide={() => setShowGithubModal(false)}
