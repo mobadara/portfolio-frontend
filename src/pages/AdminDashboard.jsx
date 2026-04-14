@@ -20,7 +20,9 @@ import {
 import {
   BiChat,
   BiEnvelope,
+  BiFile,
   BiFolder,
+  BiImage,
   BiLogOut,
   BiMoon,
   BiPlus,
@@ -48,6 +50,10 @@ const USERS_ENDPOINT = ADMIN_ROUTES.users;
 const MESSAGES_ENDPOINT = ADMIN_ROUTES.messages;
 const MESSAGES_CREATE_PUBLIC_ENDPOINT = ADMIN_ROUTES.contactCreate;
 const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
+const UPLOAD_RESUME_ENDPOINT = ADMIN_ROUTES.uploadResume;
+const UPLOAD_PORTRAIT_ENDPOINT = ADMIN_ROUTES.uploadPortrait;
+const RESUME_ASSET_ENDPOINT = ADMIN_ROUTES.resumeAsset;
+const PORTRAIT_ASSET_ENDPOINT = ADMIN_ROUTES.portraitAsset;
 const DELETE_ALL_CHAT_SESSIONS_ENDPOINT = ADMIN_ROUTES.deleteAllChatSessions;
 const DELETE_ALL_MESSAGES_ENDPOINT = ADMIN_ROUTES.deleteAllMessages;
 const DELETE_ALL_PROJECTS_ENDPOINT = ADMIN_ROUTES.deleteAllProjects;
@@ -104,6 +110,11 @@ function AdminDashboard() {
   const [dangerAction, setDangerAction] = useState('');
   const [dangerPassword, setDangerPassword] = useState('');
   const [isRunningDangerAction, setIsRunningDangerAction] = useState(false);
+  const [assetFiles, setAssetFiles] = useState({ resume: null, portrait: null });
+  const [isUploadingAssets, setIsUploadingAssets] = useState({ resume: false, portrait: false });
+  const [assetVersion, setAssetVersion] = useState({ resume: 0, portrait: 0 });
+  const [assetLinks, setAssetLinks] = useState({ resume: '', portrait: '' });
+  const [assetMissing, setAssetMissing] = useState({ resume: false, portrait: false });
 
   const currentRole = String(authUser?.role || 'assistant').toLowerCase();
   const isAdminRole = currentRole === 'admin';
@@ -462,6 +473,130 @@ function AdminDashboard() {
     navigate('/admin');
   };
 
+  const toAbsoluteAssetUrl = useCallback((url = '') => {
+    const normalized = String(url || '').trim();
+    if (!normalized) return '';
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    return buildAdminUrl(normalized.startsWith('/') ? normalized : `/${normalized}`);
+  }, []);
+
+  const withVersion = useCallback((url, version) => {
+    if (!url || !version) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}v=${version}`;
+  }, []);
+
+  const loadAssetLinks = useCallback(async () => {
+    const fetchAsset = async (kind) => {
+      const endpoint = kind === 'resume' ? RESUME_ASSET_ENDPOINT : PORTRAIT_ASSET_ENDPOINT;
+      const response = await fetch(buildAdminUrl(endpoint));
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (response.status === 404) {
+        return { kind, url: '', missing: true };
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.detail || data?.message || `Unable to load ${kind} asset.`);
+      }
+
+      const resolvedUrl = toAbsoluteAssetUrl(data?.url);
+      return {
+        kind,
+        url: withVersion(resolvedUrl, assetVersion[kind]),
+        missing: !resolvedUrl
+      };
+    };
+
+    try {
+      const [resumeAsset, portraitAsset] = await Promise.all([
+        fetchAsset('resume'),
+        fetchAsset('portrait')
+      ]);
+
+      setAssetLinks({
+        resume: resumeAsset.url,
+        portrait: portraitAsset.url
+      });
+
+      setAssetMissing({
+        resume: resumeAsset.missing,
+        portrait: portraitAsset.missing
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to load asset previews.');
+    }
+  }, [assetVersion, toAbsoluteAssetUrl, withVersion]);
+
+  useEffect(() => {
+    loadAssetLinks();
+  }, [loadAssetLinks]);
+
+  const handleAssetFileChange = (kind, file) => {
+    setAssetFiles((prev) => ({
+      ...prev,
+      [kind]: file || null
+    }));
+  };
+
+  const handleUploadAsset = async (kind) => {
+    const file = assetFiles[kind];
+    if (!file) {
+      setError(`Please choose a ${kind} file first.`);
+      return;
+    }
+
+    const endpoint = kind === 'resume' ? UPLOAD_RESUME_ENDPOINT : UPLOAD_PORTRAIT_ENDPOINT;
+    const fieldName = kind === 'resume' ? 'resume' : 'portrait';
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append(fieldName, file);
+
+    setError('');
+    setSuccess('');
+    setIsUploadingAssets((prev) => ({ ...prev, [kind]: true }));
+
+    try {
+      const response = await fetch(buildAdminUrl(endpoint), {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.detail || data?.message || `Failed to upload ${kind}.`);
+      }
+
+      const now = Date.now();
+      setAssetVersion((prev) => ({ ...prev, [kind]: now }));
+      const uploadedUrl = toAbsoluteAssetUrl(data?.url);
+      if (uploadedUrl) {
+        setAssetLinks((prev) => ({ ...prev, [kind]: withVersion(uploadedUrl, now) }));
+        setAssetMissing((prev) => ({ ...prev, [kind]: false }));
+      }
+      setAssetFiles((prev) => ({ ...prev, [kind]: null }));
+      setSuccess(data?.message || `${kind[0].toUpperCase()}${kind.slice(1)} uploaded successfully.`);
+      setShowToast(true);
+    } catch (err) {
+      setError(err.message || `Unable to upload ${kind}.`);
+    } finally {
+      setIsUploadingAssets((prev) => ({ ...prev, [kind]: false }));
+    }
+  };
+
   const dangerLabels = {
     sessions: 'Delete All Chat Sessions',
     messages: 'Delete All Messages',
@@ -640,6 +775,92 @@ function AdminDashboard() {
                       </Button>
                     </div>
                   </div>
+                </Card.Body>
+              </Card>
+            )}
+
+            {canManageUsersAndProjects && (
+              <Card className="border-0 admin-panel-card mb-3">
+                <Card.Body className="p-3">
+                  <div className="d-flex align-items-center justify-content-between mb-3">
+                    <h6 className="mb-0 fw-bold">Resume & Portrait Assets</h6>
+                    <small className="text-muted">Upload latest files used on public pages</small>
+                  </div>
+
+                  <Row className="g-3">
+                    <Col xs={12} lg={6}>
+                      <Card className="h-100 border">
+                        <Card.Body>
+                          <h6 className="d-flex align-items-center gap-2 mb-2"><BiFile /> Resume (PDF)</h6>
+                          <div className="mb-2">
+                            {assetLinks.resume && !assetMissing.resume ? (
+                              <a href={assetLinks.resume} target="_blank" rel="noreferrer" className="small">
+                                Open current resume
+                              </a>
+                            ) : (
+                              <span className="small text-muted">Resume not uploaded yet</span>
+                            )}
+                          </div>
+                          <Form.Group className="mb-2">
+                            <Form.Control
+                              type="file"
+                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                              onChange={(event) => handleAssetFileChange('resume', event.target.files?.[0])}
+                            />
+                          </Form.Group>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleUploadAsset('resume')}
+                            disabled={isUploadingAssets.resume || !assetFiles.resume}
+                          >
+                            {isUploadingAssets.resume ? <Spinner animation="border" size="sm" /> : 'Upload Resume'}
+                          </Button>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+
+                    <Col xs={12} lg={6}>
+                      <Card className="h-100 border">
+                        <Card.Body>
+                          <h6 className="d-flex align-items-center gap-2 mb-2"><BiImage /> Portrait (Image)</h6>
+                          <div className="mb-2">
+                            {assetLinks.portrait && !assetMissing.portrait ? (
+                              <a href={assetLinks.portrait} target="_blank" rel="noreferrer" className="small">
+                                Open current portrait
+                              </a>
+                            ) : (
+                              <span className="small text-muted">Portrait not uploaded yet</span>
+                            )}
+                          </div>
+                          <div className="admin-portrait-preview-wrap mb-2">
+                            {assetLinks.portrait && !assetMissing.portrait ? (
+                              <img src={assetLinks.portrait} alt="Current portrait" className="admin-portrait-preview" />
+                            ) : (
+                              <div className="admin-portrait-preview d-flex align-items-center justify-content-center text-muted text-center px-2">
+                                Portrait not uploaded
+                              </div>
+                            )}
+                          </div>
+                          <Form.Group className="mb-2">
+                            <Form.Control
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => handleAssetFileChange('portrait', event.target.files?.[0])}
+                            />
+                          </Form.Group>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleUploadAsset('portrait')}
+                            disabled={isUploadingAssets.portrait || !assetFiles.portrait}
+                          >
+                            {isUploadingAssets.portrait ? <Spinner animation="border" size="sm" /> : 'Upload Portrait'}
+                          </Button>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
                 </Card.Body>
               </Card>
             )}

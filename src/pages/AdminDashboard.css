@@ -114,6 +114,21 @@
   background: #fff;
 }
 
+.admin-portrait-preview-wrap {
+  width: 100%;
+  max-width: 160px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #dee2e6;
+}
+
+.admin-portrait-preview {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
 .admin-dash-loading {
   min-height: 100vh;
   background: #111b21;
@@ -151,6 +166,10 @@
 [data-bs-theme='dark'] .metric-card {
   background: #202c33;
   color: #e9edef;
+}
+
+[data-bs-theme='dark'] .admin-portrait-preview-wrap {
+  border-color: #2a3942;
 }
 
 [data-bs-theme='dark'] .metric-card .text-muted,

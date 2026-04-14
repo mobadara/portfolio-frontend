@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -8,8 +9,8 @@ import {
   FaDownload, FaExternalLinkAlt
 } from 'react-icons/fa';
 import { contactDetails, socialLinks } from '../data/siteContact';
+import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 import './FooterSection.css';
-import resumePdf from '../assets/resume.pdf';
 
 const NAV_LINKS = [
   { to: '/',          label: 'Home',      Icon: FaHome },
@@ -26,7 +27,63 @@ const MediumIcon = socialLinks.find((item) => item.label === 'Medium')?.Icon;
 const LinkedInIcon = socialLinks.find((item) => item.label === 'LinkedIn')?.Icon;
 const TwitterIcon = socialLinks.find((item) => item.label === 'Twitter')?.Icon;
 
-const FooterSection = () => (
+const FooterSection = () => {
+  const [resumeUrl, setResumeUrl] = useState('');
+  const [isResumeAvailable, setIsResumeAvailable] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const resolveAssetUrl = (url = '') => {
+      const normalized = String(url || '').trim();
+      if (!normalized) return '';
+      if (/^https?:\/\//i.test(normalized)) return normalized;
+      return buildAdminUrl(normalized.startsWith('/') ? normalized : `/${normalized}`);
+    };
+
+    const loadResumeAsset = async () => {
+      try {
+        const response = await fetch(buildAdminUrl(ADMIN_ROUTES.resumeAsset));
+        if (response.status === 404) {
+          if (!isMounted) return;
+          setResumeUrl('');
+          setIsResumeAvailable(false);
+          return;
+        }
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+
+        if (!response.ok) {
+          if (!isMounted) return;
+          setResumeUrl('');
+          setIsResumeAvailable(false);
+          return;
+        }
+
+        const resolvedUrl = resolveAssetUrl(data?.url);
+        if (!isMounted) return;
+        setResumeUrl(resolvedUrl);
+        setIsResumeAvailable(Boolean(resolvedUrl));
+      } catch {
+        if (!isMounted) return;
+        setResumeUrl('');
+        setIsResumeAvailable(false);
+      }
+    };
+
+    loadResumeAsset();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return (
   <footer className="footer-root">
     <Container>
       <Row className="gy-5">
@@ -61,9 +118,15 @@ const FooterSection = () => (
           <h6 className="footer-heading">Resources</h6>
           <ul className="footer-links">
             <li>
-              <a href={resumePdf} download className="footer-link">
-                <FaDownload className="footer-link-icon" /> Download Resume
-              </a>
+              {isResumeAvailable ? (
+                <a href={resumeUrl} target="_blank" rel="noopener noreferrer" className="footer-link">
+                  <FaDownload className="footer-link-icon" /> Download Resume
+                </a>
+              ) : (
+                <span className="footer-link footer-link-disabled" aria-disabled="true">
+                  <FaDownload className="footer-link-icon" /> Resume not Available
+                </span>
+              )}
             </li>
             <li>
               <a href="https://github.com/mobadara" target="_blank" rel="noopener noreferrer" className="footer-link">
@@ -142,6 +205,7 @@ const FooterSection = () => (
       </div>
     </Container>
   </footer>
-);
+  );
+};
 
 export default FooterSection;

@@ -1,16 +1,80 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Modal from 'react-bootstrap/Modal';
-import { Link } from 'react-router-dom';
 import GithubActivity from './GithubActivity';
 import './AboutSection.css';
-import portrait from '../assets/portrait.png';
+import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 
 
 const AboutSection = ({ theme }) => {
   const [showGithubModal, setShowGithubModal] = useState(false);
+  const [resumeAssetUrl, setResumeAssetUrl] = useState('');
+  const [portraitSrc, setPortraitSrc] = useState('');
+  const [isResumeMissing, setIsResumeMissing] = useState(false);
+  const [isPortraitMissing, setIsPortraitMissing] = useState(false);
+
+  const toAbsoluteAssetUrl = (url = '') => {
+    const normalized = String(url || '').trim();
+    if (!normalized) return '';
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    return buildAdminUrl(normalized.startsWith('/') ? normalized : `/${normalized}`);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchAsset = async (endpoint) => {
+      const response = await fetch(buildAdminUrl(endpoint));
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (response.status === 404) {
+        return { missing: true, url: '' };
+      }
+
+      if (!response.ok) {
+        return { missing: true, url: '' };
+      }
+
+      const resolvedUrl = toAbsoluteAssetUrl(data?.url);
+      return { missing: !resolvedUrl, url: resolvedUrl };
+    };
+
+    const loadAssets = async () => {
+      try {
+        const [resumeAsset, portraitAsset] = await Promise.all([
+          fetchAsset(ADMIN_ROUTES.resumeAsset),
+          fetchAsset(ADMIN_ROUTES.portraitAsset)
+        ]);
+
+        if (!isMounted) return;
+
+        setResumeAssetUrl(resumeAsset.url);
+        setIsResumeMissing(resumeAsset.missing);
+        setPortraitSrc(portraitAsset.url);
+        setIsPortraitMissing(portraitAsset.missing);
+      } catch {
+        if (!isMounted) return;
+        setResumeAssetUrl('');
+        setIsResumeMissing(true);
+        setPortraitSrc('');
+        setIsPortraitMissing(true);
+      }
+    };
+
+    loadAssets();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <section id="about" className="py-5 section-padding" style={{ backgroundColor: 'var(--body-bg)' }}>
@@ -21,11 +85,22 @@ const AboutSection = ({ theme }) => {
           <Col lg={5} className="d-flex justify-content-center">
             <div className="profile-card animate-slide-in-left">
               <div className="profile-image-wrapper">
-                <img
-                  src={portrait}
-                  alt="Muyiwa J. Obadara Portrait"
-                  className="profile-image"
-                />
+                {portraitSrc && !isPortraitMissing ? (
+                  <img
+                    src={portraitSrc}
+                    alt="Muyiwa J. Obadara Portrait"
+                    className="profile-image"
+                    onError={() => {
+                      setPortraitSrc('');
+                      setIsPortraitMissing(true);
+                    }}
+                  />
+                ) : (
+                  <div className="profile-image d-flex flex-column align-items-center justify-content-center text-white text-center px-3">
+                    <i className="bi bi-image fs-1 mb-2"></i>
+                    <span className="fw-semibold">Portrait not uploaded</span>
+                  </div>
+                )}
                 <div className="profile-image-overlay"></div>
               </div>
             </div>
@@ -85,13 +160,22 @@ const AboutSection = ({ theme }) => {
 
               {/* Action Buttons */}
               <div className="action-buttons">
-                <Link 
-                  to="/resume"
-                  className="btn btn-primary btn-download"
-                >
-                  <i className="bi bi-file-earmark-text me-2"></i>
-                  View Resume
-                </Link>
+                {resumeAssetUrl && !isResumeMissing ? (
+                  <a
+                    href={resumeAssetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-primary btn-download"
+                  >
+                    <i className="bi bi-file-earmark-text me-2"></i>
+                    View Resume
+                  </a>
+                ) : (
+                  <button type="button" className="btn btn-secondary btn-download" disabled>
+                    <i className="bi bi-file-earmark-x me-2"></i>
+                    Resume not uploaded
+                  </button>
+                )}
                 
                 <button 
                   className="btn btn-outline-primary btn-github-activity"
