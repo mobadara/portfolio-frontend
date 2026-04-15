@@ -3,6 +3,7 @@ import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Modal from 'react-bootstrap/Modal';
+import { Link } from 'react-router-dom';
 import GithubActivity from './GithubActivity';
 import './AboutSection.css';
 import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
@@ -10,9 +11,7 @@ import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 
 const AboutSection = ({ theme }) => {
   const [showGithubModal, setShowGithubModal] = useState(false);
-  const [resumeAssetUrl, setResumeAssetUrl] = useState('');
   const [portraitSrc, setPortraitSrc] = useState('');
-  const [isResumeMissing, setIsResumeMissing] = useState(false);
   const [isPortraitMissing, setIsPortraitMissing] = useState(false);
 
   const toAbsoluteAssetUrl = (url = '') => {
@@ -49,21 +48,14 @@ const AboutSection = ({ theme }) => {
 
     const loadAssets = async () => {
       try {
-        const [resumeAsset, portraitAsset] = await Promise.all([
-          fetchAsset(ADMIN_ROUTES.resumeAsset),
-          fetchAsset(ADMIN_ROUTES.portraitAsset)
-        ]);
+        const portraitAsset = await fetchAsset(ADMIN_ROUTES.portraitAsset);
 
         if (!isMounted) return;
 
-        setResumeAssetUrl(resumeAsset.url);
-        setIsResumeMissing(resumeAsset.missing);
         setPortraitSrc(portraitAsset.url);
         setIsPortraitMissing(portraitAsset.missing);
       } catch {
         if (!isMounted) return;
-        setResumeAssetUrl('');
-        setIsResumeMissing(true);
         setPortraitSrc('');
         setIsPortraitMissing(true);
       }
@@ -160,22 +152,10 @@ const AboutSection = ({ theme }) => {
 
               {/* Action Buttons */}
               <div className="action-buttons">
-                {resumeAssetUrl && !isResumeMissing ? (
-                  <a
-                    href={resumeAssetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-primary btn-download"
-                  >
-                    <i className="bi bi-file-earmark-text me-2"></i>
-                    View Resume
-                  </a>
-                ) : (
-                  <button type="button" className="btn btn-secondary btn-download" disabled>
-                    <i className="bi bi-file-earmark-x me-2"></i>
-                    Resume not uploaded
-                  </button>
-                )}
+                <Link to="/resume" className="btn btn-primary btn-download">
+                  <i className="bi bi-file-earmark-text me-2"></i>
+                  View Resume
+                </Link>
                 
                 <button 
                   className="btn btn-outline-primary btn-github-activity"

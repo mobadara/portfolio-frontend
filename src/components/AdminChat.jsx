@@ -31,8 +31,9 @@ import Modal from 'react-bootstrap/Modal';
     const [isRecording, setIsRecording] = useState(false)
     const [isDeletingSession, setIsDeletingSession] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [recordingTime, setRecordingTime] = useState(0);
-    const webSocketRef = useRef(null);
+    const [recordingTime, setRecordingTime] = useState(0);  const [deletingMessageId, setDeletingMessageId] = useState(null);
+  const [showDeleteMessageModal, setShowDeleteMessageModal] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState(null);    const webSocketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const reconnectTimerRef = useRef(null);
     const pingTimerRef = useRef(null);
@@ -641,6 +642,31 @@ import Modal from 'react-bootstrap/Modal';
       }
     };
 
+    const handleDeleteMessageClick = (message) => {
+      setMessageToDelete(message);
+      setShowDeleteMessageModal(true);
+    };
+
+    const handleConfirmDeleteMessage = async () => {
+      if (!messageToDelete || deletingMessageId) return;
+
+      setDeletingMessageId(messageToDelete.id);
+      
+      try {
+        // Remove message from UI optimistically
+        setMessages((prev) => prev.filter((msg) => msg.id !== messageToDelete.id));
+        setShowDeleteMessageModal(false);
+        setMessageToDelete(null);
+      } catch (err) {
+        console.error('Error deleting message:', err);
+        setError('Failed to delete message');
+        // Re-add the message if deletion failed
+        setMessages((prev) => [...prev, messageToDelete]);
+      } finally {
+        setDeletingMessageId(null);
+      }
+    };
+
     return (
       <div className="admin-chat-container">
         <Card className="h-100 border-0 d-flex flex-column my-chat-card">
@@ -708,6 +734,56 @@ import Modal from 'react-bootstrap/Modal';
                       </Button>
                     </Modal.Footer>
                   </Modal>
+                  <Modal show={showDeleteMessageModal} onHide={() => setShowDeleteMessageModal(false)} centered>
+                    <Modal.Header closeButton>
+                      <Modal.Title className="d-flex align-items-center gap-2">
+                        <BiTrash size={20} className="text-danger" />
+                        Delete Message
+                      </Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                      <p className="mb-3">Are you sure you want to delete this message?</p>
+                      {messageToDelete && (
+                        <div className="p-3 rounded bg-light border-start border-4 border-warning">
+                          <small className="text-muted d-block mb-2">Message preview:</small>
+                          <div className="my-chat-markdown">
+                            <ReactMarkdown>
+                              {messageToDelete.content || '(empty)'}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      )}
+                      <p className="mb-0 mt-3 text-muted">
+                        <small>This action cannot be undone.</small>
+                      </p>
+                    </Modal.Body>
+                    <Modal.Footer>
+                      <Button 
+                        variant="secondary" 
+                        onClick={() => setShowDeleteMessageModal(false)} 
+                        disabled={deletingMessageId}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        variant="danger" 
+                        onClick={handleConfirmDeleteMessage} 
+                        disabled={deletingMessageId}
+                      >
+                        {deletingMessageId ? (
+                          <>
+                            <Spinner animation="border" size="sm" className="me-2" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <BiTrash className="me-1" />
+                            Delete Message
+                          </>
+                        )}
+                      </Button>
+                    </Modal.Footer>
+                  </Modal>
                 </>
               )}
             </div>
@@ -735,11 +811,11 @@ import Modal from 'react-bootstrap/Modal';
               messages.map((msg) => (
                 <div 
                   key={msg.id} 
-                  className={`d-flex mb-2 align-items-center ${msg.sender === 'admin' ? 'justify-content-end' : 'justify-content-start'}`}
+                  className={`d-flex mb-3 align-items-end ${msg.sender === 'admin' ? 'justify-content-end' : 'justify-content-start'}`}
                 >
                   {/* Message bubble */}
                   <div 
-                    className={`p-2 px-3 rounded-3 my-message-bubble ${
+                    className={`p-3 rounded-3 my-message-bubble ${
                       msg.sender === 'admin'
                         ? 'my-message-admin rounded-bottom-end-0'
                         : 'my-message-user rounded-bottom-start-0'
@@ -788,23 +864,36 @@ import Modal from 'react-bootstrap/Modal';
                       </small>
                     )}
                   </div>
-                  {/* Copy icon, only for text messages */}
-                  {msg.type === 'text' && msg.content && (
-                    <button
-                      className="btn btn-sm btn-light my-copy-btn ms-2"
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'none', boxShadow: 'none' }}
-                      title="Copy message"
-                      aria-label="Copy message"
-                      onClick={() => {
-                        navigator.clipboard.writeText(msg.content);
-                      }}
-                    >
-                      {/* WhatsApp style copy icon (Material Design) */}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                      </svg>
-                    </button>
-                  )}
+                  
+                  {/* Action buttons group */}
+                  <div className="d-flex gap-1 ms-2 align-items-center">
+                    {/* Copy icon, only for text messages */}
+                    {msg.type === 'text' && msg.content && (
+                      <button
+                        className="btn btn-sm my-copy-btn"
+                        title="Copy message"
+                        aria-label="Copy message"
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.content);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                      </button>
+                    )}
+                    {/* Delete button - only for admin messages */}
+                    {msg.sender === 'admin' && (
+                      <button
+                        className="btn btn-sm my-delete-msg-btn"
+                        title="Delete message"
+                        aria-label="Delete message"
+                        onClick={() => handleDeleteMessageClick(msg)}
+                      >
+                        <BiTrash size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}

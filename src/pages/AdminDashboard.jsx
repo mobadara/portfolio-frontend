@@ -115,6 +115,8 @@ function AdminDashboard() {
   const [assetVersion, setAssetVersion] = useState({ resume: 0, portrait: 0 });
   const [assetLinks, setAssetLinks] = useState({ resume: '', portrait: '' });
   const [assetMissing, setAssetMissing] = useState({ resume: false, portrait: false });
+  const [uploadProgress, setUploadProgress] = useState({ resume: 0, portrait: 0 });
+  const [showResumePreview, setShowResumePreview] = useState(false);
 
   const currentRole = String(authUser?.role || 'assistant').toLowerCase();
   const isAdminRole = currentRole === 'admin';
@@ -560,39 +562,78 @@ function AdminDashboard() {
 
     setError('');
     setSuccess('');
+    setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
     setIsUploadingAssets((prev) => ({ ...prev, [kind]: true }));
 
     try {
-      const response = await fetch(buildAdminUrl(endpoint), {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setUploadProgress((prev) => ({ ...prev, [kind]: Math.round(percentComplete) }));
+        }
       });
 
-      let data = null;
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
+      // Handle completion
+      xhr.addEventListener('load', async () => {
+        try {
+          let data = null;
+          try {
+            data = JSON.parse(xhr.responseText);
+          } catch {
+            data = null;
+          }
+
+          if (xhr.status >= 400) {
+            throw new Error(data?.detail || data?.message || `Failed to upload ${kind}.`);
+          }
+
+          const now = Date.now();
+          setAssetVersion((prev) => ({ ...prev, [kind]: now }));
+          const uploadedUrl = toAbsoluteAssetUrl(data?.url);
+          if (uploadedUrl) {
+            setAssetLinks((prev) => ({ ...prev, [kind]: withVersion(uploadedUrl, now) }));
+            setAssetMissing((prev) => ({ ...prev, [kind]: false }));
+          }
+          setAssetFiles((prev) => ({ ...prev, [kind]: null }));
+          setSuccess(data?.message || `${kind[0].toUpperCase()}${kind.slice(1)} uploaded successfully.`);
+          setShowToast(true);
+          setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+        } catch (err) {
+          setError(err.message || `Unable to upload ${kind}.`);
+          setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+        } finally {
+          setIsUploadingAssets((prev) => ({ ...prev, [kind]: false }));
+        }
+      });
+
+      // Handle error
+      xhr.addEventListener('error', () => {
+        setError(`Network error while uploading ${kind}.`);
+        setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+        setIsUploadingAssets((prev) => ({ ...prev, [kind]: false }));
+      });
+
+      // Handle abort
+      xhr.addEventListener('abort', () => {
+        setError(`Upload of ${kind} was cancelled.`);
+        setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+        setIsUploadingAssets((prev) => ({ ...prev, [kind]: false }));
+      });
+
+      // Open connection and set headers
+      xhr.open('POST', buildAdminUrl(endpoint));
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
 
-      if (!response.ok) {
-        throw new Error(data?.detail || data?.message || `Failed to upload ${kind}.`);
-      }
-
-      const now = Date.now();
-      setAssetVersion((prev) => ({ ...prev, [kind]: now }));
-      const uploadedUrl = toAbsoluteAssetUrl(data?.url);
-      if (uploadedUrl) {
-        setAssetLinks((prev) => ({ ...prev, [kind]: withVersion(uploadedUrl, now) }));
-        setAssetMissing((prev) => ({ ...prev, [kind]: false }));
-      }
-      setAssetFiles((prev) => ({ ...prev, [kind]: null }));
-      setSuccess(data?.message || `${kind[0].toUpperCase()}${kind.slice(1)} uploaded successfully.`);
-      setShowToast(true);
+      // Send
+      xhr.send(formData);
     } catch (err) {
       setError(err.message || `Unable to upload ${kind}.`);
-    } finally {
+      setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
       setIsUploadingAssets((prev) => ({ ...prev, [kind]: false }));
     }
   };
@@ -755,107 +796,239 @@ function AdminDashboard() {
             {error && <Alert variant="danger">{error}</Alert>}
             {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
 
-            {isAdminRole && (
-              <Card className="border-danger-subtle bg-danger-subtle mb-3">
-                <Card.Body className="p-3">
-                  <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
-                    <div>
-                      <h6 className="mb-1 text-danger fw-bold">Danger Zone</h6>
-                      <p className="mb-0 small text-danger-emphasis">These actions permanently delete data and require your admin password.</p>
-                    </div>
-                    <div className="d-flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('sessions')}>
-                        Delete All Chat Sessions
-                      </Button>
-                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('messages')}>
-                        Delete All Messages
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => openDangerModal('projects')}>
-                        Delete All Projects
-                      </Button>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            )}
-
             {canManageUsersAndProjects && (
               <Card className="border-0 admin-panel-card mb-3">
                 <Card.Body className="p-3">
                   <div className="d-flex align-items-center justify-content-between mb-3">
-                    <h6 className="mb-0 fw-bold">Resume & Portrait Assets</h6>
-                    <small className="text-muted">Upload latest files used on public pages</small>
+                    <h5 className="mb-0 fw-bold d-flex align-items-center gap-2">
+                      <BiFile /> Asset Management
+                    </h5>
+                    <small className="text-muted">Upload and manage your resume and portrait</small>
                   </div>
 
-                  <Row className="g-3">
-                    <Col xs={12} lg={6}>
-                      <Card className="h-100 border">
-                        <Card.Body>
-                          <h6 className="d-flex align-items-center gap-2 mb-2"><BiFile /> Resume (PDF)</h6>
-                          <div className="mb-2">
+                  <Row className="g-4 align-items-stretch">
+                    <Col xs={12} lg={6} className="d-flex">
+                      <Card className="h-100 border-0 shadow-sm flex-fill" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+                        <Card.Header className="bg-light border-0 py-3 px-4">
+                          <h6 className="mb-0 fw-bold d-flex align-items-center gap-2">
+                            <BiFile size={20} style={{ color: '#0d6efd' }} />
+                            Resume (PDF/DOC)
+                          </h6>
+                        </Card.Header>
+                        <Card.Body className="p-4">
+                          {/* Resume Preview */}
+                          {assetLinks.resume && !assetMissing.resume && (
+                            <div className="mb-3">
+                              <div className="d-flex align-items-center justify-content-between mb-2">
+                                <small className="fw-semibold text-muted">Preview</small>
+                                <button
+                                  className="btn btn-sm btn-link p-0"
+                                  onClick={() => setShowResumePreview(!showResumePreview)}
+                                >
+                                  {showResumePreview ? 'Hide' : 'Show'}
+                                </button>
+                              </div>
+                              {showResumePreview && (
+                                <iframe
+                                  src={assetLinks.resume}
+                                  title="Resume Preview"
+                                  style={{
+                                    width: '100%',
+                                    height: '300px',
+                                    border: '1px solid #e9ecef',
+                                    borderRadius: '8px'
+                                  }}
+                                />
+                              )}
+                            </div>
+                          )}
+
+                          {/* Status Badge */}
+                          <div className="mb-3">
                             {assetLinks.resume && !assetMissing.resume ? (
-                              <a href={assetLinks.resume} target="_blank" rel="noreferrer" className="small">
-                                Open current resume
-                              </a>
+                              <div className="d-flex align-items-center gap-2">
+                                <Badge bg="success" className="fw-semibold">✓ Uploaded</Badge>
+                                <a href={assetLinks.resume} target="_blank" rel="noreferrer" className="small fw-bold text-decoration-none ms-2">
+                                  Download
+                                </a>
+                              </div>
                             ) : (
-                              <span className="small text-muted">Resume not uploaded yet</span>
+                              <Badge bg="secondary" className="fw-semibold">Not uploaded</Badge>
                             )}
                           </div>
-                          <Form.Group className="mb-2">
-                            <Form.Control
-                              type="file"
-                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                              onChange={(event) => handleAssetFileChange('resume', event.target.files?.[0])}
-                            />
-                          </Form.Group>
+
+                          {/* File Selection */}
+                          <div className="mb-3">
+                            {assetFiles.resume && (
+                              <small className="text-muted d-block mb-2">
+                                Selected: <strong>{assetFiles.resume.name}</strong> ({(assetFiles.resume.size / 1024 / 1024).toFixed(2)} MB)
+                              </small>
+                            )}
+                            <Form.Group>
+                              <Form.Label className="fw-semibold mb-2">Choose File</Form.Label>
+                              <div className="admin-file-upload-wrapper">
+                                <input
+                                  type="file"
+                                  id="resume-file-input"
+                                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                  onChange={(event) => handleAssetFileChange('resume', event.target.files?.[0])}
+                                  className="admin-file-input"
+                                />
+                                <label htmlFor="resume-file-input" className="admin-file-upload-label">
+                                  <div className="d-flex flex-column align-items-center gap-2">
+                                    <BiFile size={32} />
+                                    <span className="fw-semibold">Click to browse</span>
+                                    <span className="small text-muted">or drag and drop</span>
+                                  </div>
+                                </label>
+                              </div>
+                            </Form.Group>
+                          </div>
+
+                          {/* Progress Bar */}
+                          {uploadProgress.resume > 0 && (
+                            <div className="mb-3">
+                              <small className="d-flex justify-content-between mb-1">
+                                <span>Uploading...</span>
+                                <span className="fw-bold">{uploadProgress.resume}%</span>
+                              </small>
+                              <div className="progress" style={{ height: '6px', borderRadius: '10px' }}>
+                                <div
+                                  className="progress-bar"
+                                  role="progressbar"
+                                  style={{
+                                    width: `${uploadProgress.resume}%`,
+                                    background: 'linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%)',
+                                    transition: 'width 0.3s ease'
+                                  }}
+                                  aria-valuenow={uploadProgress.resume}
+                                  aria-valuemin="0"
+                                  aria-valuemax="100"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Upload Button */}
                           <Button
-                            size="sm"
                             variant="primary"
                             onClick={() => handleUploadAsset('resume')}
                             disabled={isUploadingAssets.resume || !assetFiles.resume}
+                            className="w-100"
+                            style={{ borderRadius: '10px' }}
                           >
-                            {isUploadingAssets.resume ? <Spinner animation="border" size="sm" /> : 'Upload Resume'}
+                            {isUploadingAssets.resume ? (
+                              <>
+                                <Spinner animation="border" size="sm" className="me-2" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <BiPlus className="me-2" />
+                                Upload Resume
+                              </>
+                            )}
                           </Button>
                         </Card.Body>
                       </Card>
                     </Col>
 
-                    <Col xs={12} lg={6}>
-                      <Card className="h-100 border">
-                        <Card.Body>
-                          <h6 className="d-flex align-items-center gap-2 mb-2"><BiImage /> Portrait (Image)</h6>
-                          <div className="mb-2">
-                            {assetLinks.portrait && !assetMissing.portrait ? (
-                              <a href={assetLinks.portrait} target="_blank" rel="noreferrer" className="small">
-                                Open current portrait
-                              </a>
-                            ) : (
-                              <span className="small text-muted">Portrait not uploaded yet</span>
-                            )}
-                          </div>
-                          <div className="admin-portrait-preview-wrap mb-2">
-                            {assetLinks.portrait && !assetMissing.portrait ? (
+                    <Col xs={12} lg={6} className="d-flex">
+                      <Card className="h-100 border-0 shadow-sm flex-fill" style={{ borderRadius: '12px', overflow: 'hidden' }}>
+                        <Card.Header className="bg-light border-0 py-3 px-4">
+                          <h6 className="mb-0 fw-bold d-flex align-items-center gap-2">
+                            <BiImage size={20} style={{ color: '#0d6efd' }} />
+                            Portrait (Image)
+                          </h6>
+                        </Card.Header>
+                        <Card.Body className="p-4">
+                          {/* Portrait Preview */}
+                          {assetLinks.portrait && !assetMissing.portrait && (
+                            <div className="admin-portrait-preview-wrap mb-3 border-0 shadow-sm" style={{ borderRadius: '12px' }}>
                               <img src={assetLinks.portrait} alt="Current portrait" className="admin-portrait-preview" />
+                            </div>
+                          )}
+
+                          {/* Status Badge */}
+                          <div className="mb-3">
+                            {assetLinks.portrait && !assetMissing.portrait ? (
+                              <Badge bg="success" className="fw-semibold">✓ Uploaded</Badge>
                             ) : (
-                              <div className="admin-portrait-preview d-flex align-items-center justify-content-center text-muted text-center px-2">
-                                Portrait not uploaded
-                              </div>
+                              <Badge bg="secondary" className="fw-semibold">Not uploaded</Badge>
                             )}
                           </div>
-                          <Form.Group className="mb-2">
-                            <Form.Control
-                              type="file"
-                              accept="image/*"
-                              onChange={(event) => handleAssetFileChange('portrait', event.target.files?.[0])}
-                            />
-                          </Form.Group>
+
+                          {/* File Selection */}
+                          <div className="mb-3">
+                            {assetFiles.portrait && (
+                              <small className="text-muted d-block mb-2">
+                                Selected: <strong>{assetFiles.portrait.name}</strong> ({(assetFiles.portrait.size / 1024 / 1024).toFixed(2)} MB)
+                              </small>
+                            )}
+                            <Form.Group>
+                              <Form.Label className="fw-semibold mb-2">Choose Image</Form.Label>
+                              <div className="admin-file-upload-wrapper">
+                                <input
+                                  type="file"
+                                  id="portrait-file-input"
+                                  accept="image/*"
+                                  onChange={(event) => handleAssetFileChange('portrait', event.target.files?.[0])}
+                                  className="admin-file-input"
+                                />
+                                <label htmlFor="portrait-file-input" className="admin-file-upload-label">
+                                  <div className="d-flex flex-column align-items-center gap-2">
+                                    <BiImage size={32} />
+                                    <span className="fw-semibold">Click to browse</span>
+                                    <span className="small text-muted">or drag and drop</span>
+                                  </div>
+                                </label>
+                              </div>
+                            </Form.Group>
+                          </div>
+
+                          {/* Progress Bar */}
+                          {uploadProgress.portrait > 0 && (
+                            <div className="mb-3">
+                              <small className="d-flex justify-content-between mb-1">
+                                <span>Uploading...</span>
+                                <span className="fw-bold">{uploadProgress.portrait}%</span>
+                              </small>
+                              <div className="progress" style={{ height: '6px', borderRadius: '10px' }}>
+                                <div
+                                  className="progress-bar"
+                                  role="progressbar"
+                                  style={{
+                                    width: `${uploadProgress.portrait}%`,
+                                    background: 'linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%)',
+                                    transition: 'width 0.3s ease'
+                                  }}
+                                  aria-valuenow={uploadProgress.portrait}
+                                  aria-valuemin="0"
+                                  aria-valuemax="100"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Upload Button */}
                           <Button
-                            size="sm"
                             variant="primary"
                             onClick={() => handleUploadAsset('portrait')}
                             disabled={isUploadingAssets.portrait || !assetFiles.portrait}
+                            className="w-100"
+                            style={{ borderRadius: '10px' }}
                           >
-                            {isUploadingAssets.portrait ? <Spinner animation="border" size="sm" /> : 'Upload Portrait'}
+                            {isUploadingAssets.portrait ? (
+                              <>
+                                <Spinner animation="border" size="sm" className="me-2" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <BiPlus className="me-2" />
+                                Upload Portrait
+                              </>
+                            )}
                           </Button>
                         </Card.Body>
                       </Card>
@@ -952,6 +1125,30 @@ function AdminDashboard() {
                 </Tab.Container>
               </Card.Body>
             </Card>
+
+            {isAdminRole && (
+              <Card className="border-danger-subtle bg-danger-subtle mt-3">
+                <Card.Body className="p-3">
+                  <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+                    <div>
+                      <h6 className="mb-1 text-danger fw-bold">Danger Zone</h6>
+                      <p className="mb-0 small text-danger-emphasis">These actions permanently delete data and require your admin password.</p>
+                    </div>
+                    <div className="d-flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('sessions')}>
+                        Delete All Chat Sessions
+                      </Button>
+                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('messages')}>
+                        Delete All Messages
+                      </Button>
+                      <Button size="sm" variant="danger" onClick={() => openDangerModal('projects')}>
+                        Delete All Projects
+                      </Button>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
           </Card.Body>
         </Card>
       </Container>

@@ -1,6 +1,6 @@
 .admin-dashboard-page {
   min-height: 100vh;
-  background: #ece5dd;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef8 100%);
   padding-bottom: 1rem;
 }
 
@@ -9,34 +9,48 @@
 }
 
 .admin-dashboard-shell {
-  background: linear-gradient(135deg, #e8eef8 0%, #f8fafc 100%) !important;
-  border-radius: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 .admin-shell-title {
   color: #0f172a;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 .admin-shell-subtitle {
-  color: #334155;
+  color: #475569;
+  font-weight: 500;
 }
 
 .admin-dash-title {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 .admin-dash-actions .btn {
-  border-radius: 8px;
+  border-radius: 10px;
   color: #fff;
-  background: #0d6efd;
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
   border: none;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.admin-dash-actions .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(13, 110, 253, 0.4);
 }
 
 /* Theme toggler button fix */
 .admin-dash-actions .btn.theme-toggle-btn {
   background: #fff;
   color: #0d6efd;
-  border: 1px solid #0d6efd;
+  border: 2px solid #0d6efd;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
 }
 
 /* Light mode fixes */
@@ -53,17 +67,39 @@
   border: none;
 }
 .admin-panel-card {
-  border-radius: 12px;
+  border-radius: 16px;
   background: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0 !important;
 }
 
 .metric-card {
-  border-radius: 10px;
-  background: #f7f8fa;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+  border: 1px solid #e9ecef !important;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(13, 110, 253, 0.15);
+  border-color: #0d6efd !important;
+}
+
+.metric-card h4 {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1.8rem;
+}
+
+.metric-card small {
+  font-weight: 600;
+  color: #64748b;
 }
 
 .metric-icon {
-  font-size: 1.35rem;
+  font-size: 2rem;
   color: #0d6efd;
 }
 
@@ -73,29 +109,47 @@
 }
 
 .admin-search-group .form-control {
-  padding-left: 2.15rem;
-  border-radius: 9px;
+  padding-left: 2.5rem;
+  border-radius: 12px;
   min-height: 40px;
+  border: 2px solid #e9ecef;
+  background: #f8f9fa;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.admin-search-group .form-control:focus {
+  border-color: #0d6efd;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
 }
 
 .admin-search-icon {
   position: absolute;
-  left: 0.7rem;
+  left: 0.9rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #667781;
+  color: #94a3b8;
+  font-size: 1.1rem;
 }
 
 .admin-tabs .nav-link {
-  border-radius: 999px;
-  color: #334155;
-  font-weight: 600;
-  padding: 0.32rem 0.8rem;
+  border-radius: 12px;
+  color: #64748b;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  transition: all 0.3s ease;
+}
+
+.admin-tabs .nav-link:hover {
+  color: #0d6efd;
+  background: rgba(13, 110, 253, 0.08);
 }
 
 .admin-tabs .nav-link.active {
-  background: #0d6efd;
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
 }
 
 .admin-table thead th {
@@ -117,9 +171,10 @@
 .admin-portrait-preview-wrap {
   width: 100%;
   max-width: 160px;
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid #dee2e6;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .admin-portrait-preview {
@@ -129,43 +184,90 @@
   display: block;
 }
 
+/* Asset management card styling */
+.admin-dashboard-page .card-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%) !important;
+  border-bottom: 2px solid #e9ecef !important;
+}
+
+[data-bs-theme='dark'] .admin-dashboard-page .card-header {
+  background: linear-gradient(135deg, #202c33 0%, #1a2332 100%) !important;
+  border-bottom-color: #2a3942 !important;
+}
+
 .admin-dash-loading {
   min-height: 100vh;
   background: #111b21;
 }
 
 [data-bs-theme='dark'] .admin-dashboard-page {
-  background: #0b141a;
+  background: linear-gradient(135deg, #0b141a 0%, #111b21 100%);
 }
 
 [data-bs-theme='dark'] .admin-dashboard-shell {
-  background: linear-gradient(135deg, #111b21 0%, #1f2c34 100%) !important;
+  background: linear-gradient(135deg, #111b21 0%, #1a2332 100%) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 [data-bs-theme='dark'] .admin-dash-actions .btn.theme-toggle-btn {
   background: #202c33;
   color: #0d6efd;
-  border: 1px solid #0d6efd;
-}
+  border: 2px solid #0d6efd;
 }
 
 [data-bs-theme='dark'] .admin-shell-title {
-  color: #f8fafc;
+  color: #f0f2f5;
+  font-weight: 700;
 }
 
 [data-bs-theme='dark'] .admin-shell-subtitle {
-  color: #cbd5e1;
+  color: #b0bcc4;
+  font-weight: 500;
 }
 
 [data-bs-theme='dark'] .admin-panel-card,
 [data-bs-theme='dark'] .admin-mobile-card {
   background: #111b21 !important;
   color: #e9edef;
+  border-color: #2a3942 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 [data-bs-theme='dark'] .metric-card {
-  background: #202c33;
+  background: linear-gradient(135deg, #202c33 0%, #1a2332 100%);
   color: #e9edef;
+  border-color: #2a3942 !important;
+}
+
+[data-bs-theme='dark'] .metric-card h4 {
+  color: #f8fafc;
+}
+
+[data-bs-theme='dark'] .metric-card small {
+  color: #96a6b2;
+}
+
+[data-bs-theme='dark'] .admin-portrait-preview-wrap {
+  border-color: #2a3942;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-bs-theme='dark'] .admin-file-upload-label {
+  background: #202c33;
+  border-color: #2a3942;
+  color: #96a6b2;
+}
+
+[data-bs-theme='dark'] .admin-file-upload-label:hover {
+  border-color: #0d6efd;
+  background: rgba(13, 110, 253, 0.1);
+  color: #0d6efd;
+}
+
+[data-bs-theme='dark'] .admin-file-input:focus + .admin-file-upload-label {
+  border-color: #0d6efd;
+  background: rgba(13, 110, 253, 0.1);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
 }
 
 [data-bs-theme='dark'] .admin-portrait-preview-wrap {
@@ -180,12 +282,18 @@
 }
 
 [data-bs-theme='dark'] .admin-tabs .nav-link {
-  color: #d1d7db;
+  color: #b0bcc4;
+}
+
+[data-bs-theme='dark'] .admin-tabs .nav-link:hover {
+  color: #0d6efd;
+  background: rgba(13, 110, 253, 0.12);
 }
 
 [data-bs-theme='dark'] .admin-tabs .nav-link.active {
-  background: #0d6efd;
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
   color: #fff;
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
 }
 
 [data-bs-theme='dark'] .admin-search-group .form-control {
@@ -216,4 +324,69 @@
   .admin-dashboard-shell {
     border-radius: 12px;
   }
+}
+
+/* Modern File Upload Styling */
+.admin-file-input {
+  display: none;
+}
+
+.admin-file-upload-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.admin-file-upload-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 2rem 1rem;
+  border: 2px dashed #e9ecef;
+  border-radius: 12px;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.admin-file-upload-label:hover {
+  border-color: #0d6efd;
+  background: #f0f4ff;
+  color: #0d6efd;
+}
+
+.admin-file-input:focus + .admin-file-upload-label {
+  border-color: #0d6efd;
+  background: #f0f4ff;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+}
+
+[data-bs-theme='dark'] .admin-file-upload-label {
+  background: #202c33;
+  border-color: #2a3942;
+  color: #96a6b2;
+}
+
+[data-bs-theme='dark'] .admin-file-upload-label:hover {
+  border-color: #0d6efd;
+  background: rgba(13, 110, 253, 0.1);
+  color: #0d6efd;
+}
+
+[data-bs-theme='dark'] .admin-file-input:focus + .admin-file-upload-label {
+  border-color: #0d6efd;
+  background: rgba(13, 110, 253, 0.1);
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.2);
+}
+
+/* Progress Bar */
+.progress {
+  background-color: #e9ecef;
+}
+
+[data-bs-theme='dark'] .progress {
+  background-color: #2a3942;
 }
