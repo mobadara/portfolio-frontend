@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import Modal from 'react-bootstrap/Modal';
-  import Card from 'react-bootstrap/Card';
-  import Button from 'react-bootstrap/Button';
-  import Form from 'react-bootstrap/Form';
-  import Spinner from 'react-bootstrap/Spinner';
-  import Alert from 'react-bootstrap/Alert';
-  import { BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
-  import ReactMarkdown from 'react-markdown';
-  import remarkMath from 'remark-math';
-  import rehypeKatex from 'rehype-katex';
-  import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
+import Card from 'react-bootstrap/Card';
+import Button from 'react-bootstrap/Button';
+import Form from 'react-bootstrap/Form';
+import Spinner from 'react-bootstrap/Spinner';
+import Alert from 'react-bootstrap/Alert';
+import Dropdown from 'react-bootstrap/Dropdown';
+import { BiArrowBack, BiMicrophone, BiSend, BiStopCircle, BiTrash, BiX } from 'react-icons/bi';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
 
   /**
    * AdminChat Component - Handles admin-to-user chat interface
@@ -18,7 +19,15 @@ import Modal from 'react-bootstrap/Modal';
    * @param {string} sessionId - The chat session ID to connect to
    * @param {function} onClose - Callback when admin closes the chat
    */
-  const AdminChat = ({ sessionId, onClose }) => {
+  const AdminChat = ({
+    sessionId,
+    onClose,
+    displayName = 'Anonymous',
+    statusLabel = 'Live support',
+    onOpenSessionsDrawer,
+    isMobileView = false,
+    onRefreshSession
+  }) => {
     const token = getStoredAdminToken();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
@@ -31,9 +40,13 @@ import Modal from 'react-bootstrap/Modal';
     const [isRecording, setIsRecording] = useState(false)
     const [isDeletingSession, setIsDeletingSession] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [recordingTime, setRecordingTime] = useState(0);  const [deletingMessageId, setDeletingMessageId] = useState(null);
-  const [showDeleteMessageModal, setShowDeleteMessageModal] = useState(false);
-  const [messageToDelete, setMessageToDelete] = useState(null);    const webSocketRef = useRef(null);
+    const [showClearModal, setShowClearModal] = useState(false);
+    const [isClearingChat, setIsClearingChat] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const [deletingMessageId, setDeletingMessageId] = useState(null);
+    const [showDeleteMessageModal, setShowDeleteMessageModal] = useState(false);
+    const [messageToDelete, setMessageToDelete] = useState(null);
+    const webSocketRef = useRef(null);
     const messagesEndRef = useRef(null);
     const reconnectTimerRef = useRef(null);
     const pingTimerRef = useRef(null);
@@ -246,6 +259,8 @@ import Modal from 'react-bootstrap/Modal';
           webSocketRef.current.close();
         }
       };
+    // `connectWebSocket` is intentionally defined in component scope and uses current refs/state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId, token]);
 
     const connectWebSocket = (wsConfig) => {
@@ -376,7 +391,7 @@ import Modal from 'react-bootstrap/Modal';
               ]);
               return;
             }
-          } catch (err) {
+          } catch {
             const rawContent = String(event?.data || '').trim();
             if (!rawContent || rawContent.startsWith('---')) {
               return;
@@ -642,6 +657,49 @@ import Modal from 'react-bootstrap/Modal';
       }
     };
 
+    const handleClearChat = async () => {
+      if (!sessionId || isClearingChat) return;
+
+      setIsClearingChat(true);
+      setError(null);
+
+      try {
+        if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
+          webSocketRef.current.send(JSON.stringify({
+            type: 'clear_chat',
+            session_id: sessionId,
+            timestamp: new Date().toISOString()
+          }));
+        }
+
+        const response = await fetch(buildAdminUrl(`/chat/${sessionId}/clear`), {
+          method: 'POST',
+          headers: withAuthHeaders(token)
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to clear chat.');
+        }
+
+        setMessages([]);
+        setSessionInfo((prev) => ({
+          ...(prev || {}),
+          human_mode: false,
+          cleared_by_user: true,
+          cleared_at: new Date().toISOString()
+        }));
+
+        setShowClearModal(false);
+        if (typeof onRefreshSession === 'function') {
+          onRefreshSession();
+        }
+      } catch (err) {
+        setError(err.message || 'Unable to clear chat.');
+      } finally {
+        setIsClearingChat(false);
+      }
+    };
+
     const handleDeleteMessageClick = (message) => {
       setMessageToDelete(message);
       setShowDeleteMessageModal(true);
@@ -673,26 +731,77 @@ import Modal from 'react-bootstrap/Modal';
           
           <div className="card-header my-chat-header d-flex align-items-center justify-content-between py-2 px-3">
             <div className="d-flex align-items-center gap-2">
+              {isMobileView && (
+                <button
+                  onClick={onClose}
+                  className="btn btn-sm my-close-btn p-0"
+                  aria-label="Back to sessions"
+                >
+                  <BiArrowBack size={22} />
+                </button>
+              )}
               <div className="my-chat-avatar">
-                <i className="bi bi-person-workspace" />
+                {(displayName || 'A').slice(0, 1).toUpperCase()}
               </div>
               <div>
-                <h6 className="mb-0 fw-semibold">Live Support</h6>
+                <h6 className="mb-0 fw-semibold text-truncate my-chat-title">{displayName}</h6>
                 <div className="d-flex align-items-center gap-2">
                   <small className="my-connection-text">
-                    {isConnected ? 'online' : isReconnecting ? 'reconnecting...' : 'disconnected'}
+                    {statusLabel} · {isConnected ? 'online' : isReconnecting ? 'reconnecting...' : 'offline'}
                   </small>
                   {isReconnecting && <span className="badge bg-warning text-dark">Reconnecting</span>}
                 </div>
               </div>
             </div>
-            <button 
-              onClick={onClose} 
-              className="btn btn-sm my-close-btn p-0"
-              aria-label="Close chat"
-            >
-              <BiX size={24} />
-            </button>
+
+            <div className="d-flex align-items-center gap-2">
+              {isMobileView && typeof onOpenSessionsDrawer === 'function' && (
+                <button
+                  onClick={onOpenSessionsDrawer}
+                  className="btn btn-sm my-close-btn p-0"
+                  aria-label="View sessions drawer"
+                  title="View sessions"
+                >
+                  <i className="bi bi-list" style={{ fontSize: '1.35rem' }} />
+                </button>
+              )}
+
+              <Dropdown align="end">
+                <Dropdown.Toggle
+                  variant="link"
+                  className="p-0 my-close-btn my-actions-toggle"
+                  aria-label="Chat actions"
+                >
+                  <i className="bi bi-three-dots-vertical" style={{ fontSize: '1.25rem' }} />
+                </Dropdown.Toggle>
+                <Dropdown.Menu className="my-chat-actions-menu">
+                  <Dropdown.Item onClick={() => navigator.clipboard.writeText(sessionId)}>
+                    Copy session ID
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => setShowClearModal(true)}>
+                    Clear chat
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={() => onRefreshSession?.()}>
+                    Refresh session
+                  </Dropdown.Item>
+                  {sessionInfo?.cleared_by_user && (
+                    <Dropdown.Item className="text-danger" onClick={() => setShowDeleteModal(true)}>
+                      Delete session
+                    </Dropdown.Item>
+                  )}
+                </Dropdown.Menu>
+              </Dropdown>
+
+              {!isMobileView && (
+                <button
+                  onClick={onClose}
+                  className="btn btn-sm my-close-btn p-0"
+                  aria-label="Close chat"
+                >
+                  <BiX size={24} />
+                </button>
+              )}
+            </div>
           </div>
 
           {sessionInfo && (
@@ -707,87 +816,104 @@ import Modal from 'react-bootstrap/Modal';
                 )}
               </small>
               {sessionInfo.cleared_by_user && (
-                <>
-                  <div className="mt-2 d-flex justify-content-end">
-                    <Button
-                      size="sm"
-                      variant="outline-danger"
-                      onClick={() => setShowDeleteModal(true)}
-                      disabled={isDeletingSession}
-                    >
-                      {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
-                    </Button>
-                  </div>
-                  <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
-                    <Modal.Header closeButton>
-                      <Modal.Title>Delete Chat Session</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                      Are you sure you want to permanently delete this cleared chat session?
-                    </Modal.Body>
-                    <Modal.Footer>
-                      <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeletingSession}>
-                        Cancel
-                      </Button>
-                      <Button variant="danger" onClick={handleDeleteSession} disabled={isDeletingSession}>
-                        {isDeletingSession ? <Spinner animation="border" size="sm" /> : 'Delete'}
-                      </Button>
-                    </Modal.Footer>
-                  </Modal>
-                  <Modal show={showDeleteMessageModal} onHide={() => setShowDeleteMessageModal(false)} centered>
-                    <Modal.Header closeButton>
-                      <Modal.Title className="d-flex align-items-center gap-2">
-                        <BiTrash size={20} className="text-danger" />
-                        Delete Message
-                      </Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                      <p className="mb-3">Are you sure you want to delete this message?</p>
-                      {messageToDelete && (
-                        <div className="p-3 rounded bg-light border-start border-4 border-warning">
-                          <small className="text-muted d-block mb-2">Message preview:</small>
-                          <div className="my-chat-markdown">
-                            <ReactMarkdown>
-                              {messageToDelete.content || '(empty)'}
-                            </ReactMarkdown>
-                          </div>
-                        </div>
-                      )}
-                      <p className="mb-0 mt-3 text-muted">
-                        <small>This action cannot be undone.</small>
-                      </p>
-                    </Modal.Body>
-                    <Modal.Footer>
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => setShowDeleteMessageModal(false)} 
-                        disabled={deletingMessageId}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        variant="danger" 
-                        onClick={handleConfirmDeleteMessage} 
-                        disabled={deletingMessageId}
-                      >
-                        {deletingMessageId ? (
-                          <>
-                            <Spinner animation="border" size="sm" className="me-2" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <BiTrash className="me-1" />
-                            Delete Message
-                          </>
-                        )}
-                      </Button>
-                    </Modal.Footer>
-                  </Modal>
-                </>
+                <div className="mt-2 d-flex justify-content-end">
+                  <Button
+                    size="sm"
+                    variant="outline-danger"
+                    onClick={() => setShowDeleteModal(true)}
+                    disabled={isDeletingSession}
+                  >
+                    {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
+                  </Button>
+                </div>
               )}
             </div>
           )}
+
+          <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>Delete Chat Session</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              Are you sure you want to permanently delete this cleared chat session?
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={isDeletingSession}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteSession} disabled={isDeletingSession}>
+                {isDeletingSession ? <Spinner animation="border" size="sm" /> : 'Delete'}
+              </Button>
+            </Modal.Footer>
+          </Modal>
+
+          <Modal show={showClearModal} onHide={() => setShowClearModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title>Clear Chat</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              Clear all messages in this session and return it to bot mode?
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={() => setShowClearModal(false)} disabled={isClearingChat}>
+                Cancel
+              </Button>
+              <Button variant="warning" onClick={handleClearChat} disabled={isClearingChat}>
+                {isClearingChat ? <Spinner animation="border" size="sm" /> : 'Clear Chat'}
+              </Button>
+            </Modal.Footer>
+          </Modal>
+
+          <Modal show={showDeleteMessageModal} onHide={() => setShowDeleteMessageModal(false)} centered>
+            <Modal.Header closeButton>
+              <Modal.Title className="d-flex align-items-center gap-2">
+                <BiTrash size={20} className="text-danger" />
+                Delete Message
+              </Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <p className="mb-3">Are you sure you want to delete this message?</p>
+              {messageToDelete && (
+                <div className="p-3 rounded bg-light border-start border-4 border-warning">
+                  <small className="text-muted d-block mb-2">Message preview:</small>
+                  <div className="my-chat-markdown">
+                    <ReactMarkdown>
+                      {messageToDelete.content || '(empty)'}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+              <p className="mb-0 mt-3 text-muted">
+                <small>This action cannot be undone.</small>
+              </p>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                variant="secondary"
+                onClick={() => setShowDeleteMessageModal(false)}
+                disabled={deletingMessageId}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleConfirmDeleteMessage}
+                disabled={deletingMessageId}
+              >
+                {deletingMessageId ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <BiTrash className="me-1" />
+                    Delete Message
+                  </>
+                )}
+              </Button>
+            </Modal.Footer>
+          </Modal>
 
           {error && (
             <Alert variant="danger" className="mb-0 rounded-0">

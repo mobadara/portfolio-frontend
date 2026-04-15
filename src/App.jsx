@@ -25,7 +25,6 @@ import NotFoundPage from './pages/NotFoundPage';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminAnalytics from './pages/AdminAnalytics';
-import AdminContent from './pages/AdminContent';
 import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import AdminMessageDetail from './pages/AdminMessageDetail';
@@ -167,7 +166,6 @@ function App() {
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminDashboard />} />
       <Route path="/admin/analytics" element={<AdminAnalytics />} />
-      <Route path="/admin/content" element={<AdminContent />} />
       <Route path="/admin/settings" element={<AdminSettings />} />
       <Route path="/admin/messages" element={<AdminMessages />} />
       <Route path="/admin/messages/:id" element={<AdminMessageDetail />} />
