@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Accordion,
   Alert,
   Toast,
   ToastContainer,
@@ -9,6 +10,7 @@ import {
   Card,
   Col,
   Container,
+  Dropdown,
   Form,
   Modal,
   Nav,
@@ -18,6 +20,8 @@ import {
   Table
 } from 'react-bootstrap';
 import {
+  BiCog,
+  BiMenu,
   BiChat,
   BiEnvelope,
   BiFile,
@@ -34,7 +38,8 @@ import {
   BiSun,
   BiTrash,
   BiUser,
-  BiUserCheck
+  BiUserCheck,
+  BiX
 } from 'react-icons/bi';
 import {
   ADMIN_ROUTES,
@@ -48,7 +53,6 @@ import './AdminDashboard.css';
 
 const USERS_ENDPOINT = ADMIN_ROUTES.users;
 const MESSAGES_ENDPOINT = ADMIN_ROUTES.messages;
-const MESSAGES_CREATE_PUBLIC_ENDPOINT = ADMIN_ROUTES.contactCreate;
 const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
 const UPLOAD_RESUME_ENDPOINT = ADMIN_ROUTES.uploadResume;
 const UPLOAD_PORTRAIT_ENDPOINT = ADMIN_ROUTES.uploadPortrait;
@@ -61,7 +65,6 @@ const CONTACT_REPLY_TO_EMAIL = import.meta?.env?.VITE_CONTACT_REPLY_TO_EMAIL || 
 
 const emptyForms = {
   user: { username: '', email: '', role: 'assistant', password: '' },
-  message: { name: '', email: '', subject: '', message: '', status: 'new' },
   project: { 
     title: '', 
     description: '', 
@@ -102,7 +105,7 @@ function AdminDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
   const [editingItem, setEditingItem] = useState(null);
-  const [formData, setFormData] = useState(emptyForms.message);
+  const [formData, setFormData] = useState(emptyForms.user);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -116,7 +119,8 @@ function AdminDashboard() {
   const [assetLinks, setAssetLinks] = useState({ resume: '', portrait: '' });
   const [assetMissing, setAssetMissing] = useState({ resume: false, portrait: false });
   const [uploadProgress, setUploadProgress] = useState({ resume: 0, portrait: 0 });
-  const [showResumePreview, setShowResumePreview] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const currentRole = String(authUser?.role || 'assistant').toLowerCase();
   const isAdminRole = currentRole === 'admin';
@@ -193,6 +197,18 @@ function AdminDashboard() {
     }
   }, [isBootstrapping, loadDashboardData]);
 
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.classList.add('admin-sidebar-open');
+    } else {
+      document.body.classList.remove('admin-sidebar-open');
+    }
+
+    return () => {
+      document.body.classList.remove('admin-sidebar-open');
+    };
+  }, [isSidebarOpen]);
+
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return users;
@@ -234,6 +250,20 @@ function AdminDashboard() {
     setShowModal(true);
   };
 
+  const openSettingsModal = () => {
+    setShowSettingsModal(true);
+  };
+
+  const closeSettingsModal = () => {
+    setShowSettingsModal(false);
+  };
+
+  const closeSidebarOnMobile = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 992) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
+
   const openEditModal = (type, item) => {
     setModalType(type);
     setEditingItem(item);
@@ -274,7 +304,7 @@ function AdminDashboard() {
   const closeModal = () => {
     setShowModal(false);
     setEditingItem(null);
-    setFormData(emptyForms.message);
+    setFormData(emptyForms.user);
   };
 
   const handleFormChange = (event) => {
@@ -286,27 +316,6 @@ function AdminDashboard() {
   };
 
   const getItemId = (item) => item.id || item._id || item.userId || item.messageId || item.projectId;
-
-  const createMessagePublic = async (payload) => {
-    const response = await fetch(buildAdminUrl(MESSAGES_CREATE_PUBLIC_ENDPOINT), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    let data = null;
-    try {
-      data = await response.json();
-    } catch {
-      data = null;
-    }
-
-    if (!response.ok) {
-      throw new Error(data?.message || 'Failed to create contact message.');
-    }
-
-    return data;
-  };
 
   const handleSave = async () => {
     const isEdit = Boolean(editingItem);
@@ -374,8 +383,12 @@ function AdminDashboard() {
       if (isEdit && !payload.password) {
         delete payload.password;
       }
+    } else if (modalType === 'message') {
+      setError('Creating messages from admin dashboard is disabled.');
+      return;
     } else {
-      endpoint = isEdit ? `${MESSAGES_ENDPOINT}/${itemId}` : MESSAGES_ENDPOINT;
+      setError('Unsupported editor action.');
+      return;
     }
 
     setIsSaving(true);
@@ -383,14 +396,10 @@ function AdminDashboard() {
     setSuccess('');
 
     try {
-      if (modalType === 'message' && !isEdit) {
-        await createMessagePublic(payload);
-      } else {
-        await requestWithAuth(endpoint, {
-          method,
-          body: JSON.stringify(payload)
-        });
-      }
+      await requestWithAuth(endpoint, {
+        method,
+        body: JSON.stringify(payload)
+      });
 
       if (modalType === 'password') {
         setSuccess('Password updated successfully. Use your new password next login.');
@@ -714,97 +723,151 @@ function AdminDashboard() {
           <Toast.Body className="text-white">{success}</Toast.Body>
         </Toast>
       </ToastContainer>
+      <div
+        className={`admin-sidebar-overlay ${isSidebarOpen ? 'show' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+        role="button"
+        tabIndex={0}
+        aria-label="Close sidebar"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            setIsSidebarOpen(false);
+          }
+        }}
+      />
       <Container fluid className="py-2 py-md-3 admin-dashboard-wrap">
-        <Card className="admin-dashboard-shell border-0 shadow-lg">
-          <Card.Body className="p-3">
-            <div className="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
-              <div>
-                <h3 className="mb-1 fw-bold d-flex align-items-center gap-2 admin-dash-title admin-shell-title">
-                  <BiShield /> Admin Dashboard
-                </h3>
-                <p className="mb-0 small admin-shell-subtitle">
-                  Signed in as <strong>{authUser?.username || 'admin'}</strong> • Role: <Badge bg="info">{currentRole}</Badge>
-                </p>
-              </div>
-              <div className="d-flex flex-wrap gap-2 admin-dash-actions">
-                <Button variant="primary" size="sm" onClick={() => navigate('/admin/chat')}>
-                  <BiChat className="me-1" /> Open Chats
-                </Button>
-                <Button variant={theme === 'dark' ? 'outline-light' : 'outline-secondary'} size="sm" onClick={openPasswordModal}>
-                  Change Password
-                </Button>
-                <Button variant="light" size="sm" onClick={loadDashboardData} disabled={isLoading}>
-                  {isLoading ? <Spinner animation="border" size="sm" /> : <BiRefresh className="me-1" />} Refresh
-                </Button>
-                <Button
-                  variant={theme === 'dark' ? 'light' : 'dark'}
-                  size="sm"
-                  className="theme-toggle-btn"
-                  onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-                >
-                  {theme === 'dark' ? <BiSun className="me-1" /> : <BiMoon className="me-1" />}
-                  {theme === 'dark' ? 'Light' : 'Dark'}
-                </Button>
-                <Button variant={theme === 'dark' ? 'outline-light' : 'outline-secondary'} size="sm" onClick={handleLogout}>
-                  <BiLogOut className="me-1" /> Logout
-                </Button>
-              </div>
-            </div>
-
-            <Row className="g-2 mb-3">
-              <Col xs={12} sm={6} xl={4}>
-                <Card className="metric-card border-0 h-100">
-                  <Card.Body className="py-3">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div>
-                        <small className="text-muted">Users</small>
-                        <h4 className="mb-0">{users.length}</h4>
-                      </div>
-                      <BiUserCheck className="metric-icon" />
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} xl={4}>
-                <Card className="metric-card border-0 h-100">
-                  <Card.Body className="py-3">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div>
-                        <small className="text-muted">Contact Messages</small>
-                        <h4 className="mb-0">{messages.length}</h4>
-                      </div>
-                      <BiEnvelope className="metric-icon" />
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col xs={12} sm={6} xl={4}>
-                <Card className="metric-card border-0 h-100">
-                  <Card.Body className="py-3">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div>
-                        <small className="text-muted">Projects</small>
-                        <h4 className="mb-0">{projects.length}</h4>
-                      </div>
-                      <BiFolder className="metric-icon" />
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-
-            {error && <Alert variant="danger">{error}</Alert>}
-            {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
-
-            {canManageUsersAndProjects && (
-              <Card className="border-0 admin-panel-card mb-3">
-                <Card.Body className="p-3">
-                  <div className="d-flex align-items-center justify-content-between mb-3">
-                    <h5 className="mb-0 fw-bold d-flex align-items-center gap-2">
-                      <BiFile /> Asset Management
-                    </h5>
-                    <small className="text-muted">Upload and manage your resume and portrait</small>
+        <div className="admin-desktop-shell">
+          <Row className="g-3 g-xl-4">
+            <Col lg={4} xl={3} xxl={2} className={`admin-sidebar-col ${isSidebarOpen ? 'is-open' : ''}`}>
+              <Card className="admin-sidebar-panel border-0">
+                <Card.Body className="p-3 p-md-4">
+                  <div className="admin-sidebar-mobile-head d-lg-none mb-3">
+                    <Button
+                      variant="link"
+                      className="admin-sidebar-close-btn"
+                      onClick={() => setIsSidebarOpen((prev) => !prev)}
+                      aria-label={isSidebarOpen ? 'Close sidebar' : 'Expand sidebar'}
+                    >
+                      {isSidebarOpen ? <BiX size={22} /> : <BiMenu size={22} />}
+                    </Button>
                   </div>
+
+                  <div className="admin-identity-card mb-4">
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="admin-identity-avatar">
+                        <BiUser />
+                      </span>
+                      <div className="admin-identity-meta">
+                        <p className="mb-0 fw-semibold">{authUser?.username || 'admin'}</p>
+                        <small className="admin-shell-subtitle">Role: {currentRole}</small>
+                      </div>
+                    </div>
+
+                    <Dropdown align="end" className="mt-3 admin-account-dropdown">
+                      <Dropdown.Toggle variant="outline-light" size="sm" className="w-100">
+                        <BiUser className="me-1 admin-sidebar-link-icon" />
+                        <span className="admin-sidebar-link-text">Account</span>
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu className="w-100">
+                        <Dropdown.Item onClick={() => { openSettingsModal(); closeSidebarOnMobile(); }}>
+                          <BiCog className="me-2" /> Settings
+                        </Dropdown.Item>
+                        <Dropdown.Divider />
+                        <Dropdown.Item onClick={() => { handleLogout(); closeSidebarOnMobile(); }} className="text-danger">
+                          <BiLogOut className="me-1" /> Logout
+                        </Dropdown.Item>
+                      </Dropdown.Menu>
+                    </Dropdown>
+                  </div>
+
+                  <div className="d-grid gap-2 admin-dash-actions">
+                    <Button variant="light" size="sm" onClick={() => { loadDashboardData(); closeSidebarOnMobile(); }} disabled={isLoading}>
+                      {isLoading ? <Spinner animation="border" size="sm" /> : <BiRefresh className="me-1 admin-sidebar-link-icon" />} <span className="admin-sidebar-link-text">Refresh</span>
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={() => { navigate('/admin/chat'); closeSidebarOnMobile(); }}>
+                      <BiChat className="me-1 admin-sidebar-link-icon" /> <span className="admin-sidebar-link-text">Open Chats</span>
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col lg={8} xl={9} xxl={10} className="admin-workspace-col">
+              <Card className="admin-dashboard-shell border-0 shadow-lg">
+                <Card.Body className="p-3 p-md-4">
+                  <div className="admin-main-header d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
+                    <div>
+                      <h4 className="mb-1 fw-bold d-flex align-items-center gap-2 admin-shell-title">
+                        <BiShield /> Admin Console <Badge bg="info" className="text-uppercase">{currentRole}</Badge>
+                      </h4>
+                      <p className="mb-0 small admin-shell-subtitle">
+                        Manage messages, users, projects, and assets from one desktop-style panel.
+                      </p>
+                    </div>
+                    <div className="d-flex align-items-center gap-2">
+                      <Button variant="outline-primary" size="sm" onClick={() => navigate('/admin/chat')}>
+                        <BiChat className="me-1" /> Chats
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Row className="g-2 mb-3">
+                    <Col xs={12} sm={6} xl={4}>
+                      <Card className="metric-card border-0 h-100">
+                        <Card.Body className="py-3">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <small className="text-muted">Users</small>
+                              <h4 className="mb-0">{users.length}</h4>
+                            </div>
+                            <BiUserCheck className="metric-icon" />
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={6} xl={4}>
+                      <Card className="metric-card border-0 h-100">
+                        <Card.Body className="py-3">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <small className="text-muted">Contact Messages</small>
+                              <h4 className="mb-0">{messages.length}</h4>
+                            </div>
+                            <BiEnvelope className="metric-icon" />
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={6} xl={4}>
+                      <Card className="metric-card border-0 h-100">
+                        <Card.Body className="py-3">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <small className="text-muted">Projects</small>
+                              <h4 className="mb-0">{projects.length}</h4>
+                            </div>
+                            <BiFolder className="metric-icon" />
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
+
+                  {error && <Alert variant="danger">{error}</Alert>}
+                  {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
+
+                  {canManageUsersAndProjects && (
+                    <Accordion className="mb-3 admin-section-accordion" alwaysOpen>
+                      <Accordion.Item eventKey="assets" className="border-0 admin-panel-card">
+                        <Accordion.Header>
+                          <span className="fw-bold d-flex align-items-center gap-2">
+                            <BiFile /> Asset Management
+                          </span>
+                        </Accordion.Header>
+                        <Accordion.Body className="p-3">
+                          <div className="d-flex align-items-center justify-content-between mb-3">
+                            <small className="text-muted">Upload and manage your resume and portrait</small>
+                          </div>
 
                   <Row className="g-4 align-items-stretch">
                     <Col xs={12} lg={6} className="d-flex">
@@ -818,28 +881,12 @@ function AdminDashboard() {
                         <Card.Body className="p-4">
                           {/* Resume Preview */}
                           {assetLinks.resume && !assetMissing.resume && (
-                            <div className="mb-3">
-                              <div className="d-flex align-items-center justify-content-between mb-2">
-                                <small className="fw-semibold text-muted">Preview</small>
-                                <button
-                                  className="btn btn-sm btn-link p-0"
-                                  onClick={() => setShowResumePreview(!showResumePreview)}
-                                >
-                                  {showResumePreview ? 'Hide' : 'Show'}
-                                </button>
-                              </div>
-                              {showResumePreview && (
-                                <iframe
-                                  src={assetLinks.resume}
-                                  title="Resume Preview"
-                                  style={{
-                                    width: '100%',
-                                    height: '300px',
-                                    border: '1px solid #e9ecef',
-                                    borderRadius: '8px'
-                                  }}
-                                />
-                              )}
+                            <div className="mb-3 admin-resume-preview-wrap">
+                              <iframe
+                                src={assetLinks.resume}
+                                title="Resume Preview"
+                                className="admin-asset-preview-frame"
+                              />
                             </div>
                           )}
 
@@ -944,7 +991,7 @@ function AdminDashboard() {
                         <Card.Body className="p-4">
                           {/* Portrait Preview */}
                           {assetLinks.portrait && !assetMissing.portrait && (
-                            <div className="admin-portrait-preview-wrap mb-3 border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+                            <div className="admin-portrait-preview-wrap mb-3 border-0 shadow-sm">
                               <img src={assetLinks.portrait} alt="Current portrait" className="admin-portrait-preview" />
                             </div>
                           )}
@@ -1034,123 +1081,126 @@ function AdminDashboard() {
                       </Card>
                     </Col>
                   </Row>
+                        </Accordion.Body>
+                      </Accordion.Item>
+                    </Accordion>
+                  )}
+
+                  <Card className="border-0 admin-panel-card">
+                    <Card.Body className="p-2 p-md-3">
+                      <div className="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
+                        <Form.Group className="admin-search-group">
+                          <BiSearch className="admin-search-icon" />
+                          <Form.Control
+                            placeholder="Search by name, email, role, status or title"
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                          />
+                        </Form.Group>
+
+                        <div className="d-flex gap-2">
+                          {activeTab === 'users' && canManageUsersAndProjects && (
+                            <Button size="sm" variant="primary" onClick={() => openCreateModal('user')}>
+                              <BiPlus className="me-1" /> Add User
+                            </Button>
+                          )}
+                          {activeTab === 'projects' && canManageUsersAndProjects && (
+                            <Button size="sm" variant="primary" onClick={() => openCreateModal('project')}>
+                              <BiPlus className="me-1" /> Add Project
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {!canManageUsersAndProjects && (
+                        <Alert variant="info" className="small mb-3">
+                          You have assistant access. You can fully manage contact messages. User and project management is restricted.
+                        </Alert>
+                      )}
+
+                      <Tab.Container activeKey={activeTab} onSelect={(tabKey) => setActiveTab(tabKey || 'messages')}>
+                        <Nav variant="pills" className="admin-tabs mb-3">
+                          <Nav.Item><Nav.Link eventKey="messages">Messages ({filteredMessages.length})</Nav.Link></Nav.Item>
+                          <Nav.Item><Nav.Link eventKey="users">Users ({filteredUsers.length})</Nav.Link></Nav.Item>
+                          <Nav.Item><Nav.Link eventKey="projects">Projects ({filteredProjects.length})</Nav.Link></Nav.Item>
+                        </Nav>
+
+                        <Tab.Content>
+                          <Tab.Pane eventKey="messages">
+                            <ResourceTable
+                              type="message"
+                              items={filteredMessages}
+                              onView={canManageMessages ? openMessageModal : null}
+                              onReply={canManageMessages ? handleReplyToMessage : null}
+                              onDelete={canManageMessages ? handleDelete : null}
+                              emptyText="No contact messages found."
+                            />
+                          </Tab.Pane>
+
+                          <Tab.Pane eventKey="users">
+                            {canManageUsersAndProjects ? (
+                              <ResourceTable
+                                type="user"
+                                items={filteredUsers}
+                                onEdit={openEditModal}
+                                onDelete={handleDelete}
+                                emptyText="No users found."
+                              />
+                            ) : (
+                              <Alert variant="warning" className="mb-0">Only owners/admins can manage users.</Alert>
+                            )}
+                          </Tab.Pane>
+
+                          <Tab.Pane eventKey="projects">
+                            {canManageUsersAndProjects ? (
+                              <ResourceTable
+                                type="project"
+                                items={filteredProjects}
+                                onEdit={openEditModal}
+                                onDelete={handleDelete}
+                                emptyText="No projects found."
+                              />
+                            ) : (
+                              <Alert variant="warning" className="mb-0">Only owners/admins can manage projects.</Alert>
+                            )}
+                          </Tab.Pane>
+                        </Tab.Content>
+                      </Tab.Container>
+                    </Card.Body>
+                  </Card>
+
+                  {isAdminRole && (
+                    <Accordion className="mt-3 admin-section-accordion admin-danger-accordion">
+                      <Accordion.Item eventKey="danger" className="border-danger-subtle bg-danger-subtle">
+                        <Accordion.Header>
+                          <span className="text-danger fw-bold">Danger Zone</span>
+                        </Accordion.Header>
+                        <Accordion.Body className="p-3">
+                          <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+                            <div>
+                              <p className="mb-0 small text-danger-emphasis">These actions permanently delete data and require your admin password.</p>
+                            </div>
+                            <div className="d-flex flex-wrap gap-2">
+                              <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('sessions')}>
+                                Delete All Chat Sessions
+                              </Button>
+                              <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('messages')}>
+                                Delete All Messages
+                              </Button>
+                              <Button size="sm" variant="danger" onClick={() => openDangerModal('projects')}>
+                                Delete All Projects
+                              </Button>
+                            </div>
+                          </div>
+                        </Accordion.Body>
+                      </Accordion.Item>
+                    </Accordion>
+                  )}
                 </Card.Body>
               </Card>
-            )}
-
-            <Card className="border-0 admin-panel-card">
-              <Card.Body className="p-2 p-md-3">
-                <div className="d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
-                  <Form.Group className="admin-search-group">
-                    <BiSearch className="admin-search-icon" />
-                    <Form.Control
-                      placeholder="Search by name, email, role, status or title"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                    />
-                  </Form.Group>
-
-                  <div className="d-flex gap-2">
-                    {activeTab === 'users' && canManageUsersAndProjects && (
-                      <Button size="sm" variant="primary" onClick={() => openCreateModal('user')}>
-                        <BiPlus className="me-1" /> Add User
-                      </Button>
-                    )}
-                    {activeTab === 'messages' && canManageMessages && (
-                      <Button size="sm" variant="primary" onClick={() => openCreateModal('message')}>
-                        <BiPlus className="me-1" /> Add Message
-                      </Button>
-                    )}
-                    {activeTab === 'projects' && canManageUsersAndProjects && (
-                      <Button size="sm" variant="primary" onClick={() => openCreateModal('project')}>
-                        <BiPlus className="me-1" /> Add Project
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {!canManageUsersAndProjects && (
-                  <Alert variant="info" className="small mb-3">
-                    You have assistant access. You can fully manage contact messages. User and project management is restricted.
-                  </Alert>
-                )}
-
-                <Tab.Container activeKey={activeTab} onSelect={(tabKey) => setActiveTab(tabKey || 'messages')}>
-                  <Nav variant="pills" className="admin-tabs mb-3">
-                    <Nav.Item><Nav.Link eventKey="messages">Messages ({filteredMessages.length})</Nav.Link></Nav.Item>
-                    <Nav.Item><Nav.Link eventKey="users">Users ({filteredUsers.length})</Nav.Link></Nav.Item>
-                    <Nav.Item><Nav.Link eventKey="projects">Projects ({filteredProjects.length})</Nav.Link></Nav.Item>
-                  </Nav>
-
-                  <Tab.Content>
-                    <Tab.Pane eventKey="messages">
-                      <ResourceTable
-                        type="message"
-                        items={filteredMessages}
-                        onView={canManageMessages ? openMessageModal : null}
-                        onReply={canManageMessages ? handleReplyToMessage : null}
-                        onDelete={canManageMessages ? handleDelete : null}
-                        emptyText="No contact messages found."
-                      />
-                    </Tab.Pane>
-
-                    <Tab.Pane eventKey="users">
-                      {canManageUsersAndProjects ? (
-                        <ResourceTable
-                          type="user"
-                          items={filteredUsers}
-                          onEdit={openEditModal}
-                          onDelete={handleDelete}
-                          emptyText="No users found."
-                        />
-                      ) : (
-                        <Alert variant="warning" className="mb-0">Only owners/admins can manage users.</Alert>
-                      )}
-                    </Tab.Pane>
-
-                    <Tab.Pane eventKey="projects">
-                      {canManageUsersAndProjects ? (
-                        <ResourceTable
-                          type="project"
-                          items={filteredProjects}
-                          onEdit={openEditModal}
-                          onDelete={handleDelete}
-                          emptyText="No projects found."
-                        />
-                      ) : (
-                        <Alert variant="warning" className="mb-0">Only owners/admins can manage projects.</Alert>
-                      )}
-                    </Tab.Pane>
-                  </Tab.Content>
-                </Tab.Container>
-              </Card.Body>
-            </Card>
-
-            {isAdminRole && (
-              <Card className="border-danger-subtle bg-danger-subtle mt-3">
-                <Card.Body className="p-3">
-                  <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
-                    <div>
-                      <h6 className="mb-1 text-danger fw-bold">Danger Zone</h6>
-                      <p className="mb-0 small text-danger-emphasis">These actions permanently delete data and require your admin password.</p>
-                    </div>
-                    <div className="d-flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('sessions')}>
-                        Delete All Chat Sessions
-                      </Button>
-                      <Button size="sm" variant="outline-danger" onClick={() => openDangerModal('messages')}>
-                        Delete All Messages
-                      </Button>
-                      <Button size="sm" variant="danger" onClick={() => openDangerModal('projects')}>
-                        Delete All Projects
-                      </Button>
-                    </div>
-                  </div>
-                </Card.Body>
-              </Card>
-            )}
-          </Card.Body>
-        </Card>
+            </Col>
+          </Row>
+        </div>
       </Container>
 
       <EditorModal
@@ -1181,6 +1231,44 @@ function AdminDashboard() {
         onHide={closeDangerModal}
         onConfirm={handleConfirmDangerAction}
       />
+
+      <Modal show={showSettingsModal} onHide={closeSettingsModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Settings</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="mb-3">
+            <Form.Label className="fw-semibold">Theme</Form.Label>
+            <div className="d-flex gap-2">
+              <Button
+                variant={theme === 'light' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setTheme('light')}
+              >
+                <BiSun className="me-1" /> Light
+              </Button>
+              <Button
+                variant={theme === 'dark' ? 'primary' : 'outline-secondary'}
+                size="sm"
+                onClick={() => setTheme('dark')}
+              >
+                <BiMoon className="me-1" /> Dark
+              </Button>
+            </div>
+          </div>
+          <hr />
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={() => {
+              closeSettingsModal();
+              openPasswordModal();
+            }}
+          >
+            Change Password
+          </Button>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 }
@@ -1388,35 +1476,6 @@ const EditorModal = ({ show, type, formData, isSaving, isEdit, onChange, onHide,
             <Form.Group>
               <Form.Label>{isEdit ? 'New Password (optional)' : 'Password'}</Form.Label>
               <Form.Control type="password" name="password" value={formData.password || ''} onChange={onChange} />
-            </Form.Group>
-          </>
-        )}
-
-        {type === 'message' && (
-          <>
-            <Form.Group className="mb-3">
-              <Form.Label>Name</Form.Label>
-              <Form.Control name="name" value={formData.name || ''} onChange={onChange} required />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Email</Form.Label>
-              <Form.Control type="email" name="email" value={formData.email || ''} onChange={onChange} required />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Subject</Form.Label>
-              <Form.Control name="subject" value={formData.subject || ''} onChange={onChange} />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Message</Form.Label>
-              <Form.Control as="textarea" rows={4} name="message" value={formData.message || ''} onChange={onChange} required />
-            </Form.Group>
-            <Form.Group>
-              <Form.Label>Status</Form.Label>
-              <Form.Select name="status" value={formData.status || 'new'} onChange={onChange}>
-                <option value="new">New</option>
-                <option value="in_progress">In Progress</option>
-                <option value="resolved">Resolved</option>
-              </Form.Select>
             </Form.Group>
           </>
         )}
