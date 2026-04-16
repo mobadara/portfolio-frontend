@@ -251,17 +251,6 @@ const AdminChatPage = () => {
                       {session.user_name ? session.user_name : session.human_mode ? 'Anonymous' : 'Bot'}
                     </strong>
                     <div className="d-flex align-items-center gap-2">
-                      {isActive && (
-                        <Badge bg="success" pill>Selected</Badge>
-                      )}
-                      {session.cleared_by_user && (
-                        <Badge bg="warning" text="dark" pill>Cleared</Badge>
-                      )}
-                      {session.human_mode ? (
-                        <Badge bg="primary" pill>Live</Badge>
-                      ) : (
-                        <Badge bg="secondary" pill>Bot</Badge>
-                      )}
                       <Button
                         type="button"
                         variant="link"
@@ -295,10 +284,17 @@ const AdminChatPage = () => {
   );
 
   return (
-    <Container fluid className="admin-chat-page my-admin-layout py-2 py-md-3">
-      <Row className="g-3 g-md-2 h-100">
+    <Container fluid className="admin-chat-page my-admin-layout">
+      <header className="my-admin-chat-main-header d-flex align-items-center justify-content-between px-3 px-md-4">
+        <div className="d-flex align-items-center gap-2">
+          <i className="bi bi-chat-left-text-fill" aria-hidden="true"></i>
+          <h5 className="mb-0">My Chat Assistant</h5>
+        </div>
+      </header>
+
+      <Row className="g-0 h-100 my-admin-chat-workspace">
         {!isMobileView || !activeSession ? (
-          <Col lg={4} xl={3} className="mb-2 mb-lg-0">
+          <Col lg={4} xl={3} className="my-sidebar-col">
             <Card className="border-0 my-sidebar-card h-100">
               {renderSessionsList()}
             </Card>

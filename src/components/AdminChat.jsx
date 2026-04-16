@@ -804,32 +804,6 @@ import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withA
             </div>
           </div>
 
-          {sessionInfo && (
-            <div className="my-session-meta px-3 py-2 border-bottom">
-              <small className="text-muted d-flex align-items-center gap-2 flex-wrap">
-                <strong>Session:</strong> {sessionId}
-                {sessionInfo.human_mode && (
-                  <span className="badge bg-primary">HUMAN MODE</span>
-                )}
-                {sessionInfo.cleared_by_user && (
-                  <span className="badge bg-warning text-dark">CLEARED BY USER</span>
-                )}
-              </small>
-              {sessionInfo.cleared_by_user && (
-                <div className="mt-2 d-flex justify-content-end">
-                  <Button
-                    size="sm"
-                    variant="outline-danger"
-                    onClick={() => setShowDeleteModal(true)}
-                    disabled={isDeletingSession}
-                  >
-                    {isDeletingSession ? <Spinner animation="border" size="sm" /> : <><BiTrash className="me-1" /> Delete Session</>}
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
           <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
             <Modal.Header closeButton>
               <Modal.Title>Delete Chat Session</Modal.Title>
@@ -1054,42 +1028,46 @@ import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withA
                 </Button>
               </div>
             ) : (
-              <Form onSubmit={handleSendMessage} className="d-flex gap-2 my-input-row">
-                <Form.Control 
-                  type="text" 
+              <>
+                <Form onSubmit={handleSendMessage} className="d-flex gap-2 my-input-row">
+                  <Form.Control
+                    type="text"
                   placeholder={isConnected ? 'Type a message' : 'Disconnected...'}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   disabled={!isConnected || isLoading}
-                  className="border-0 shadow-none my-chat-input my-mobile-input rounded-pill"
-                  style={{ fontSize: '0.88rem', color: 'var(--text-main)', background: 'var(--section-bg)' }}
-                />
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={!sessionInfo?.human_mode}
-                  className="rounded-circle d-flex align-items-center justify-content-center bg-navy"
-                  style={{ width: 48, height: 48 }}
-                  onPointerDown={handleRecordPressStart}
-                  onPointerUp={handleRecordPressEnd}
-                  onPointerCancel={handleRecordPressEnd}
-                  onPointerLeave={handleRecordPressEnd}
-                  onContextMenu={(event) => event.preventDefault()}
-                  title={sessionInfo?.human_mode ? 'Hold to record voice message' : 'Voice is available in human mode'}
-                  aria-label="Record voice"
-                >
-                  <BiMicrophone size={28} />
-                </Button>
-                <Button 
-                  type="submit" 
-                  variant="primary"
-                  disabled={!isConnected || isLoading || isSending || !input.trim()}
-                  className="rounded-circle d-flex align-items-center justify-content-center bg-navy"
-                  style={{ width: 48, height: 48 }}
-                >
-                  {isSending ? <Spinner animation="border" size="sm" /> : <BiSend size={28} />}
-                </Button>
-              </Form>
+                    className="border-0 shadow-none my-chat-input my-mobile-input rounded-pill"
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={!sessionInfo?.human_mode}
+                    className="rounded-circle d-flex align-items-center justify-content-center my-mic-btn"
+                    onPointerDown={handleRecordPressStart}
+                    onPointerUp={handleRecordPressEnd}
+                    onPointerCancel={handleRecordPressEnd}
+                    onPointerLeave={handleRecordPressEnd}
+                    onContextMenu={(event) => event.preventDefault()}
+                    title={sessionInfo?.human_mode ? 'Hold to record voice message' : 'Mic disabled outside live mode'}
+                    aria-label="Record voice"
+                  >
+                    <BiMicrophone size={22} />
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={!isConnected || isLoading || isSending || !input.trim()}
+                    className="rounded-circle d-flex align-items-center justify-content-center my-send-btn"
+                  >
+                    {isSending ? <Spinner animation="border" size="sm" /> : <BiSend size={21} />}
+                  </Button>
+                </Form>
+                {!sessionInfo?.human_mode && (
+                  <small className="my-mic-disabled-note d-block mt-1">
+                    Mic is disabled when chat is not in live mode.
+                  </small>
+                )}
+              </>
             )}
 
             {isDeletingSession && (
