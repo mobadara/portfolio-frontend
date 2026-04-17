@@ -169,6 +169,7 @@
 .admin-chat-container {
   height: 100%;
   min-height: 0;
+  width: 100%;
 }
 
 .my-chat-column {
@@ -260,7 +261,7 @@
   position: relative;
 }
 
-.my-actions-dropdown .dropdown-toggle::after {
+.my-actions-dropdown-wrap .dropdown-toggle::after {
   display: none !important;
 }
 
@@ -338,6 +339,7 @@
   color: inherit;
   background-clip: padding-box;
   max-width: 85%;
+  min-width: 80px;
 }
 
 .my-message-user {
@@ -369,20 +371,112 @@
   color: #8696a0;
 }
 
+/* --- FILE ATTACHMENT PREVIEW --- */
+.my-attachment-preview {
+  background-color: #f0f2f5;
+  border-top: 1px solid #d1d7db;
+}
+
+[data-bs-theme='dark'] .my-attachment-preview {
+  background-color: #202c33;
+  border-top-color: #2a3942;
+}
+
+[data-bs-theme='dark'] .my-attachment-preview span {
+  color: #e9edef;
+}
+
 /* --- WHATSAPP INPUT AREA --- */
 .my-input-wrap {
   background: #f0f2f5;
+  width: 100% !important; /* Forces 100% width */
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  align-items: end;
+  column-gap: 0.5rem;
+  padding: 0.35rem 0 !important;
 }
 
 [data-bs-theme='dark'] .my-input-wrap {
   background: #202c33;
 }
 
+.my-emoji-picker-popover {
+  bottom: 100%;
+  left: 10px;
+  margin-bottom: 10px;
+  width: min(360px, calc(100vw - 1rem));
+  max-height: min(360px, 52vh);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.my-emoji-dismiss-layer {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  z-index: 9;
+}
+
+[data-bs-theme='dark'] .my-emoji-picker-popover {
+  background: #2a3942 !important;
+  border-color: #3b4a54 !important;
+}
+
+[data-bs-theme='dark'] .my-emoji-picker-popover .btn-light {
+  background: #111b21;
+  color: #e9edef;
+}
+
 .my-chat-input-wrapper {
   background-color: #ffffff;
   border-radius: 24px;
-  padding: 0.15rem 0.5rem;
+  padding: 0.1rem 0.3rem;
   min-height: 48px;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.my-recording-hold-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0 0.3rem;
+}
+
+.my-recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  flex: 0 0 8px;
+}
+
+.my-recording-time {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #54656f;
+  white-space: nowrap;
+}
+
+.my-recording-hint {
+  font-size: 0.78rem;
+  color: #667781;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.my-recording-locked-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 0 0 auto;
 }
 
 [data-bs-theme='dark'] .my-chat-input-wrapper {
@@ -391,6 +485,8 @@
 
 .my-chat-input-field {
   color: #111b21;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .my-chat-input-field:focus {
@@ -410,8 +506,26 @@
   color: #8696a0;
 }
 
+[data-bs-theme='dark'] .my-recording-time {
+  color: #c9d3da;
+}
+
+[data-bs-theme='dark'] .my-recording-hint {
+  color: #90a3ad;
+}
+
 .my-action-icon {
   color: #54656f !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-width: 24px;
+  line-height: 1;
+}
+
+/* Explicit pointer for file input label */
+.my-action-icon:hover,
+.my-action-icon label {
+  cursor: pointer;
 }
 
 [data-bs-theme='dark'] .my-action-icon {
@@ -425,13 +539,24 @@
   border-radius: 50%;
   background: #00a884;
   border: none;
-  flex-shrink: 0;
+  flex: 0 0 48px;
+  padding: 0;
+  margin: 0;
   transition: background 0.2s ease;
   cursor: pointer;
 }
 
 .my-send-mic-btn:hover {
   background: #019a77;
+}
+
+.my-send-mic-btn:disabled {
+  background: #8da7a0;
+  cursor: not-allowed;
+}
+
+[data-bs-theme='dark'] .my-send-mic-btn:disabled {
+  background: #005c4b;
 }
 
 .my-chat-list-status {
@@ -566,11 +691,22 @@
     width: 100%;
   }
 
-  /* Mobile Input Wrapper Docking */
+  /* Mobile Input Wrapper Docking & Full Width Fix */
   .my-input-wrap {
     position: sticky;
     bottom: 0;
     z-index: 3;
-    padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom)) !important;
+    padding: 0.35rem 0 calc(0.35rem + env(safe-area-inset-bottom)) !important;
+    width: 100% !important;
+    margin: 0;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    align-items: end !important;
+    column-gap: 0.5rem;
+  }
+
+  .my-chat-input-wrapper {
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
