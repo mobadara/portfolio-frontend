@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Container, Row, Col, Card, Badge, Alert, Spinner, Button, Offcanvas } from 'react-bootstrap';
+import { Container, Row, Col, Card, Badge, Spinner, Button } from 'react-bootstrap';
 import { BiArrowBack, BiMoon, BiRefresh, BiSun, BiTrash } from 'react-icons/bi';
 import AdminChat from './AdminChat';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, withAuthHeaders } from '../utils/adminApi';
@@ -20,7 +20,6 @@ const AdminChatPage = () => {
   const [error, setError] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('adminTheme') || 'dark');
   const [deletingSessionId, setDeletingSessionId] = useState(null);
-  const [showSessionsDrawer, setShowSessionsDrawer] = useState(false);
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 991.98px)').matches : false
   );
@@ -40,9 +39,6 @@ const AdminChatPage = () => {
     const mediaQuery = window.matchMedia('(max-width: 991.98px)');
     const onChange = (event) => {
       setIsMobileView(event.matches);
-      if (!event.matches) {
-        setShowSessionsDrawer(false);
-      }
     };
 
     setIsMobileView(mediaQuery.matches);
@@ -145,7 +141,6 @@ const AdminChatPage = () => {
   const handleOpenSession = (sessionId) => {
     setActiveSession(sessionId);
     navigate(`/admin/chat/${sessionId}`);
-    setShowSessionsDrawer(false);
   };
 
   const handleDeleteSession = async (event, sessionId) => {
@@ -186,6 +181,7 @@ const AdminChatPage = () => {
   const activeSessionData = sessions.find((session) => session.session_id === activeSession) || null;
   const chatDisplayName = activeSessionData?.human_mode ? (activeSessionData?.user_name || 'Anonymous') : 'Bot';
   const chatStatusLabel = activeSessionData?.human_mode ? 'Live support' : 'Bot mode';
+  const isTransientConnectionIssue = /fetch|network|connect|load sessions|failed to/i.test(error || '');
 
   const renderSessionsList = () => (
     <>
@@ -218,14 +214,17 @@ const AdminChatPage = () => {
       </Card.Header>
       <Card.Body className="p-0 my-sidebar-body">
         {loading ? (
-          <div className="p-3 text-center">
-            <Spinner animation="border" size="sm" variant="primary" />
+          <div className="p-3 text-center my-chat-list-status">
+            <Spinner animation="border" size="sm" className="my-teal-spinner" />
             <p className="small text-muted mt-2 mb-0">Loading chats...</p>
           </div>
         ) : error ? (
-          <Alert variant="danger" className="m-3 mb-0">
-            <small>{error}</small>
-          </Alert>
+          <div className="p-3 text-center my-chat-list-status">
+            <Spinner animation="border" size="sm" className="my-teal-spinner" />
+            <p className="small text-muted mt-2 mb-0">
+              {isTransientConnectionIssue ? 'Reconnecting to chat service...' : error}
+            </p>
+          </div>
         ) : sessions.length === 0 ? (
           <div className="p-3 text-center text-muted">
             <i className="bi bi-chat-dots fs-1 d-block mb-2 opacity-25"></i>
@@ -284,17 +283,24 @@ const AdminChatPage = () => {
   );
 
   return (
-    <Container fluid className="admin-chat-page my-admin-layout">
-      <header className="my-admin-chat-main-header d-flex align-items-center justify-content-between px-3 px-md-4">
-        <div className="d-flex align-items-center gap-2">
-          <i className="bi bi-chat-left-text-fill" aria-hidden="true"></i>
-          <h5 className="mb-0">My Chat Assistant</h5>
-        </div>
-      </header>
+    <Container
+      fluid
+      className={`admin-chat-page my-admin-layout ${isMobileView ? 'my-mobile-layout' : ''} ${
+        isMobileView && activeSession ? 'my-mobile-chat-open' : ''
+      }`}
+    >
+      {!isMobileView && (
+        <header className="my-admin-chat-main-header d-flex align-items-center justify-content-between px-3 px-md-4">
+          <div className="d-flex align-items-center gap-2">
+            <i className="bi bi-chat-left-text-fill" aria-hidden="true"></i>
+            <h5 className="mb-0">My Chat Assistant</h5>
+          </div>
+        </header>
+      )}
 
-      <Row className="g-0 h-100 my-admin-chat-workspace">
+      <Row className={`g-0 h-100 my-admin-chat-workspace ${isMobileView ? 'my-mobile-workspace' : ''}`}>
         {!isMobileView || !activeSession ? (
-          <Col lg={4} xl={3} className="my-sidebar-col">
+          <Col lg={4} xl={3} className={`my-sidebar-col ${isMobileView ? 'my-mobile-sidebar' : ''}`}>
             <Card className="border-0 my-sidebar-card h-100">
               {renderSessionsList()}
             </Card>
@@ -302,14 +308,13 @@ const AdminChatPage = () => {
         ) : null}
 
         {(!isMobileView || activeSession) && (
-          <Col lg={8} xl={9} className="my-chat-column">
+          <Col lg={8} xl={9} className={`my-chat-column ${isMobileView ? 'my-mobile-chat-panel' : ''}`}>
             {activeSession ? (
               <AdminChat
                 sessionId={activeSession}
                 onClose={handleCloseChat}
                 displayName={chatDisplayName}
                 statusLabel={chatStatusLabel}
-                onOpenSessionsDrawer={() => setShowSessionsDrawer(true)}
                 isMobileView={isMobileView}
                 onRefreshSession={fetchActiveSessions}
               />
@@ -329,24 +334,6 @@ const AdminChatPage = () => {
               </Card>
             )}
           </Col>
-        )}
-
-        {isMobileView && (
-          <Offcanvas
-            placement="start"
-            show={showSessionsDrawer}
-            onHide={() => setShowSessionsDrawer(false)}
-            className="my-sessions-drawer"
-          >
-            <Offcanvas.Header closeButton>
-              <Offcanvas.Title>Sessions</Offcanvas.Title>
-            </Offcanvas.Header>
-            <Offcanvas.Body className="p-0">
-              <Card className="border-0 rounded-0 h-100 my-sidebar-card">
-                {renderSessionsList()}
-              </Card>
-            </Offcanvas.Body>
-          </Offcanvas>
         )}
       </Row>
     </Container>
