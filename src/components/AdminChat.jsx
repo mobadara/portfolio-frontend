@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Spinner, Dropdown, Form } from 'react-bootstrap';
 import EmojiPicker from 'emoji-picker-react';
 import ReactMarkdown from 'react-markdown';
@@ -6,9 +6,11 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { 
   BiArrowBack, BiSmile, BiPaperclip, BiSend, BiMicrophone, BiPause, BiPlay, BiLockAlt,
-  BiDotsVerticalRounded, BiX, BiCheckDouble 
+  BiDotsVerticalRounded, BiX, BiCheckDouble, BiChevronDown 
 } from 'react-icons/bi';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
+
+const MESSAGE_REACTIONS = ['👍', '❤️', '😂', '😮', '🙏'];
 
 const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView, onRefreshSession }) => {
   const [messages, setMessages] = useState([]);
@@ -22,6 +24,9 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const [isRecordingPaused, setIsRecordingPaused] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState(null);
+  const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
+  const [swipeReplyState, setSwipeReplyState] = useState({ messageId: null, offset: 0 });
   const [isDarkModeEnabled, setIsDarkModeEnabled] = useState(() => {
     if (typeof document === 'undefined') return false;
     return document.documentElement.getAttribute('data-bs-theme') === 'dark';
@@ -37,6 +42,15 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const swipeReplyRef = useRef({ messageId: null, offset: 0 });
+  const messageTouchRef = useRef({
+    messageId: null,
+    startX: 0,
+    startY: 0,
+    isHorizontal: false,
+    longPressTriggered: false
+  });
+  const longPressTimerRef = useRef(null);
   const isMicPressingRef = useRef(false);
   const micStartYRef = useRef(null);
   const shouldSendRecordingRef = useRef(true);
@@ -60,6 +74,13 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
       recorder.stop();
+    }
+  }, []);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
   }, []);
 
@@ -96,7 +117,10 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
           type: 'audio',
           audioBase64: messageData.audio_base64,
           mimeType: messageData.mime_type || 'audio/webm',
-          created_at: messageData.timestamp || new Date().toISOString()
+          created_at: messageData.timestamp || new Date().toISOString(),
+          reaction: null,
+          replyTo: null,
+          deleted: false
         }
       ]);
       return;
@@ -110,7 +134,10 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
           sender: 'admin',
           text: 'This chat session was deleted.',
           created_at: messageData.timestamp || new Date().toISOString(),
-          type: 'text'
+          type: 'text',
+          reaction: null,
+          replyTo: null,
+          deleted: false
         }
       ]);
       if (onCloseRef.current) onCloseRef.current();
@@ -171,7 +198,10 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
           sender: role === 'user' ? 'user' : 'admin',
           text: rawContent,
           created_at: createdAt,
-          type: 'text'
+          type: 'text',
+          reaction: null,
+          replyTo: null,
+          deleted: false
         };
       })
       .filter(Boolean);
@@ -277,8 +307,9 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
 
       stopVoiceRecording();
       clearRecordingTimer();
+      clearLongPressTimer();
     };
-  }, [clearRecordingTimer, connectAdminWebSocket, fetchMessages, sessionId, stopVoiceRecording]);
+  }, [clearLongPressTimer, clearRecordingTimer, connectAdminWebSocket, fetchMessages, sessionId, stopVoiceRecording]);
 
   // Auto-scroll when new messages arrive
   useEffect(() => {
@@ -302,6 +333,33 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [showEmojiPicker]);
+
+  useEffect(() => {
+    if (!openMessageActionsId) return;
+
+    const handleOutsideActionsClick = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      if (
+        target.closest('.my-message-mobile-actions') ||
+        target.closest('.my-message-actions-dropdown') ||
+        target.closest('.my-message-actions-toggle')
+      ) {
+        return;
+      }
+
+      setOpenMessageActionsId(null);
+    };
+
+    document.addEventListener('mousedown', handleOutsideActionsClick);
+    document.addEventListener('touchstart', handleOutsideActionsClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideActionsClick);
+      document.removeEventListener('touchstart', handleOutsideActionsClick);
+    };
+  }, [openMessageActionsId]);
 
   const startVoiceRecording = useCallback(async () => {
     if (isRecording || sending) return;
@@ -461,20 +519,26 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     const outboundText = attachedFile
       ? `${textToSend}${textToSend ? '\n' : ''}[Attachment selected: ${attachedFile.name}]`
       : textToSend;
+    const replyHeader = replyToMessage?.previewText ? `↩️ Replying to: ${replyToMessage.previewText}` : '';
+    const payloadText = replyHeader ? `${replyHeader}\n${outboundText}` : outboundText;
     
     // Optimistic UI update
     const optimisticMsg = {
       id: Date.now(),
       sender: 'admin',
-      text: outboundText,
+      text: payloadText,
       created_at: new Date().toISOString(),
       file: attachedFile ? attachedFile.name : null,
-      isPending: true
+      isPending: true,
+      reaction: null,
+      replyTo: replyToMessage,
+      deleted: false
     };
     
     setMessages(prev => [...prev, optimisticMsg]);
     setInputText('');
     setAttachedFile(null);
+    setReplyToMessage(null);
     setShowEmojiPicker(false);
     scrollToBottom();
 
@@ -482,7 +546,7 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
       const sent = sendSocketPayload({
         type: 'message',
         role: 'admin',
-        content: outboundText,
+        content: payloadText,
         timestamp: new Date().toISOString()
       });
 
@@ -579,10 +643,299 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     });
   };
 
-  const formatTime = (timestamp) => {
+  const getMessagePreviewText = useCallback((msg) => {
+    if (!msg) return '';
+    if (msg.type === 'audio') return 'Voice message';
+    const base = (msg.text || '').replace(/\s+/g, ' ').trim();
+    if (!base) return 'Message';
+    return base.length > 65 ? `${base.slice(0, 65)}...` : base;
+  }, []);
+
+  const handleCopyMessage = useCallback(async (msg) => {
+    const text = msg?.type === 'audio' ? 'Voice message' : (msg?.text || '');
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      document.body.removeChild(temp);
+    }
+
+    setOpenMessageActionsId(null);
+  }, []);
+
+  const handleReplyToMessage = useCallback((msg) => {
+    if (!msg) return;
+    setReplyToMessage({
+      id: msg.id,
+      sender: msg.sender,
+      previewText: getMessagePreviewText(msg)
+    });
+    setOpenMessageActionsId(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [getMessagePreviewText]);
+
+  const handleReactToMessage = useCallback((messageId, emoji) => {
+    setMessages((prev) => prev.map((msg) => (
+      msg.id === messageId ? { ...msg, reaction: emoji } : msg
+    )));
+    setOpenMessageActionsId(null);
+  }, []);
+
+  const handleDeleteFromMe = useCallback((messageId) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+    if (replyToMessage?.id === messageId) {
+      setReplyToMessage(null);
+    }
+    setOpenMessageActionsId(null);
+  }, [replyToMessage]);
+
+  const handleDeleteForEveryone = useCallback((msg) => {
+    if (!msg) return;
+
+    const isAdminMessage = msg.sender === 'admin' || msg.sender === 'bot';
+    if (!isAdminMessage) {
+      handleDeleteFromMe(msg.id);
+      return;
+    }
+
+    const sent = sendSocketPayload({
+      type: 'message',
+      role: 'admin',
+      content: 'This message was deleted.',
+      timestamp: new Date().toISOString()
+    });
+
+    setMessages((prev) => prev.map((entry) => (
+      entry.id === msg.id
+        ? {
+            ...entry,
+            text: 'This message was deleted.',
+            type: 'text',
+            deleted: true,
+            reaction: null,
+            file: null,
+            audioBase64: null,
+            mimeType: null
+          }
+        : entry
+    )));
+
+    if (replyToMessage?.id === msg.id) {
+      setReplyToMessage(null);
+    }
+
+    if (sent && onRefreshSessionRef.current) {
+      onRefreshSessionRef.current();
+    }
+
+    setOpenMessageActionsId(null);
+  }, [handleDeleteFromMe, replyToMessage, sendSocketPayload]);
+
+  const onMessageTouchStart = useCallback((msg, event) => {
+    if (!isMobileView) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    messageTouchRef.current = {
+      messageId: msg.id,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      isHorizontal: false,
+      longPressTriggered: false
+    };
+
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      messageTouchRef.current.longPressTriggered = true;
+      setOpenMessageActionsId((prev) => (prev === msg.id ? null : msg.id));
+    }, 420);
+  }, [clearLongPressTimer, isMobileView]);
+
+  const onMessageTouchMove = useCallback((msg, event) => {
+    if (!isMobileView) return;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+
+    const touchState = messageTouchRef.current;
+    if (touchState.messageId !== msg.id) return;
+
+    const deltaX = touch.clientX - touchState.startX;
+    const deltaY = touch.clientY - touchState.startY;
+
+    if (Math.abs(deltaY) > 10 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      clearLongPressTimer();
+      swipeReplyRef.current = { messageId: null, offset: 0 };
+      setSwipeReplyState((prev) => (prev.messageId === msg.id ? { messageId: null, offset: 0 } : prev));
+      return;
+    }
+
+    if (deltaX > 0 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      touchState.isHorizontal = true;
+      clearLongPressTimer();
+      const nextSwipe = { messageId: msg.id, offset: Math.min(deltaX, 84) };
+      swipeReplyRef.current = nextSwipe;
+      setSwipeReplyState(nextSwipe);
+    }
+  }, [clearLongPressTimer, isMobileView]);
+
+  const onMessageTouchEnd = useCallback((msg) => {
+    if (!isMobileView) return;
+    clearLongPressTimer();
+
+    const currentSwipe = swipeReplyRef.current;
+    if (currentSwipe.messageId === msg.id && currentSwipe.offset >= 56) {
+      handleReplyToMessage(msg);
+    }
+
+    swipeReplyRef.current = { messageId: null, offset: 0 };
+    setSwipeReplyState({ messageId: null, offset: 0 });
+    messageTouchRef.current = {
+      messageId: null,
+      startX: 0,
+      startY: 0,
+      isHorizontal: false,
+      longPressTriggered: false
+    };
+  }, [clearLongPressTimer, handleReplyToMessage, isMobileView]);
+
+  const formatTime = useCallback((timestamp) => {
     if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  }, []);
+
+  const renderedMessages = useMemo(() => {
+    if (loading) {
+      return (
+        <div className="d-flex justify-content-center align-items-center h-100">
+          <Spinner animation="border" className="my-teal-spinner" />
+        </div>
+      );
+    }
+
+    if (messages.length === 0) {
+      return (
+        <div className="text-center text-muted mt-5">
+          <small className="bg-white rounded-pill px-3 py-1 shadow-sm opacity-75">
+            No messages yet. Send a message to start the conversation.
+          </small>
+        </div>
+      );
+    }
+
+    return messages.map((msg, idx) => {
+      const isAdmin = msg.sender === 'admin' || msg.sender === 'bot';
+      const isActionsOpen = openMessageActionsId === msg.id;
+      const swipeOffset = swipeReplyState.messageId === msg.id ? swipeReplyState.offset : 0;
+      return (
+        <div key={msg.id || idx} className={`mb-2 ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}>
+          <div
+            className={`my-message-bubble p-2 rounded position-relative ${isAdmin ? 'my-message-admin' : 'my-message-user'} ${isActionsOpen ? 'my-message-active' : ''}`}
+            style={{ transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : undefined }}
+            onTouchStart={(event) => onMessageTouchStart(msg, event)}
+            onTouchMove={(event) => onMessageTouchMove(msg, event)}
+            onTouchEnd={() => onMessageTouchEnd(msg)}
+            onTouchCancel={() => onMessageTouchEnd(msg)}
+          >
+            <div className="my-message-top-row">
+              <Dropdown
+                align="end"
+                className="my-message-actions-dropdown"
+                autoClose={true}
+                show={isActionsOpen}
+                onToggle={(isOpen) => setOpenMessageActionsId(isOpen ? msg.id : null)}
+              >
+                <Dropdown.Toggle as="button" className="my-message-actions-toggle" aria-label="Message options">
+                  <BiChevronDown size={11} />
+                </Dropdown.Toggle>
+                <Dropdown.Menu className="my-message-actions-menu">
+                  <div className="my-reaction-row" role="group" aria-label="React to message">
+                    {MESSAGE_REACTIONS.map((emoji) => (
+                      <button
+                        key={`${msg.id}-${emoji}`}
+                        type="button"
+                        className="my-reaction-btn"
+                        onClick={() => handleReactToMessage(msg.id, emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <Dropdown.Divider />
+                  <Dropdown.Item className="my-message-action-item" onClick={() => handleCopyMessage(msg)}>
+                    Copy
+                  </Dropdown.Item>
+                  <Dropdown.Item className="my-message-action-item" onClick={() => handleReplyToMessage(msg)}>
+                    Reply
+                  </Dropdown.Item>
+                  <Dropdown.Item className="my-message-action-item text-danger" onClick={() => handleDeleteFromMe(msg.id)}>
+                    Delete from me
+                  </Dropdown.Item>
+                  <Dropdown.Item className="my-message-action-item text-danger" onClick={() => handleDeleteForEveryone(msg)}>
+                    Delete from everyone
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
+            </div>
+
+            {msg.file && (
+              <div className="bg-dark bg-opacity-10 rounded p-2 mb-1 small d-flex align-items-center gap-2">
+                <BiPaperclip /> {msg.file}
+              </div>
+            )}
+
+            {msg.type === 'audio' && msg.audioBase64 ? (
+              <audio controls src={msg.audioBase64} preload="none" style={{ maxWidth: '100%' }} />
+            ) : (
+              <div style={{ wordBreak: 'break-word' }}>
+                {msg.replyTo && (
+                  <div className="my-replied-context mb-1">
+                    <small>{msg.replyTo.previewText}</small>
+                  </div>
+                )}
+                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {msg.text || ''}
+                </ReactMarkdown>
+              </div>
+            )}
+
+            <div className="my-message-time text-end mt-1 d-flex align-items-center justify-content-end gap-1">
+              {formatTime(msg.created_at)}
+              {isAdmin && (
+                <BiCheckDouble size={16} color={msg.isPending ? 'gray' : msg.failed ? '#ff7b7b' : '#53bdeb'} />
+              )}
+            </div>
+
+            {msg.reaction && (
+              <div className="my-message-reaction-chip" aria-label={`Reaction ${msg.reaction}`}>
+                {msg.reaction}
+              </div>
+            )}
+
+          </div>
+        </div>
+      );
+    });
+  }, [
+    loading,
+    messages,
+    openMessageActionsId,
+    swipeReplyState,
+    onMessageTouchStart,
+    onMessageTouchMove,
+    onMessageTouchEnd,
+    handleReactToMessage,
+    handleCopyMessage,
+    handleReplyToMessage,
+    handleDeleteFromMe,
+    handleDeleteForEveryone,
+    formatTime
+  ]);
 
   return (
     <div className="d-flex flex-column h-100 admin-chat-container position-relative">
@@ -642,55 +995,28 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
 
       {/* --- CHAT BODY --- */}
       <div className="my-chat-body flex-grow-1 overflow-auto p-3">
-        {loading ? (
-          <div className="d-flex justify-content-center align-items-center h-100">
-            <Spinner animation="border" className="my-teal-spinner" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="text-center text-muted mt-5">
-            <small className="bg-white rounded-pill px-3 py-1 shadow-sm opacity-75">
-              No messages yet. Send a message to start the conversation.
-            </small>
-          </div>
-        ) : (
-          messages.map((msg, idx) => {
-            const isAdmin = msg.sender === 'admin' || msg.sender === 'bot';
-            return (
-              <div key={msg.id || idx} className={`mb-2 ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}>
-                <div className={`my-message-bubble p-2 rounded position-relative ${isAdmin ? 'my-message-admin' : 'my-message-user'}`}>
-                  
-                  {/* If message has an attachment */}
-                  {msg.file && (
-                    <div className="bg-dark bg-opacity-10 rounded p-2 mb-1 small d-flex align-items-center gap-2">
-                      <BiPaperclip /> {msg.file}
-                    </div>
-                  )}
-
-                  {msg.type === 'audio' && msg.audioBase64 ? (
-                    <audio controls src={msg.audioBase64} preload="none" style={{ maxWidth: '100%' }} />
-                  ) : (
-                    <div style={{ wordBreak: 'break-word' }}>
-                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                        {msg.text || ''}
-                      </ReactMarkdown>
-                    </div>
-                  )}
-                  
-                  <div className="my-message-time text-end mt-1 d-flex align-items-center justify-content-end gap-1">
-                    {formatTime(msg.created_at)}
-                    {isAdmin && (
-                      <BiCheckDouble size={16} color={msg.isPending ? 'gray' : msg.failed ? '#ff7b7b' : '#53bdeb'} />
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+        {renderedMessages}
         <div ref={messagesEndRef} />
       </div>
 
       {/* --- ATTACHMENT PREVIEW --- */}
+      {replyToMessage && (
+        <div className="my-reply-preview d-flex align-items-center justify-content-between px-3 py-2">
+          <div className="my-reply-preview-content">
+            <small className="d-block fw-semibold">Replying to {replyToMessage.sender === 'admin' ? 'you' : 'user'}</small>
+            <small className="d-block text-truncate">{replyToMessage.previewText}</small>
+          </div>
+          <button
+            type="button"
+            className="btn btn-link text-muted p-0 my-reply-preview-close"
+            onClick={() => setReplyToMessage(null)}
+            aria-label="Cancel reply"
+          >
+            <BiX size={18} />
+          </button>
+        </div>
+      )}
+
       {attachedFile && (
         <div className="my-attachment-preview bg-white border-top p-2 d-flex align-items-center justify-content-between">
           <div className="d-flex align-items-center gap-2 text-truncate small text-muted">
@@ -743,11 +1069,11 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
               {/* Emoji Button (Left) */}
               <button 
                 type="button"
-                className="btn btn-link p-0 m-0 my-action-icon text-decoration-none shadow-none" 
+                className="my-action-icon" 
                 title="Emojis"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               >
-                <BiSmile size={24} />
+                <BiSmile size={22} />
               </button>
 
               {/* Text Input Field */}
@@ -763,8 +1089,8 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
               />
 
               {/* Attach File Button (Right - Docs & Images Only) */}
-              <label className="btn btn-link p-0 m-0 my-action-icon shadow-none" title="Attach file" style={{ cursor: 'pointer' }}>
-                <BiPaperclip size={24} style={{ transform: 'rotate(45deg)' }} />
+              <label className="my-action-icon" title="Attach file" style={{ cursor: 'pointer' }}>
+                <BiPaperclip size={22} style={{ transform: 'rotate(45deg)' }} />
                 <input
                   type="file"
                   accept=".doc,.docx,.pdf,image/*"
@@ -780,7 +1106,7 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
             <div className="my-recording-locked-controls ms-2">
               <button
                 type="button"
-                className="btn btn-link p-0 m-0 my-action-icon text-decoration-none shadow-none"
+                className="my-action-icon"
                 onClick={togglePauseRecording}
                 title={isRecordingPaused ? 'Resume recording' : 'Pause recording'}
               >
@@ -789,7 +1115,7 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
               <span className="my-recording-time">{formatRecordingTime(recordingSeconds)}</span>
               <button
                 type="button"
-                className="btn btn-link p-0 m-0 my-action-icon text-decoration-none shadow-none"
+                className="my-action-icon"
                 onClick={() => stopVoiceRecordingWithMode(true)}
                 title="Send recording"
               >
@@ -824,11 +1150,13 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
           }}
           onTouchStart={(e) => {
             if (inputText.trim() || attachedFile) return;
+            e.preventDefault();
             const touch = e.touches?.[0];
             handleMicPressStart(touch?.clientY ?? null);
           }}
           onTouchMove={(e) => {
             if (inputText.trim() || attachedFile) return;
+            e.preventDefault();
             const touch = e.touches?.[0];
             handleMicPressMove(touch?.clientY ?? null);
           }}
@@ -843,6 +1171,15 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
               return;
             }
             e.preventDefault();
+
+            if (!isRecording) {
+              handleMicPressStart(null);
+              return;
+            }
+
+            if (!isMicPressingRef.current) {
+              stopVoiceRecordingWithMode(true);
+            }
           }}
           title={(inputText.trim() || attachedFile) ? 'Send message' : isRecording ? (isRecordingLocked ? 'Recording locked' : 'Release to send') : 'Hold to record'}
           disabled={sending}
