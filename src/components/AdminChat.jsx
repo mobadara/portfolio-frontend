@@ -11,6 +11,7 @@ import {
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
 
 const MESSAGE_REACTIONS = ['👍', '❤️', '😂', '😮', '🙏'];
+const VOICE_WAVE_BARS = [5, 8, 6, 11, 7, 10, 6, 12, 8, 9, 5, 11, 7, 10, 6, 12, 8, 9, 5, 8];
 
 const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView, onRefreshSession }) => {
   const [messages, setMessages] = useState([]);
@@ -29,6 +30,9 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
   const [swipeReplyState, setSwipeReplyState] = useState({ messageId: null, offset: 0 });
+  const [activeAudioId, setActiveAudioId] = useState(null);
+  const [audioCurrentById, setAudioCurrentById] = useState({});
+  const [audioDurationById, setAudioDurationById] = useState({});
   const [isDarkModeEnabled, setIsDarkModeEnabled] = useState(() => {
     if (typeof document === 'undefined') return false;
     return document.documentElement.getAttribute('data-bs-theme') === 'dark';
@@ -47,6 +51,7 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const audioElementsRef = useRef({});
   const swipeReplyRef = useRef({ messageId: null, offset: 0 });
   const messageTouchRef = useRef({
     messageId: null,
@@ -70,6 +75,20 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   useEffect(() => {
     onRefreshSessionRef.current = onRefreshSession;
   }, [onRefreshSession]);
+
+  useEffect(() => {
+    const audioMap = audioElementsRef.current;
+    return () => {
+      Object.values(audioMap).forEach((audioEl) => {
+        if (!audioEl) return;
+        try {
+          audioEl.pause();
+        } catch {
+          // no-op
+        }
+      });
+    };
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -375,19 +394,27 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   }, [showMessageSearch]);
 
   useEffect(() => {
-    const handleGlobalEscape = (event) => {
-      if (event.key !== 'Escape') return;
+    const handleGlobalKeyDown = (event) => {
+      // Escape closes all UI elements
+      if (event.key === 'Escape') {
+        setShowActionsMenu(false);
+        setOpenMessageActionsId(null);
+        setShowEmojiPicker(false);
+        setShowMessageSearch(false);
+        setMessageSearchQuery('');
+        return;
+      }
 
-      setShowActionsMenu(false);
-      setOpenMessageActionsId(null);
-      setShowEmojiPicker(false);
-      setShowMessageSearch(false);
-      setMessageSearchQuery('');
+      // Ctrl/Cmd+F activates search
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+        event.preventDefault();
+        setShowMessageSearch(true);
+      }
     };
 
-    document.addEventListener('keydown', handleGlobalEscape);
+    document.addEventListener('keydown', handleGlobalKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleGlobalEscape);
+      document.removeEventListener('keydown', handleGlobalKeyDown);
     };
   }, []);
 
@@ -888,6 +915,74 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     });
   }, []);
 
+  const setAudioElementRef = useCallback((audioId, node) => {
+    if (!audioId) return;
+    if (node) {
+      audioElementsRef.current[audioId] = node;
+      return;
+    }
+    delete audioElementsRef.current[audioId];
+  }, []);
+
+  const formatAudioTime = useCallback((seconds = 0) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  }, []);
+
+  const handleAudioLoadedMetadata = useCallback((audioId, event) => {
+    const duration = Number(event.currentTarget?.duration || 0);
+    if (!duration) return;
+    setAudioDurationById((prev) => ({ ...prev, [audioId]: duration }));
+  }, []);
+
+  const handleAudioTimeUpdate = useCallback((audioId, event) => {
+    const current = Number(event.currentTarget?.currentTime || 0);
+    setAudioCurrentById((prev) => ({ ...prev, [audioId]: current }));
+  }, []);
+
+  const handleAudioEnded = useCallback((audioId) => {
+    setActiveAudioId((prev) => (prev === audioId ? null : prev));
+  }, []);
+
+  const handleAudioPause = useCallback((audioId) => {
+    setActiveAudioId((prev) => (prev === audioId ? null : prev));
+  }, []);
+
+  const handleAudioSeek = useCallback((audioId, nextTime) => {
+    const audioEl = audioElementsRef.current[audioId];
+    if (!audioEl || !Number.isFinite(nextTime)) return;
+    audioEl.currentTime = nextTime;
+    setAudioCurrentById((prev) => ({ ...prev, [audioId]: nextTime }));
+  }, []);
+
+  const toggleAudioPlayback = useCallback((audioId) => {
+    const targetAudio = audioElementsRef.current[audioId];
+    if (!targetAudio) return;
+
+    Object.entries(audioElementsRef.current).forEach(([id, audioEl]) => {
+      if (!audioEl) return;
+      if (id !== audioId && !audioEl.paused) {
+        audioEl.pause();
+      }
+    });
+
+    if (targetAudio.paused) {
+      targetAudio.play()
+        .then(() => {
+          setActiveAudioId(audioId);
+        })
+        .catch(() => {
+          setActiveAudioId(null);
+        });
+      return;
+    }
+
+    targetAudio.pause();
+    setActiveAudioId(null);
+  }, []);
+
   const renderedMessages = useMemo(() => {
     if (loading) {
       return (
@@ -911,6 +1006,14 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
       const isAdmin = msg.sender === 'admin' || msg.sender === 'bot';
       const isActionsOpen = openMessageActionsId === msg.id;
       const swipeOffset = swipeReplyState.messageId === msg.id ? swipeReplyState.offset : 0;
+      const audioId = String(msg.id || idx);
+      const currentAudioTime = audioCurrentById[audioId] || 0;
+      const totalAudioDuration = audioDurationById[audioId] || 0;
+      const clampedCurrentTime = Math.min(currentAudioTime, totalAudioDuration || currentAudioTime);
+      const waveformProgressPct = totalAudioDuration > 0
+        ? Math.min((clampedCurrentTime / totalAudioDuration) * 100, 100)
+        : 0;
+      const isAudioPlaying = activeAudioId === audioId;
       return (
         <div key={msg.id || idx} className={`mb-2 ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}>
           <div
@@ -969,7 +1072,59 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
             )}
 
             {msg.type === 'audio' && msg.audioBase64 ? (
-              <audio controls src={msg.audioBase64} preload="none" style={{ maxWidth: '100%' }} />
+              <div className="my-voice-note-shell">
+                <button
+                  type="button"
+                  className="my-voice-note-play-btn"
+                  onClick={() => toggleAudioPlayback(audioId)}
+                  aria-label={isAudioPlaying ? 'Pause voice note' : 'Play voice note'}
+                >
+                  {isAudioPlaying ? <BiPause size={16} /> : <BiPlay size={16} />}
+                </button>
+
+                <div className="my-voice-note-main">
+                  <div className="my-voice-note-wave" aria-hidden="true">
+                    {VOICE_WAVE_BARS.map((barHeight, waveIdx) => {
+                      const checkpoint = ((waveIdx + 1) / VOICE_WAVE_BARS.length) * 100;
+                      const isWaveActive = waveformProgressPct >= checkpoint;
+                      return (
+                        <span
+                          key={`${audioId}-bar-${waveIdx}`}
+                          className={`my-voice-note-bar ${isWaveActive ? 'my-voice-note-bar-active' : ''}`}
+                          style={{ height: `${barHeight}px` }}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="range"
+                    className="my-voice-note-seek"
+                    min="0"
+                    max={totalAudioDuration || 0}
+                    step="0.01"
+                    value={totalAudioDuration ? clampedCurrentTime : 0}
+                    onChange={(event) => handleAudioSeek(audioId, Number(event.target.value))}
+                    aria-label="Seek voice note"
+                  />
+                </div>
+
+                <span className="my-voice-note-duration">
+                  {formatAudioTime(clampedCurrentTime)} / {formatAudioTime(totalAudioDuration)}
+                </span>
+
+                <audio
+                  ref={(node) => setAudioElementRef(audioId, node)}
+                  src={msg.audioBase64}
+                  preload="metadata"
+                  onLoadedMetadata={(event) => handleAudioLoadedMetadata(audioId, event)}
+                  onTimeUpdate={(event) => handleAudioTimeUpdate(audioId, event)}
+                  onEnded={() => handleAudioEnded(audioId)}
+                  onPause={() => handleAudioPause(audioId)}
+                  onPlay={() => setActiveAudioId(audioId)}
+                  className="my-voice-note-native"
+                />
+              </div>
             ) : (
               <div style={{ wordBreak: 'break-word' }}>
                 {msg.replyTo && (
@@ -1017,6 +1172,17 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     handleReplyToMessage,
     handleDeleteFromMe,
     handleDeleteForEveryone,
+    activeAudioId,
+    audioCurrentById,
+    audioDurationById,
+    toggleAudioPlayback,
+    setAudioElementRef,
+    handleAudioLoadedMetadata,
+    handleAudioTimeUpdate,
+    handleAudioEnded,
+    handleAudioPause,
+    handleAudioSeek,
+    formatAudioTime,
     formatTime,
     messageSearchQuery,
     renderHighlightedText

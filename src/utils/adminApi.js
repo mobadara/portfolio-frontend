@@ -1,24 +1,11 @@
 const ADMIN_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 
-export const ADMIN_ROUTES = {
-  login: import.meta?.env?.VITE_ADMIN_LOGIN_ENDPOINT || '/admin/login',
-  changePassword: import.meta?.env?.VITE_ADMIN_CHANGE_PASSWORD_ENDPOINT || '/admin/change-password',
-  users: import.meta?.env?.VITE_ADMIN_USERS_ENDPOINT || '/admin/users',
-  messages: import.meta?.env?.VITE_ADMIN_MESSAGES_ENDPOINT || '/admin/contact-messages',
-  contactCreate: import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact',
-  projects: import.meta?.env?.VITE_ADMIN_PROJECTS_ENDPOINT || '/admin/projects',
-  uploadResume: import.meta?.env?.VITE_ADMIN_UPLOAD_RESUME_ENDPOINT || '/admin/upload/resume',
-  uploadPortrait: import.meta?.env?.VITE_ADMIN_UPLOAD_PORTRAIT_ENDPOINT || '/admin/upload/portrait',
-  resumeAsset: import.meta?.env?.VITE_RESUME_ASSET_ENDPOINT || '/api/assets/resume',
-  portraitAsset: import.meta?.env?.VITE_PORTRAIT_ASSET_ENDPOINT || '/api/assets/portrait',
-  sessions: import.meta?.env?.VITE_ADMIN_SESSIONS_ENDPOINT || '/admin/sessions',
-  chatSessions: import.meta?.env?.VITE_ADMIN_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions',
-  deleteAllChatSessions: import.meta?.env?.VITE_ADMIN_DELETE_ALL_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions/delete-all',
-  deleteAllMessages: import.meta?.env?.VITE_ADMIN_DELETE_ALL_MESSAGES_ENDPOINT || '/admin/contact-messages/delete-all',
-  deleteAllProjects: import.meta?.env?.VITE_ADMIN_DELETE_ALL_PROJECTS_ENDPOINT || '/admin/projects/delete-all'
-};
-
 export const buildAdminUrl = (endpoint = '') => `${ADMIN_API_BASE}${endpoint}`;
+
+export const buildAdminWebSocketUrl = (endpoint = '') => {
+  const baseUrl = ADMIN_API_BASE.replace(/^https?:/, '').replace(/\/$/, '');
+  return `${buildAdminUrl(endpoint).replace(/^https?:/, 'wss:').replace(/^http?:/, 'ws:')}`;
+};
 
 export const withAuthHeaders = (token, headers = {}) => ({
   'Content-Type': 'application/json',

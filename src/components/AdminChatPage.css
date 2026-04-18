@@ -176,6 +176,129 @@
   min-height: 18px;
 }
 
+.my-session-actions-dropdown {
+  position: relative;
+}
+
+.my-session-actions-dropdown .dropdown-toggle::after {
+  display: none !important;
+}
+
+.my-session-actions-toggle {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #667781;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.my-session-actions-toggle:hover,
+.my-session-actions-toggle:focus,
+.my-session-actions-dropdown.show .my-session-actions-toggle {
+  background: rgba(0, 168, 132, 0.09);
+}
+
+.my-session-actions-menu {
+  border: 1px solid #d1d7db;
+  border-radius: 12px;
+  padding: 0.3rem;
+  min-width: 168px;
+}
+
+.my-session-action-item {
+  border-radius: 8px;
+  font-size: 0.84rem;
+  padding: 0.42rem 0.58rem;
+}
+
+.my-session-action-item:hover,
+.my-session-action-item:focus {
+  background: #eef7f3;
+  color: #00a884;
+}
+
+.my-session-row {
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+  width: 100%;
+}
+
+.my-session-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dfe5e7;
+  color: #111b21;
+  font-weight: 700;
+  font-size: 0.84rem;
+  flex: 0 0 34px;
+  position: relative;
+}
+
+[data-bs-theme='dark'] .my-session-avatar {
+  background: #2a3942;
+  color: #e9edef;
+}
+
+.my-session-unread-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #25d366;
+  border: 2px solid #efeae2;
+  box-shadow: 0 0 0 1px #25d366;
+}
+
+[data-bs-theme='dark'] .my-session-unread-dot {
+  border-color: #0b141a;
+}
+
+.my-session-main {
+  min-width: 0;
+  display: block;
+  flex: 1 1 auto;
+}
+
+.my-session-unread {
+  font-weight: 700;
+  color: #1f2a30 !important;
+}
+
+[data-bs-theme='dark'] .my-session-actions-toggle {
+  color: #aebac1;
+}
+
+[data-bs-theme='dark'] .my-session-actions-menu {
+  background: #1f2c34;
+  border-color: #2a3942;
+}
+
+[data-bs-theme='dark'] .my-session-action-item {
+  color: #dbe5ea;
+}
+
+[data-bs-theme='dark'] .my-session-action-item:hover,
+[data-bs-theme='dark'] .my-session-action-item:focus {
+  background: #2c3f4a;
+  color: #47d7ac;
+}
+
+[data-bs-theme='dark'] .my-session-unread {
+  color: #e9edef !important;
+}
+
 .session-last-message {
   font-size: 0.78rem;
 }
@@ -551,6 +674,71 @@
   padding: 0.2rem 0.45rem;
 }
 
+.my-voice-note-shell {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 200px;
+}
+
+.my-voice-note-play-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  background: #00a884;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.my-voice-note-main {
+  position: relative;
+  min-width: 0;
+}
+
+.my-voice-note-wave {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  pointer-events: none;
+}
+
+.my-voice-note-bar {
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(84, 101, 111, 0.42);
+  transition: background-color 0.15s ease;
+}
+
+.my-voice-note-bar-active {
+  background: #00a884;
+}
+
+.my-voice-note-seek {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.my-voice-note-duration {
+  font-size: 0.7rem;
+  color: #667781;
+  white-space: nowrap;
+}
+
+.my-voice-note-native {
+  display: none;
+}
+
 .my-reply-preview {
   border-top: 1px solid #d1d7db;
   background: #f7f9fa;
@@ -659,6 +847,23 @@
 
 [data-bs-theme='dark'] .my-replied-context {
   background: rgba(71, 215, 172, 0.14);
+}
+
+[data-bs-theme='dark'] .my-voice-note-play-btn {
+  background: #25d366;
+  color: #0b141a;
+}
+
+[data-bs-theme='dark'] .my-voice-note-bar {
+  background: rgba(174, 186, 193, 0.38);
+}
+
+[data-bs-theme='dark'] .my-voice-note-bar-active {
+  background: #47d7ac;
+}
+
+[data-bs-theme='dark'] .my-voice-note-duration {
+  color: #aebac1;
 }
 
 [data-bs-theme='dark'] .my-reply-preview {

@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Container, Row, Col, Card, Badge, Spinner, Button } from 'react-bootstrap';
-import { BiArrowBack, BiMoon, BiRefresh, BiSun, BiTrash } from 'react-icons/bi';
+import { Container, Row, Col, Card, Badge, Spinner, Button, Dropdown } from 'react-bootstrap';
+import { BiArrowBack, BiMoon, BiRefresh, BiSun, BiDotsVerticalRounded } from 'react-icons/bi';
 import AdminChat from './AdminChat';
-import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, withAuthHeaders } from '../utils/adminApi';
+import { ADMIN_ROUTES, buildAdminUrl, buildAdminWebSocketUrl, getStoredAdminToken, withAuthHeaders } from '../utils/adminApi';
 import './AdminChatPage.css';
 
 /**
@@ -20,9 +20,48 @@ const AdminChatPage = () => {
   const [error, setError] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('adminTheme') || 'dark');
   const [deletingSessionId, setDeletingSessionId] = useState(null);
+  const [openSessionActionsId, setOpenSessionActionsId] = useState(null);
+  const [updatingSessionIds, setUpdatingSessionIds] = useState(new Set());
+  const previewCacheRef = useRef({});
+  const sessionTouchTimerRef = useRef(null);
+  const sessionTouchLongPressRef = useRef(false);
+  const websocketRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
+  const wsReconnectCountRef = useRef(0);
   const [isMobileView, setIsMobileView] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 991.98px)').matches : false
   );
+
+  const clearSessionTouchTimer = useCallback(() => {
+    if (sessionTouchTimerRef.current) {
+      clearTimeout(sessionTouchTimerRef.current);
+      sessionTouchTimerRef.current = null;
+    }
+  }, []);
+
+  const deriveLastMessagePreview = useCallback((messages = []) => {
+    if (!Array.isArray(messages) || messages.length === 0) return 'No messages yet';
+
+    const lastEntry = messages[messages.length - 1] || {};
+    const rawContent = (typeof lastEntry.content === 'string' ? lastEntry.content : '').trim();
+    if (!rawContent) return 'No messages yet';
+
+    try {
+      const parsed = JSON.parse(rawContent);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.type === 'audio' && parsed.audio_base64) {
+          return 'Voice message';
+        }
+
+        const content = (parsed.content || '').toString().trim();
+        if (content) return content;
+      }
+    } catch {
+      // Keep plain string content as-is when message is not JSON.
+    }
+
+    return rawContent;
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -46,6 +85,42 @@ const AdminChatPage = () => {
     return () => mediaQuery.removeEventListener('change', onChange);
   }, []);
 
+  useEffect(() => {
+    if (!openSessionActionsId) return;
+
+    const handleOutsideSessionActions = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      if (
+        target.closest('.my-session-actions-dropdown') ||
+        target.closest('.my-session-actions-toggle')
+      ) {
+        return;
+      }
+
+      setOpenSessionActionsId(null);
+    };
+
+    document.addEventListener('mousedown', handleOutsideSessionActions);
+    document.addEventListener('touchstart', handleOutsideSessionActions);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideSessionActions);
+      document.removeEventListener('touchstart', handleOutsideSessionActions);
+    };
+  }, [openSessionActionsId]);
+
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape') return;
+      setOpenSessionActionsId(null);
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
+
   const fetchActiveSessions = useCallback(async () => {
     try {
       const response = await fetch(buildAdminUrl(ADMIN_ROUTES.sessions), {
@@ -65,7 +140,44 @@ const AdminChatPage = () => {
           const timeB = new Date(b.last_activity || b.created_at || 0);
           return timeB - timeA; // Most recent first
         });
-        setSessions(sortedSessions);
+
+        const sessionsWithPreviews = await Promise.all(
+          sortedSessions.map(async (session) => {
+            const sessionId = session.session_id;
+            const providedPreview = (session.last_message || '').toString().trim();
+            const messageCount = Number(session.message_count || 0);
+
+            if (providedPreview) {
+              previewCacheRef.current[sessionId] = { messageCount, preview: providedPreview };
+              return session;
+            }
+
+            const cached = previewCacheRef.current[sessionId];
+            if (cached && cached.messageCount === messageCount && cached.preview) {
+              return { ...session, last_message: cached.preview };
+            }
+
+            try {
+              const detailResponse = await fetch(
+                buildAdminUrl(`${ADMIN_ROUTES.chatSessions}/${sessionId}`),
+                { headers: withAuthHeaders(token) }
+              );
+
+              if (!detailResponse.ok) {
+                return { ...session, last_message: 'No messages yet' };
+              }
+
+              const detailData = await detailResponse.json();
+              const preview = deriveLastMessagePreview(detailData.messages || []);
+              previewCacheRef.current[sessionId] = { messageCount, preview };
+              return { ...session, last_message: preview };
+            } catch {
+              return { ...session, last_message: 'No messages yet' };
+            }
+          })
+        );
+
+        setSessions(sessionsWithPreviews);
         setError(null);
       } else {
         setSessions([]);
@@ -76,14 +188,16 @@ const AdminChatPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [deriveLastMessagePreview, token]);
 
   // Fetch active sessions on component mount and set up polling
   useEffect(() => {
     fetchActiveSessions();
-    // Poll for new sessions every 2 seconds (faster response)
-    const interval = setInterval(fetchActiveSessions, 2000);
-    return () => clearInterval(interval);
+    // Poll for new sessions every 10 seconds (WebSocket handles real-time updates, polling is backup)
+    pollingIntervalRef.current = setInterval(fetchActiveSessions, 10000);
+    return () => {
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    };
   }, [fetchActiveSessions]);
 
   useEffect(() => {
@@ -91,6 +205,85 @@ const AdminChatPage = () => {
       setActiveSession(routeSessionId);
     }
   }, [routeSessionId]);
+
+  // WebSocket connection for real-time session list updates
+  useEffect(() => {
+    if (!token) return;
+
+    const connectWebSocket = () => {
+      try {
+        const wsUrl = buildAdminWebSocketUrl('/ws/admin/sessions-list');
+        const wsUrlWithToken = `${wsUrl}?token=${encodeURIComponent(token)}`;
+        const ws = new WebSocket(wsUrlWithToken);
+
+        ws.onopen = () => {
+          console.log('✅ Connected to session list WebSocket');
+          websocketRef.current = ws;
+          wsReconnectCountRef.current = 0; // Reset on successful connection
+          // Send ping to keep connection alive every 30 seconds
+          const pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'ping' }));
+            }
+          }, 30000);
+          ws.pingInterval = pingInterval;
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const update = JSON.parse(event.data);
+            
+            if (update.type === 'pong') return;
+            
+            // Handle session updates
+            if (update.type === 'session_marked_read' || 
+                update.type === 'session_archived' || 
+                update.type === 'session_deleted') {
+              setSessions((prev) =>
+                prev.map((session) =>
+                  session.session_id === update.session_id
+                    ? { ...session, ...update.session_data }
+                    : session
+                )
+              );
+            }
+          } catch (err) {
+            console.error('Failed to parse WebSocket message:', err);
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+        };
+
+        ws.onclose = () => {
+          console.log('⚠️ Disconnected from session list WebSocket');
+          websocketRef.current = null;
+          if (ws.pingInterval) clearInterval(ws.pingInterval);
+          
+          // Exponential backoff for reconnection (max 30 seconds)
+          const delayMs = Math.min(1000 * Math.pow(2, wsReconnectCountRef.current), 30000);
+          wsReconnectCountRef.current += 1;
+          console.log(`🔄 Reconnecting WebSocket in ${delayMs}ms (attempt ${wsReconnectCountRef.current})`);
+          setTimeout(connectWebSocket, delayMs);
+        };
+      } catch (err) {
+        console.error('Failed to connect WebSocket:', err);
+        const delayMs = Math.min(1000 * Math.pow(2, wsReconnectCountRef.current), 30000);
+        wsReconnectCountRef.current += 1;
+        setTimeout(connectWebSocket, delayMs);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (websocketRef.current) {
+        websocketRef.current.close();
+        websocketRef.current = null;
+      }
+    };
+  }, [token]);
 
   useEffect(() => {
     if (!activeSession || loading) return;
@@ -139,14 +332,15 @@ const AdminChatPage = () => {
   };
 
   const handleOpenSession = (sessionId) => {
+    if (sessionTouchLongPressRef.current) {
+      sessionTouchLongPressRef.current = false;
+      return;
+    }
     setActiveSession(sessionId);
     navigate(`/admin/chat/${sessionId}`);
   };
 
-  const handleDeleteSession = async (event, sessionId) => {
-    event.stopPropagation();
-    event.preventDefault();
-
+  const handleDeleteSession = async (sessionId) => {
     if (!sessionId || deletingSessionId) return;
 
     const shouldDelete = window.confirm('Delete this chat session permanently? The user will be notified by email if available.');
@@ -175,10 +369,99 @@ const AdminChatPage = () => {
       setError(err.message || 'Unable to delete session.');
     } finally {
       setDeletingSessionId(null);
+      setOpenSessionActionsId(null);
     }
   };
 
-  const activeSessionData = sessions.find((session) => session.session_id === activeSession) || null;
+  const handleMarkSessionRead = async (sessionId) => {
+    if (!sessionId) return;
+    
+    setUpdatingSessionIds((prev) => new Set([...prev, sessionId]));
+    try {
+      const response = await fetch(
+        buildAdminUrl(`${ADMIN_ROUTES.chatSessions}/${sessionId}/mark-read`),
+        {
+          method: 'PATCH',
+          headers: withAuthHeaders(token)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to mark session as read');
+      }
+
+      // Update local session state
+      setSessions((prev) =>
+        prev.map((session) =>
+          session.session_id === sessionId ? { ...session, is_read: true } : session
+        )
+      );
+    } catch (err) {
+      setError(err.message || 'Failed to mark session as read');
+    } finally {
+      setUpdatingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+      setOpenSessionActionsId(null);
+    }
+  };
+
+  const handleArchiveSession = async (sessionId) => {
+    if (!sessionId) return;
+
+    setUpdatingSessionIds((prev) => new Set([...prev, sessionId]));
+    try {
+      const response = await fetch(
+        buildAdminUrl(`${ADMIN_ROUTES.chatSessions}/${sessionId}/archive`),
+        {
+          method: 'PATCH',
+          headers: withAuthHeaders(token)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to archive session');
+      }
+
+      // Update local session state
+      setSessions((prev) =>
+        prev.map((session) =>
+          session.session_id === sessionId ? { ...session, is_archived: true } : session
+        )
+      );
+
+      if (activeSession === sessionId) {
+        handleCloseChat();
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to archive session');
+    } finally {
+      setUpdatingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+      setOpenSessionActionsId(null);
+    }
+  };
+
+  const handleSessionTouchStart = (sessionId) => {
+    clearSessionTouchTimer();
+    sessionTouchLongPressRef.current = false;
+    sessionTouchTimerRef.current = setTimeout(() => {
+      sessionTouchLongPressRef.current = true;
+      setOpenSessionActionsId((prev) => (prev === sessionId ? null : sessionId));
+    }, 420);
+  };
+
+  const handleSessionTouchEnd = () => {
+    clearSessionTouchTimer();
+  };
+
+  const visibleSessions = sessions.filter((session) => !session.is_archived);
+  const activeSessionData = visibleSessions.find((session) => session.session_id === activeSession) || null;
   const chatDisplayName = activeSessionData?.human_mode ? (activeSessionData?.user_name || 'Anonymous') : 'Bot';
   const chatStatusLabel = activeSessionData?.human_mode ? 'Live support' : 'Bot mode';
   const isTransientConnectionIssue = /fetch|network|connect|load sessions|failed to/i.test(error || '');
@@ -196,7 +479,7 @@ const AdminChatPage = () => {
             <BiArrowBack />
           </Button>
           <h6 className="mb-0">Chats</h6>
-          <Badge bg="light" text="dark" pill>{sessions.length}</Badge>
+          <Badge bg="light" text="dark" pill>{visibleSessions.length}</Badge>
         </div>
         <div className="d-flex align-items-center gap-2">
           <Button variant="link" className="p-0 my-icon-btn" onClick={fetchActiveSessions} aria-label="Refresh chats">
@@ -225,16 +508,21 @@ const AdminChatPage = () => {
               {isTransientConnectionIssue ? 'Reconnecting to chat service...' : error}
             </p>
           </div>
-        ) : sessions.length === 0 ? (
+        ) : visibleSessions.length === 0 ? (
           <div className="p-3 text-center text-muted">
             <i className="bi bi-chat-dots fs-1 d-block mb-2 opacity-25"></i>
             <small>No active chats</small>
           </div>
         ) : (
           <div className="list-group list-group-flush my-session-list">
-            {sessions.map((session) => {
+            {visibleSessions.map((session) => {
               const isActive = activeSession === session.session_id;
               const isDeletingThis = deletingSessionId === session.session_id;
+              const isUpdatingThis = updatingSessionIds.has(session.session_id);
+              const isRead = session.is_read || false;
+              const sessionDisplayName = session.user_name ? session.user_name : session.human_mode ? 'Anonymous' : 'Bot';
+              const sessionAvatarInitial = (sessionDisplayName || '?').trim().charAt(0).toUpperCase() || '?';
+              const lastMessagePreview = (session.last_message || '').toString().trim() || 'No messages yet';
 
               return (
                 <button
@@ -244,35 +532,74 @@ const AdminChatPage = () => {
                     isActive ? 'my-session-item-active' : ''
                   }`}
                   aria-current={isActive ? 'true' : undefined}
+                  onTouchStart={() => handleSessionTouchStart(session.session_id)}
+                  onTouchMove={handleSessionTouchEnd}
+                  onTouchEnd={handleSessionTouchEnd}
+                  onTouchCancel={handleSessionTouchEnd}
                 >
-                  <div className="d-flex justify-content-between align-items-start mb-1">
-                    <strong className="small text-truncate me-2">
-                      {session.user_name ? session.user_name : session.human_mode ? 'Anonymous' : 'Bot'}
-                    </strong>
-                    <div className="d-flex align-items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="p-0 text-danger my-session-delete-btn"
-                        onClick={(event) => handleDeleteSession(event, session.session_id)}
-                        disabled={isDeletingThis}
-                        aria-label={`Delete session ${session.session_id}`}
-                        title="Delete session"
-                      >
-                        {isDeletingThis ? <Spinner animation="border" size="sm" /> : <BiTrash />}
-                      </Button>
+                  <div className="my-session-row">
+                    <div className="my-session-avatar" aria-hidden="true">
+                      {sessionAvatarInitial}
+                      {!isRead && <span className="my-session-unread-dot"></span>}
+                    </div>
+                    <div className="my-session-main flex-grow-1">
+                      <div className="d-flex justify-content-between align-items-start mb-1">
+                        <strong className={`small text-truncate me-2 ${isRead ? '' : 'my-session-unread'}`}>
+                          {sessionDisplayName}
+                        </strong>
+                        <div className="d-flex align-items-center gap-2">
+                          <Dropdown
+                            align="end"
+                            className="my-session-actions-dropdown"
+                            autoClose={true}
+                            show={openSessionActionsId === session.session_id}
+                            onToggle={(isOpen) => setOpenSessionActionsId(isOpen ? session.session_id : null)}
+                          >
+                            <Dropdown.Toggle
+                              as="button"
+                              className="my-session-actions-toggle"
+                              onClick={(event) => event.stopPropagation()}
+                              aria-label={`Open actions for ${sessionDisplayName}`}
+                            >
+                              <BiDotsVerticalRounded size={16} />
+                            </Dropdown.Toggle>
+
+                            <Dropdown.Menu className="my-session-actions-menu" onClick={(event) => event.stopPropagation()}>
+                              <Dropdown.Item
+                                className="my-session-action-item"
+                                onClick={() => handleDeleteSession(session.session_id)}
+                                disabled={isDeletingThis}
+                              >
+                                {isDeletingThis ? 'Deleting...' : 'Delete session'}
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                className="my-session-action-item"
+                                onClick={() => handleMarkSessionRead(session.session_id)}
+                                disabled={isUpdatingThis || isRead}
+                              >
+                                {isUpdatingThis ? 'Updating...' : isRead ? 'Already read' : 'Mark as read'}
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                className="my-session-action-item"
+                                onClick={() => handleArchiveSession(session.session_id)}
+                              >
+                                Archive
+                              </Dropdown.Item>
+                            </Dropdown.Menu>
+                          </Dropdown>
+                        </div>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-1">
+                        <small className="text-muted">{session.message_count || 0} messages</small>
+                        <small className="text-muted text-nowrap">
+                          {formatRelativeTime(session.last_activity || session.created_at)}
+                        </small>
+                      </div>
+                      <small className={`text-truncate d-block text-muted session-last-message ${isRead ? '' : 'my-session-unread'}`}>
+                        {lastMessagePreview}
+                      </small>
                     </div>
                   </div>
-                  <div className="d-flex justify-content-between align-items-center mb-1">
-                    <small className="text-muted">{session.message_count || 0} messages</small>
-                    <small className="text-muted text-nowrap">
-                      {formatRelativeTime(session.last_activity || session.created_at)}
-                    </small>
-                  </div>
-                  <small className="text-truncate d-block text-muted session-last-message">
-                    ID: {session.session_id}
-                  </small>
                 </button>
               );
             })}
