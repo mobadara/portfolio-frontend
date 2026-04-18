@@ -6,7 +6,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { 
   BiArrowBack, BiSmile, BiPaperclip, BiSend, BiMicrophone, BiPause, BiPlay, BiLockAlt,
-  BiDotsVerticalRounded, BiX, BiCheckDouble, BiChevronDown 
+  BiDotsVerticalRounded, BiX, BiCheckDouble, BiChevronDown, BiSearch
 } from 'react-icons/bi';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
 
@@ -24,6 +24,8 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const [isRecordingPaused, setIsRecordingPaused] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showMessageSearch, setShowMessageSearch] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
   const [swipeReplyState, setSwipeReplyState] = useState({ messageId: null, offset: 0 });
@@ -35,6 +37,9 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
+  const searchInputRef = useRef(null);
+  const searchRowRef = useRef(null);
+  const searchToggleBtnRef = useRef(null);
   const emojiPopoverRef = useRef(null);
   const webSocketRef = useRef(null);
   const reconnectTimerRef = useRef(null);
@@ -333,6 +338,58 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
       document.removeEventListener('touchstart', handleOutsideClick);
     };
   }, [showEmojiPicker]);
+
+  useEffect(() => {
+    if (!showMessageSearch) return;
+    const id = requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showMessageSearch]);
+
+  useEffect(() => {
+    if (!showMessageSearch) return;
+
+    const handleOutsideSearchClick = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      if (
+        searchRowRef.current?.contains(target) ||
+        searchToggleBtnRef.current?.contains(target)
+      ) {
+        return;
+      }
+
+      setShowMessageSearch(false);
+      setMessageSearchQuery('');
+    };
+
+    document.addEventListener('mousedown', handleOutsideSearchClick);
+    document.addEventListener('touchstart', handleOutsideSearchClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideSearchClick);
+      document.removeEventListener('touchstart', handleOutsideSearchClick);
+    };
+  }, [showMessageSearch]);
+
+  useEffect(() => {
+    const handleGlobalEscape = (event) => {
+      if (event.key !== 'Escape') return;
+
+      setShowActionsMenu(false);
+      setOpenMessageActionsId(null);
+      setShowEmojiPicker(false);
+      setShowMessageSearch(false);
+      setMessageSearchQuery('');
+    };
+
+    document.addEventListener('keydown', handleGlobalEscape);
+    return () => {
+      document.removeEventListener('keydown', handleGlobalEscape);
+    };
+  }, []);
 
   useEffect(() => {
     if (!openMessageActionsId) return;
@@ -809,6 +866,28 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }, []);
 
+  const renderHighlightedText = useCallback((text, query) => {
+    const source = (text || '').toString();
+    const search = (query || '').trim();
+    if (!search) return source;
+
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!escaped) return source;
+
+    const regex = new RegExp(`(${escaped})`, 'ig');
+    const pieces = source.split(regex);
+
+    return pieces.map((piece, idx) => {
+      const isMatch = piece.toLowerCase() === search.toLowerCase();
+      if (!isMatch) return <React.Fragment key={`text-${idx}`}>{piece}</React.Fragment>;
+      return (
+        <mark key={`mark-${idx}`} className="my-search-highlight">
+          {piece}
+        </mark>
+      );
+    });
+  }, []);
+
   const renderedMessages = useMemo(() => {
     if (loading) {
       return (
@@ -898,9 +977,13 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
                     <small>{msg.replyTo.previewText}</small>
                   </div>
                 )}
-                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                  {msg.text || ''}
-                </ReactMarkdown>
+                {messageSearchQuery.trim() ? (
+                  <div className="my-searchable-message-text">{renderHighlightedText(msg.text || '', messageSearchQuery)}</div>
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    {msg.text || ''}
+                  </ReactMarkdown>
+                )}
               </div>
             )}
 
@@ -934,7 +1017,9 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     handleReplyToMessage,
     handleDeleteFromMe,
     handleDeleteForEveryone,
-    formatTime
+    formatTime,
+    messageSearchQuery,
+    renderHighlightedText
   ]);
 
   return (
@@ -959,6 +1044,36 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
         
         {/* Three Dots Context Menu */}
         <div className="my-chat-header-actions">
+          {showMessageSearch && (
+            <div ref={searchRowRef} className="my-chat-search-inline-shell d-flex align-items-center gap-2">
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="my-chat-search-input"
+                value={messageSearchQuery}
+                onChange={(e) => setMessageSearchQuery(e.target.value)}
+                placeholder="Search"
+                aria-label="Search in chat messages"
+              />
+            </div>
+          )}
+
+          <button
+            ref={searchToggleBtnRef}
+            type="button"
+            className="btn btn-link shadow-none my-actions-toggle-btn text-muted p-2"
+            onClick={() => {
+              setShowMessageSearch((prev) => !prev);
+              if (showMessageSearch) {
+                setMessageSearchQuery('');
+              }
+            }}
+            aria-label="Search messages"
+            title="Search messages"
+          >
+            <BiSearch size={20} color={isMobileView ? 'white' : undefined} />
+          </button>
+
           <Dropdown
             align="end"
             className="my-actions-dropdown-wrap"
