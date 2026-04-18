@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Container, Row, Col, Card, Badge, Spinner, Button, Dropdown } from 'react-bootstrap';
+import { Container, Row, Col, Card, Badge, Spinner, Button, Dropdown, Modal } from 'react-bootstrap';
 import { BiArrowBack, BiMoon, BiRefresh, BiSun, BiDotsVerticalRounded } from 'react-icons/bi';
 import AdminChat from './AdminChat';
 import { ADMIN_ROUTES, buildAdminUrl, buildAdminWebSocketUrl, getStoredAdminToken, withAuthHeaders } from '../utils/adminApi';
@@ -20,6 +20,7 @@ const AdminChatPage = () => {
   const [error, setError] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('adminTheme') || 'dark');
   const [deletingSessionId, setDeletingSessionId] = useState(null);
+  const [deleteSessionConfirm, setDeleteSessionConfirm] = useState({ show: false, sessionId: null, title: '', body: '' });
   const [openSessionActionsId, setOpenSessionActionsId] = useState(null);
   const [updatingSessionIds, setUpdatingSessionIds] = useState(new Set());
   const previewCacheRef = useRef({});
@@ -343,8 +344,17 @@ const AdminChatPage = () => {
   const handleDeleteSession = async (sessionId) => {
     if (!sessionId || deletingSessionId) return;
 
-    const shouldDelete = window.confirm('Delete this chat session permanently? The user will be notified by email if available.');
-    if (!shouldDelete) return;
+    setDeleteSessionConfirm({
+      show: true,
+      sessionId,
+      title: 'Delete session?',
+      body: 'This chat session will be permanently deleted. The user will be notified by email if available.'
+    });
+  };
+
+  const confirmDeleteSession = async () => {
+    const sessionId = deleteSessionConfirm.sessionId;
+    if (!sessionId || deletingSessionId) return;
 
     setDeletingSessionId(sessionId);
     setError(null);
@@ -370,6 +380,7 @@ const AdminChatPage = () => {
     } finally {
       setDeletingSessionId(null);
       setOpenSessionActionsId(null);
+      setDeleteSessionConfirm({ show: false, sessionId: null, title: '', body: '' });
     }
   };
 
@@ -463,6 +474,7 @@ const AdminChatPage = () => {
   const visibleSessions = sessions.filter((session) => !session.is_archived);
   const activeSessionData = visibleSessions.find((session) => session.session_id === activeSession) || null;
   const chatDisplayName = activeSessionData?.human_mode ? (activeSessionData?.user_name || 'Anonymous') : 'Bot';
+  const chatUserName = activeSessionData?.user_name || 'User';
   const chatStatusLabel = activeSessionData?.human_mode ? 'Live support' : 'Bot mode';
   const isTransientConnectionIssue = /fetch|network|connect|load sessions|failed to/i.test(error || '');
 
@@ -543,7 +555,7 @@ const AdminChatPage = () => {
                       {!isRead && <span className="my-session-unread-dot"></span>}
                     </div>
                     <div className="my-session-main flex-grow-1">
-                      <div className="d-flex justify-content-between align-items-start mb-1">
+                      <div className="my-session-header-row d-flex justify-content-between align-items-start mb-1">
                         <strong className={`small text-truncate me-2 ${isRead ? '' : 'my-session-unread'}`}>
                           {sessionDisplayName}
                         </strong>
@@ -641,6 +653,7 @@ const AdminChatPage = () => {
                 sessionId={activeSession}
                 onClose={handleCloseChat}
                 displayName={chatDisplayName}
+                chatUserName={chatUserName}
                 statusLabel={chatStatusLabel}
                 isMobileView={isMobileView}
                 onRefreshSession={fetchActiveSessions}
@@ -663,6 +676,28 @@ const AdminChatPage = () => {
           </Col>
         )}
       </Row>
+
+      <Modal
+        show={deleteSessionConfirm.show}
+        onHide={() => setDeleteSessionConfirm({ show: false, sessionId: null, title: '', body: '' })}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>{deleteSessionConfirm.title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>{deleteSessionConfirm.body}</Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={() => setDeleteSessionConfirm({ show: false, sessionId: null, title: '', body: '' })}
+          >
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteSession} disabled={!deleteSessionConfirm.sessionId}>
+            Delete session
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

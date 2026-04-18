@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Spinner, Dropdown, Form } from 'react-bootstrap';
+import { Spinner, Dropdown, Form, Modal, Button, Toast, ToastContainer } from 'react-bootstrap';
 import EmojiPicker from 'emoji-picker-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -13,7 +13,7 @@ import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withA
 const MESSAGE_REACTIONS = ['👍', '❤️', '😂', '😮', '🙏'];
 const VOICE_WAVE_BARS = [5, 8, 6, 11, 7, 10, 6, 12, 8, 9, 5, 11, 7, 10, 6, 12, 8, 9, 5, 8];
 
-const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView, onRefreshSession }) => {
+const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel, isMobileView, onRefreshSession }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,15 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   const [activeAudioId, setActiveAudioId] = useState(null);
   const [audioCurrentById, setAudioCurrentById] = useState({});
   const [audioDurationById, setAudioDurationById] = useState({});
+  const [showCopyToast, setShowCopyToast] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    show: false,
+    title: '',
+    body: '',
+    confirmLabel: 'Delete',
+    variant: 'danger',
+    onConfirm: null
+  });
   const [isDarkModeEnabled, setIsDarkModeEnabled] = useState(() => {
     if (typeof document === 'undefined') return false;
     return document.documentElement.getAttribute('data-bs-theme') === 'dark';
@@ -750,6 +759,7 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
       document.body.removeChild(temp);
     }
 
+    setShowCopyToast(true);
     setOpenMessageActionsId(null);
   }, []);
 
@@ -772,10 +782,19 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
   }, []);
 
   const handleDeleteFromMe = useCallback((messageId) => {
-    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-    if (replyToMessage?.id === messageId) {
-      setReplyToMessage(null);
-    }
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete message?',
+      body: 'This message will be removed from your view.',
+      confirmLabel: 'Delete message',
+      variant: 'danger',
+      onConfirm: () => {
+        setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+        if (replyToMessage?.id === messageId) {
+          setReplyToMessage(null);
+        }
+      }
+    });
     setOpenMessageActionsId(null);
   }, [replyToMessage]);
 
@@ -783,43 +802,65 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     if (!msg) return;
 
     const isAdminMessage = msg.sender === 'admin' || msg.sender === 'bot';
-    if (!isAdminMessage) {
-      handleDeleteFromMe(msg.id);
-      return;
-    }
+    setDeleteConfirm({
+      show: true,
+      title: 'Delete for everyone?',
+      body: isAdminMessage
+        ? 'This will replace the message with a deleted placeholder for everyone.'
+        : 'This message will be removed from your view.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: () => {
+        if (!isAdminMessage) {
+          setMessages((prev) => prev.filter((entry) => entry.id !== msg.id));
+          if (replyToMessage?.id === msg.id) {
+            setReplyToMessage(null);
+          }
+          return;
+        }
 
-    const sent = sendSocketPayload({
-      type: 'message',
-      role: 'admin',
-      content: 'This message was deleted.',
-      timestamp: new Date().toISOString()
+        const sent = sendSocketPayload({
+          type: 'message',
+          role: 'admin',
+          content: 'This message was deleted.',
+          timestamp: new Date().toISOString()
+        });
+
+        setMessages((prev) => prev.map((entry) => (
+          entry.id === msg.id
+            ? {
+                ...entry,
+                text: 'This message was deleted.',
+                type: 'text',
+                deleted: true,
+                reaction: null,
+                file: null,
+                audioBase64: null,
+                mimeType: null
+              }
+            : entry
+        )));
+
+        if (replyToMessage?.id === msg.id) {
+          setReplyToMessage(null);
+        }
+
+        if (sent && onRefreshSessionRef.current) {
+          onRefreshSessionRef.current();
+        }
+      }
     });
 
-    setMessages((prev) => prev.map((entry) => (
-      entry.id === msg.id
-        ? {
-            ...entry,
-            text: 'This message was deleted.',
-            type: 'text',
-            deleted: true,
-            reaction: null,
-            file: null,
-            audioBase64: null,
-            mimeType: null
-          }
-        : entry
-    )));
-
-    if (replyToMessage?.id === msg.id) {
-      setReplyToMessage(null);
-    }
-
-    if (sent && onRefreshSessionRef.current) {
-      onRefreshSessionRef.current();
-    }
-
     setOpenMessageActionsId(null);
-  }, [handleDeleteFromMe, replyToMessage, sendSocketPayload]);
+  }, [replyToMessage, sendSocketPayload]);
+
+  const confirmDeleteAction = useCallback(async () => {
+    const action = deleteConfirm.onConfirm;
+    setDeleteConfirm((prev) => ({ ...prev, show: false }));
+    if (action) {
+      await action();
+    }
+  }, [deleteConfirm.onConfirm]);
 
   const onMessageTouchStart = useCallback((msg, event) => {
     if (!isMobileView) return;
@@ -1014,8 +1055,12 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
         ? Math.min((clampedCurrentTime / totalAudioDuration) * 100, 100)
         : 0;
       const isAudioPlaying = activeAudioId === audioId;
+      const messageOwnerName = isAdmin ? 'Admin' : (chatUserName?.trim() || 'User');
       return (
-        <div key={msg.id || idx} className={`mb-2 ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}>
+        <div key={msg.id || idx} className={`mb-2 my-msg-row-shell ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}>
+          <div className="my-message-avatar" aria-hidden="true">
+            {isAdmin ? 'A' : 'U'}
+          </div>
           <div
             className={`my-message-bubble p-2 rounded position-relative ${isAdmin ? 'my-message-admin' : 'my-message-user'} ${isActionsOpen ? 'my-message-active' : ''}`}
             style={{ transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : undefined }}
@@ -1024,7 +1069,11 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
             onTouchEnd={() => onMessageTouchEnd(msg)}
             onTouchCancel={() => onMessageTouchEnd(msg)}
           >
-            <div className="my-message-top-row">
+            <div
+              className={`my-message-top-row ${isActionsOpen ? 'my-message-top-row-active' : ''}`}
+              onClick={() => setOpenMessageActionsId((prev) => (prev === msg.id ? null : msg.id))}
+            >
+              <span className="my-message-owner-name">{messageOwnerName}</span>
               <Dropdown
                 align="end"
                 className="my-message-actions-dropdown"
@@ -1032,7 +1081,12 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
                 show={isActionsOpen}
                 onToggle={(isOpen) => setOpenMessageActionsId(isOpen ? msg.id : null)}
               >
-                <Dropdown.Toggle as="button" className="my-message-actions-toggle" aria-label="Message options">
+                <Dropdown.Toggle
+                  as="button"
+                  className="my-message-actions-toggle"
+                  aria-label="Message options"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <BiChevronDown size={11} />
                 </Dropdown.Toggle>
                 <Dropdown.Menu className="my-message-actions-menu">
@@ -1184,6 +1238,7 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
     handleAudioSeek,
     formatAudioTime,
     formatTime,
+    chatUserName,
     messageSearchQuery,
     renderHighlightedText
   ]);
@@ -1476,6 +1531,27 @@ const AdminChat = ({ sessionId, onClose, displayName, statusLabel, isMobileView,
           )}
         </button>
       </div>
+
+      <ToastContainer position="bottom-end" className="p-3">
+        <Toast bg="success" show={showCopyToast} autohide delay={2200} onClose={() => setShowCopyToast(false)}>
+          <Toast.Body className="text-white">Copied successfully</Toast.Body>
+        </Toast>
+      </ToastContainer>
+
+      <Modal show={deleteConfirm.show} onHide={() => setDeleteConfirm((prev) => ({ ...prev, show: false }))} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{deleteConfirm.title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>{deleteConfirm.body}</Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setDeleteConfirm((prev) => ({ ...prev, show: false }))}>
+            Cancel
+          </Button>
+          <Button variant={deleteConfirm.variant || 'danger'} onClick={confirmDeleteAction}>
+            {deleteConfirm.confirmLabel || 'Delete'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
