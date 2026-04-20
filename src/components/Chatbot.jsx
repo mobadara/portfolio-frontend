@@ -1602,20 +1602,47 @@ const Chatbot = () => {
                                 <button 
                                   onClick={async (e) => { 
                                     e.preventDefault(); 
-                                    setAwaitingTransferConfirmation(false);
-                                    setIsHumanMode(true);
-                                    setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Excellent. You are now connected. Please wait while a representative joins the chat.', sender: 'bot' }]);
-                                    
-                                    // Fetch details and immediately resend lead
+                                    setLeadSubmitStatus({ type: 'pending', text: 'Reconnecting you to human support...' });
+
+                                    let leadPayload = {};
                                     const savedDetails = localStorage.getItem(CHATBOT_LEAD_DETAILS_KEY);
                                     if (savedDetails) {
                                       try {
                                         const parsedDetails = JSON.parse(savedDetails);
-                                        await submitHumanSupportLead(parsedDetails);
+                                        leadPayload = {
+                                          name: parsedDetails?.name || undefined,
+                                          email: parsedDetails?.email || undefined,
+                                          country_code: parsedDetails?.countryCode || undefined,
+                                          phone_local: String(parsedDetails?.phone || '').replace(/[^\d]/g, '') || undefined,
+                                          phone: parsedDetails?.fullPhone || undefined,
+                                          user_name: parsedDetails?.name || undefined,
+                                          user_email: parsedDetails?.email || undefined,
+                                          user_phone: parsedDetails?.fullPhone || undefined,
+                                          details: parsedDetails?.detailsMessage || undefined,
+                                        };
                                       } catch {
                                         // No-op: silently ignore malformed cached lead payload.
                                       }
                                     }
+
+                                    const backendEnabled = await requestHumanModeActivation(leadPayload);
+                                    if (!backendEnabled) {
+                                      setLeadSubmitStatus({ type: 'error', text: 'Could not reconnect to human support. Please try again.' });
+                                      setMessages((prev) => [
+                                        ...prev,
+                                        {
+                                          id: getNextMessageId(),
+                                          text: 'I could not confirm the handoff to human support yet. Please click Continue Session again in a moment.',
+                                          sender: 'bot'
+                                        }
+                                      ]);
+                                      return;
+                                    }
+
+                                    setAwaitingTransferConfirmation(false);
+                                    setLeadSubmitStatus({ type: 'success', text: 'Connected to human support.' });
+                                    setIsHumanMode(true);
+                                    setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Excellent. You are now connected. Please wait while a representative joins the chat.', sender: 'bot' }]);
                                   }} 
                                   className="btn btn-sm btn-success mt-2 mb-1 d-block w-100" 
                                   type="button"
