@@ -26,8 +26,14 @@ const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
 const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
 const CHATBOT_LEAD_SUBMITTED_KEY = 'portfolio_chatbot_lead_submitted';
 const CHATBOT_LEAD_DETAILS_KEY = 'portfolio_chatbot_lead_details';
+const CHATBOT_LAST_PAGE_EXIT_AT_KEY = 'portfolio_chatbot_last_page_exit_at';
 const CHATBOT_AUTO_PROMPT_KEY = 'portfolio_chatbot_auto_prompt_seen_v1';
 const CHATBOT_AUTO_PROMPT_DELAY_MS = 25000;
+const CHATBOT_IDLE_RESET_TIMEOUT_MS = (() => {
+  const configuredMinutes = Number(import.meta?.env?.VITE_CHATBOT_IDLE_RESET_MINUTES ?? 7);
+  if (!Number.isFinite(configuredMinutes) || configuredMinutes <= 0) return 7 * 60 * 1000;
+  return configuredMinutes * 60 * 1000;
+})();
 const defaultBotMessage = { id: 1, text: "Hi! I'm Muyiwa's AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
 
 const generateSessionId = () => {
@@ -185,6 +191,7 @@ const Chatbot = () => {
   const recordingTimerRef = useRef(null);
   const pendingReachSupportTriggerRef = useRef(false);
   const resumeSessionRef = useRef(parseResumeSessionFromUrl());
+  const shouldResetModeOnConnectRef = useRef(false);
 
   const suggestedQuestions = [
     'What are your key skills?',
@@ -468,6 +475,22 @@ const Chatbot = () => {
   }, [leadSubmitStatus]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const markPageExit = () => {
+      localStorage.setItem(CHATBOT_LAST_PAGE_EXIT_AT_KEY, String(Date.now()));
+    };
+
+    window.addEventListener('pagehide', markPageExit);
+    window.addEventListener('beforeunload', markPageExit);
+
+    return () => {
+      window.removeEventListener('pagehide', markPageExit);
+      window.removeEventListener('beforeunload', markPageExit);
+    };
+  }, []);
+
+  useEffect(() => {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return;
     persistMessagesForSession(sessionId, messages);
@@ -519,6 +542,20 @@ const Chatbot = () => {
 
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
       if (!storedSessionId) return generateSessionId();
+
+      const lastExitRaw = localStorage.getItem(CHATBOT_LAST_PAGE_EXIT_AT_KEY);
+      const lastExitAt = Number(lastExitRaw || 0);
+      const shouldResetForIdle = Number.isFinite(lastExitAt)
+        && lastExitAt > 0
+        && (Date.now() - lastExitAt >= CHATBOT_IDLE_RESET_TIMEOUT_MS);
+
+      shouldResetModeOnConnectRef.current = Boolean(shouldResetForIdle);
+      localStorage.removeItem(CHATBOT_LAST_PAGE_EXIT_AT_KEY);
+
+      if (shouldResetForIdle) {
+        localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+        localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
+      }
       
       try {
         const response = await fetch(CHAT_SESSION_STATUS_ENDPOINT(storedSessionId));
@@ -526,7 +563,7 @@ const Chatbot = () => {
         const data = await response.json();
         if (data?.exists) {
           setHasSession(true);
-          setIsHumanMode(Boolean(data?.human_mode));
+          setIsHumanMode(shouldResetForIdle ? false : Boolean(data?.human_mode));
           return storedSessionId;
         }
       } catch {
@@ -656,6 +693,24 @@ const Chatbot = () => {
           if (isMounted) {
             setIsConnected(true);
             setIsConnecting(false);
+          }
+
+          if (shouldResetModeOnConnectRef.current && sessionIdRef.current) {
+            try {
+              ws.send(JSON.stringify({
+                type: 'leave_human_mode',
+                session_id: sessionIdRef.current,
+                reason: 'idle_timeout'
+              }));
+              shouldResetModeOnConnectRef.current = false;
+              setIsHumanMode(false);
+              setAwaitingTransferConfirmation(false);
+              setShowHumanForm(false);
+              localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+              localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
+            } catch {
+              // If this fails, session status fetch already forced local AI mode.
+            }
           }
         };
 
