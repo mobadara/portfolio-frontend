@@ -12,7 +12,7 @@ import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 const AboutSection = ({ theme }) => {
   const [showGithubModal, setShowGithubModal] = useState(false);
   const [portraitSrc, setPortraitSrc] = useState('');
-  const [isPortraitMissing, setIsPortraitMissing] = useState(false);
+  const [portraitLoadState, setPortraitLoadState] = useState('loading');
 
   const toAbsoluteAssetUrl = (url = '') => {
     const normalized = String(url || '').trim();
@@ -48,16 +48,17 @@ const AboutSection = ({ theme }) => {
 
     const loadAssets = async () => {
       try {
+        setPortraitLoadState('loading');
         const portraitAsset = await fetchAsset(ADMIN_ROUTES.portraitAsset);
 
         if (!isMounted) return;
 
         setPortraitSrc(portraitAsset.url);
-        setIsPortraitMissing(portraitAsset.missing);
+        setPortraitLoadState(portraitAsset.missing || !portraitAsset.url ? 'fallback' : 'ready');
       } catch {
         if (!isMounted) return;
         setPortraitSrc('');
-        setIsPortraitMissing(true);
+        setPortraitLoadState('fallback');
       }
     };
 
@@ -77,20 +78,26 @@ const AboutSection = ({ theme }) => {
           <Col lg={5} className="d-flex justify-content-center">
             <div className="profile-card animate-slide-in-left">
               <div className="profile-image-wrapper">
-                {portraitSrc && !isPortraitMissing ? (
+                {portraitLoadState === 'loading' ? (
+                  <div className="profile-image profile-image-placeholder profile-image-loading d-flex flex-column align-items-center justify-content-center text-center px-3">
+                    <span className="portrait-loader" aria-hidden="true"></span>
+                    <span className="portrait-loader-label">Loading portrait...</span>
+                  </div>
+                ) : portraitLoadState === 'ready' && portraitSrc ? (
                   <img
                     src={portraitSrc}
                     alt="Muyiwa J. Obadara Portrait"
                     className="profile-image"
+                    onLoad={() => setPortraitLoadState('ready')}
                     onError={() => {
                       setPortraitSrc('');
-                      setIsPortraitMissing(true);
+                      setPortraitLoadState('fallback');
                     }}
                   />
                 ) : (
-                  <div className="profile-image d-flex flex-column align-items-center justify-content-center text-white text-center px-3">
-                    <i className="bi bi-image fs-1 mb-2"></i>
-                    <span className="fw-semibold">Portrait not uploaded</span>
+                  <div className="profile-image profile-image-placeholder profile-image-fallback d-flex flex-column align-items-center justify-content-center text-center px-3">
+                    <i className="bi bi-person-circle portrait-fallback-icon" aria-hidden="true"></i>
+                    <span className="portrait-fallback-label">Portrait unavailable</span>
                   </div>
                 )}
                 <div className="profile-image-overlay"></div>

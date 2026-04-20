@@ -8,6 +8,7 @@ import {
   FaPen, FaCogs, FaEnvelope,
   FaDownload, FaExternalLinkAlt
 } from 'react-icons/fa';
+import { FaGraduationCap, FaOrcid } from 'react-icons/fa';
 import { contactDetails, socialLinks } from '../data/siteContact';
 import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 import './FooterSection.css';
@@ -17,8 +18,8 @@ const NAV_LINKS = [
   { to: '/about',     label: 'About',     Icon: FaUser },
   { to: '/skills',    label: 'Skills',    Icon: FaCode },
   { to: '/portfolio', label: 'Portfolio', Icon: FaBriefcase },
-  { to: '/blog',      label: 'Blog',      Icon: FaPen },
   { to: '/services',  label: 'Services',  Icon: FaCogs },
+  { to: '/publications', label: 'Publications', Icon: FaGraduationCap },
   { to: '/contact',   label: 'Contact',   Icon: FaEnvelope },
 ];
 
@@ -131,6 +132,16 @@ const FooterSection = () => {
             <li>
               <a href="https://github.com/mobadara" target="_blank" rel="noopener noreferrer" className="footer-link">
                 {GithubIcon && <GithubIcon className="footer-link-icon" />} GitHub Profile
+              </a>
+            </li>
+            <li>
+              <a href="https://scholar.google.com/citations?hl=en&user=Jx9f5gcAAAAJ" target="_blank" rel="noopener noreferrer" className="footer-link">
+                <FaGraduationCap className="footer-link-icon" /> Google Scholar
+              </a>
+            </li>
+            <li>
+              <a href="https://orcid.org/0009-0008-3470-1610" target="_blank" rel="noopener noreferrer" className="footer-link">
+                <FaOrcid className="footer-link-icon" /> ORCID
               </a>
             </li>
             <li>

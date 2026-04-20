@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/bootstrap.css';
 import { formatTimestamp } from '../utils/adminChatUtils';
+import EmojiPicker from 'emoji-picker-react';
 import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Modal from 'react-bootstrap/Modal';
-import { BiMicrophone, BiSend, BiStopCircle, BiX } from 'react-icons/bi';
+import { BiMicrophone, BiSend, BiStopCircle, BiX, BiSmile, BiPaperclip, BiReply, BiImage, BiFile } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -15,14 +16,19 @@ import 'katex/dist/katex.min.css';
 
 const CHAT_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfolio-backend-tjq3.onrender.com').replace(/\/$/, '');
 const CHAT_REQUEST_HUMAN_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/request-human`;
+const CHAT_CLEAR_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/clear`;
+const CHAT_ATTACHMENT_UPLOAD_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/attachment`;
 const CONTACT_CREATE_ENDPOINT = (import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact');
 const CHAT_SESSION_STATUS_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/status`;
+const CHAT_SESSION_HISTORY_ENDPOINT = (sessionId) => `${CHAT_API_BASE}/chat/${sessionId}/history`;
 const CHATBOT_SESSION_STORAGE_KEY = 'portfolio_chatbot_session_id';
 const CHATBOT_AUDIO_PREFIX = 'portfolio_chatbot_audio_';
 const CHATBOT_MESSAGES_PREFIX = 'portfolio_chatbot_messages_';
 const CHATBOT_LEAD_SUBMITTED_KEY = 'portfolio_chatbot_lead_submitted';
 const CHATBOT_LEAD_DETAILS_KEY = 'portfolio_chatbot_lead_details';
-const defaultBotMessage = { id: 1, text: "Hi! I'm Muyiwa\'s AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
+const CHATBOT_AUTO_PROMPT_KEY = 'portfolio_chatbot_auto_prompt_seen_v1';
+const CHATBOT_AUTO_PROMPT_DELAY_MS = 25000;
+const defaultBotMessage = { id: 1, text: "Hi! I'm Muyiwa's AI Assistant. How can I help you today?", sender: 'bot', type: 'text' };
 
 const generateSessionId = () => {
   const timestamp = Date.now().toString();
@@ -32,6 +38,109 @@ const generateSessionId = () => {
 
 const getChatMessagesStorageKey = (sessionId) => `${CHATBOT_MESSAGES_PREFIX}${sessionId}`;
 const getChatAudioStorageKey = (sessionId, messageId) => `${CHATBOT_AUDIO_PREFIX}${sessionId}_${messageId}`;
+
+const normalizeReplyPayload = (replyTo) => {
+  if (!replyTo || typeof replyTo !== 'object') return null;
+  const previewText = String(replyTo.previewText || replyTo.preview_text || replyTo.text || replyTo.content || '').trim();
+  const sender = String(replyTo.sender || '').trim();
+  const normalized = {
+    id: replyTo.id ?? null,
+    sender: sender || null,
+    previewText: previewText || null,
+  };
+
+  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== null && value !== '')) || null;
+};
+
+const normalizeAttachmentPayload = (attachment) => {
+  if (!attachment || typeof attachment !== 'object') return null;
+  const fileName = String(attachment.file_name || attachment.name || '').trim();
+  const mimeType = String(attachment.mime_type || attachment.type || '').trim();
+  const dataUrl = String(attachment.data_url || attachment.dataUrl || attachment.url || '').trim();
+  const previewType = String(attachment.preview_type || attachment.previewType || '').trim() || (mimeType.startsWith('image/') ? 'image' : mimeType ? 'document' : '');
+  const normalized = {
+    file_name: fileName || null,
+    mime_type: mimeType || null,
+    size_bytes: attachment.size_bytes ?? attachment.sizeBytes ?? null,
+    data_url: dataUrl || null,
+    preview_type: previewType || null,
+  };
+
+  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== null && value !== '')) || null;
+};
+
+const parseStructuredChatPayload = (rawValue) => {
+  const rawContent = typeof rawValue === 'string' ? rawValue : '';
+  if (!rawContent) return null;
+
+  try {
+    const parsed = JSON.parse(rawContent);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    if (parsed.type === 'audio' && parsed.audio_base64) {
+      return {
+        kind: 'audio',
+        mimeType: parsed.mime_type || 'audio/webm',
+        audioData: parsed.audio_base64,
+        timestamp: parsed.timestamp || new Date().toISOString()
+      };
+    }
+
+    const attachment = normalizeAttachmentPayload(parsed.attachment);
+    const replyTo = normalizeReplyPayload(parsed.reply_to);
+    const text = String(parsed.content || parsed.text || parsed.caption || '').trim();
+
+    return {
+      kind: attachment ? 'attachment' : 'text',
+      text,
+      attachment,
+      replyTo,
+      timestamp: parsed.timestamp || new Date().toISOString()
+    };
+  } catch {
+    return null;
+  }
+};
+
+const parseResumeSessionFromUrl = () => {
+  if (typeof window === 'undefined') return { sessionId: '', shouldOpen: false };
+
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = String(params.get('chat_session') || '').trim();
+  const shouldOpen = params.get('open_chat') === '1';
+
+  if (!sessionId) return { sessionId: '', shouldOpen: false };
+
+  const sanitized = sessionId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  return { sessionId: sanitized, shouldOpen };
+};
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  if (!file) {
+    resolve('');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+  reader.onerror = () => reject(new Error('Failed to read file'));
+  reader.readAsDataURL(file);
+});
+
+const formatFileSize = (sizeBytes) => {
+  const value = Number(sizeBytes || 0);
+  if (!Number.isFinite(value) || value <= 0) return '';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+};
 
 const Chatbot = () => {
   // --- STATE & REFS ---
@@ -59,18 +168,23 @@ const Chatbot = () => {
   const [hasSession, setHasSession] = useState(false);
   const [awaitingTransferConfirmation, setAwaitingTransferConfirmation] = useState(false);
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [replyToMessage, setReplyToMessage] = useState(null);
 
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const webSocketRef = useRef(null);
   const sessionIdRef = useRef(null);
   const messageIdRef = useRef(2);
   const loadingTimeoutRef = useRef(null);
   const audioContextRef = useRef(null);
-  const typingSoundIntervalRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
   const pendingReachSupportTriggerRef = useRef(false);
+  const resumeSessionRef = useRef(parseResumeSessionFromUrl());
 
   const suggestedQuestions = [
     'What are your key skills?',
@@ -102,6 +216,20 @@ const Chatbot = () => {
   const persistMessagesForSession = (sessionId, updatedMessages) => {
     if (!sessionId) return;
     localStorage.setItem(getChatMessagesStorageKey(sessionId), JSON.stringify(updatedMessages));
+  };
+
+  const clearChatStorageForSession = (sessionId) => {
+    if (!sessionId) return;
+    localStorage.removeItem(getChatMessagesStorageKey(sessionId));
+    const prefix = `${CHATBOT_AUDIO_PREFIX}${sessionId}_`;
+    const keysToDelete = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach((key) => localStorage.removeItem(key));
   };
 
   const resolveAudioSource = (message) => {
@@ -161,6 +289,35 @@ const Chatbot = () => {
     } catch { /* ignore audio error */ }
   };
 
+  const requestHumanModeActivation = async (leadPayload = {}) => {
+    const sessionId = sessionIdRef.current || localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
+    if (!sessionId) return false;
+
+    try {
+      const response = await fetch(CHAT_REQUEST_HUMAN_ENDPOINT(sessionId), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...leadPayload,
+          type: 'request_human',
+          source: 'portfolio-frontend'
+        })
+      });
+
+      if (response.ok) {
+        setHasSession(true);
+        setIsHumanMode(true);
+        return true;
+      }
+    } catch {
+      // Fall through to the optimistic UI update below.
+    }
+
+    setHasSession(true);
+    setIsHumanMode(true);
+    return false;
+  };
+
   const shouldEnableHumanMode = (text = '') => {
     const normalized = text.toLowerCase();
     const normalizedCompact = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -213,29 +370,92 @@ const Chatbot = () => {
     setContactForm({ name: '', email: '', countryCode: '+234', phone: '' });
   };
 
-  const toggleChat = () => {
-    setIsOpen((prev) => {
-      const nextOpen = !prev;
-      if (nextOpen) {
-        setLeadSubmitStatus(null);
-        setIsConnected(false);
-        setIsConnecting(true);
-        // Force back to AI mode visually every time they open the chat
-        setIsHumanMode(false);
-        setShowHumanForm(false);
-        setAwaitingTransferConfirmation(false);
-      } else {
-        setLeadSubmitStatus(null);
-        setIsConnecting(false);
-        setIsLoading(false);
-        setIsHumanMode(false);
-        setIsRecording(false);
-        clearLoadingTimeout();
-        clearRecordingTimer();
-        resetHumanSupportForm();
-      }
-      return nextOpen;
+  const getMessageSenderLabel = (sender) => {
+    if (sender === 'user') return 'You';
+    if (sender === 'admin') return 'Admin';
+    return 'Muyiwa AI';
+  };
+
+  const getReplyPreviewText = (text = '', maxLen = 64) => {
+    const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    return normalized.length > maxLen ? `${normalized.slice(0, maxLen)}...` : normalized;
+  };
+
+  const renderReplyQuote = (replyTarget, isOutgoing = false) => {
+    if (!replyTarget?.previewText) return null;
+
+    const quoteBg = isOutgoing ? 'rgba(255,255,255,0.14)' : 'rgba(0,168,132,0.12)';
+    const quoteBorder = isOutgoing ? 'rgba(255,255,255,0.55)' : '#00a884';
+    const quoteLabel = replyTarget.sender ? getMessageSenderLabel(replyTarget.sender) : 'Message';
+
+    return (
+      <div
+        className="mb-2 px-2 py-1 rounded-2"
+        style={{
+          borderLeft: `3px solid ${quoteBorder}`,
+          background: quoteBg,
+          lineHeight: 1.2
+        }}
+      >
+        <small className="d-block fw-semibold" style={{ opacity: 0.9 }}>
+          Replying to {quoteLabel}
+        </small>
+        <small className="d-block text-truncate" style={{ opacity: 0.95 }}>
+          {replyTarget.previewText}
+        </small>
+      </div>
+    );
+  };
+
+  const handleEmojiPick = (emojiData) => {
+    const emoji = emojiData?.emoji || '';
+    if (!emoji) return;
+    setInput((prev) => `${prev}${emoji}`);
+  };
+
+  const handleAttachFile = (event) => {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    setAttachedFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSetReplyTarget = (msg) => {
+    if (!msg) return;
+    const attachmentName = msg.attachment?.file_name || msg.fileName || '';
+    setReplyToMessage({
+      id: msg.id,
+      sender: msg.sender,
+      previewText: getReplyPreviewText(msg.text || (attachmentName ? `Attachment: ${attachmentName}` : 'Voice message'))
     });
+  };
+
+  const openChatPanel = () => {
+    setLeadSubmitStatus(null);
+    if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
+      setIsConnecting(true);
+    }
+    setShowHumanForm(false);
+    setAwaitingTransferConfirmation(false);
+    setIsOpen(true);
+  };
+
+  const closeChatPanel = () => {
+    setLeadSubmitStatus(null);
+    setIsLoading(false);
+    setIsRecording(false);
+    clearLoadingTimeout();
+    clearRecordingTimer();
+    setIsOpen(false);
+  };
+
+  const toggleChat = () => {
+    if (isOpen) {
+      closeChatPanel();
+      return;
+    }
+    openChatPanel();
   };
 
   // --- USE EFFECTS ---
@@ -263,18 +483,40 @@ const Chatbot = () => {
   }, []);
 
   useEffect(() => {
-    if (!isOpen) {
-      if (webSocketRef.current) {
-        webSocketRef.current.close();
-        webSocketRef.current = null;
-      }
-      clearLoadingTimeout();
-      return undefined;
-    }
+    if (typeof window === 'undefined') return undefined;
+    const hasShownPrompt = localStorage.getItem(CHATBOT_AUTO_PROMPT_KEY) === 'true';
+    if (hasShownPrompt) return undefined;
+
+    const autoPromptTimer = setTimeout(() => {
+      playChatSound('receive');
+      setShowWelcomeModal(true);
+      openChatPanel();
+      localStorage.setItem(CHATBOT_AUTO_PROMPT_KEY, 'true');
+    }, CHATBOT_AUTO_PROMPT_DELAY_MS);
+
+    return () => clearTimeout(autoPromptTimer);
+  }, []);
+
+  useEffect(() => {
     let isMounted = true;
     let handleVisibilityChange;
 
     const resolveSessionId = async () => {
+      const resumeSessionId = resumeSessionRef.current.sessionId;
+      if (resumeSessionId) {
+        const previousSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
+        if (previousSessionId && previousSessionId !== resumeSessionId) {
+          clearChatStorageForSession(previousSessionId);
+        }
+
+        localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
+        localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
+        localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
+        localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, resumeSessionId);
+
+        return resumeSessionId;
+      }
+
       const storedSessionId = localStorage.getItem(CHATBOT_SESSION_STORAGE_KEY);
       if (!storedSessionId) return generateSessionId();
       
@@ -284,6 +526,7 @@ const Chatbot = () => {
         const data = await response.json();
         if (data?.exists) {
           setHasSession(true);
+          setIsHumanMode(Boolean(data?.human_mode));
           return storedSessionId;
         }
       } catch {
@@ -306,10 +549,102 @@ const Chatbot = () => {
       localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
 
       const restoredMessages = loadMessagesForSession(sessionId);
-      setMessages(restoredMessages);
+      let initialMessages = restoredMessages;
 
-      const maxId = restoredMessages.reduce((acc, item) => Math.max(acc, Number(item?.id || 0)), 0);
+      if (resumeSessionRef.current.sessionId) {
+        try {
+          const historyResponse = await fetch(CHAT_SESSION_HISTORY_ENDPOINT(sessionId));
+          const historyData = await historyResponse.json();
+          const historyMessages = Array.isArray(historyData?.messages) ? historyData.messages : [];
+
+          if (historyMessages.length > 0) {
+            const hydrated = historyMessages.map((entry) => {
+              const role = entry?.role === 'user' ? 'user' : 'bot';
+              const timestamp = entry?.timestamp || new Date().toISOString();
+              const structured = parseStructuredChatPayload(entry?.content || '');
+
+              if (structured?.kind === 'audio') {
+                return {
+                  id: getNextMessageId(),
+                  sender: role,
+                  type: 'audio',
+                  mimeType: structured.mimeType,
+                  audioData: structured.audioData,
+                  timestamp: structured.timestamp || timestamp
+                };
+              }
+
+              if (structured) {
+                return {
+                  id: getNextMessageId(),
+                  sender: role,
+                  text: structured.text,
+                  type: structured.kind,
+                  fileName: structured.attachment?.file_name || null,
+                  fileType: structured.attachment?.mime_type || null,
+                  fileDataUrl: structured.attachment?.data_url || null,
+                  attachment: structured.attachment,
+                  replyTo: structured.replyTo,
+                  timestamp: structured.timestamp || timestamp
+                };
+              }
+
+              return {
+                id: getNextMessageId(),
+                sender: role,
+                text: entry?.content || '',
+                type: 'text',
+                timestamp
+              };
+            }).filter(Boolean);
+
+            initialMessages = hydrated.length > 0 ? hydrated : [defaultBotMessage];
+          } else {
+            initialMessages = [defaultBotMessage];
+          }
+
+          persistMessagesForSession(sessionId, initialMessages);
+        } catch {
+          initialMessages = restoredMessages;
+        }
+      }
+
+      setMessages(initialMessages);
+
+      const maxId = initialMessages.reduce((acc, item) => Math.max(acc, Number(item?.id || 0)), 0);
       messageIdRef.current = Math.max(maxId + 1, 2);
+
+      if (resumeSessionRef.current.sessionId) {
+        setHasSession(true);
+        setAwaitingTransferConfirmation(false);
+        setShowHumanForm(false);
+
+        try {
+          const statusResponse = await fetch(CHAT_SESSION_STATUS_ENDPOINT(resumeSessionRef.current.sessionId));
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            if (statusData?.exists) {
+              setIsHumanMode(Boolean(statusData?.human_mode));
+            }
+          }
+        } catch {
+          // Keep the existing local mode if the status check fails.
+        }
+
+        if (resumeSessionRef.current.shouldOpen) {
+          setIsOpen(true);
+          setShowWelcomeModal(false);
+        }
+
+        if (typeof window !== 'undefined') {
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete('chat_session');
+          currentUrl.searchParams.delete('open_chat');
+          window.history.replaceState({}, '', `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+        }
+
+        resumeSessionRef.current = { sessionId: '', shouldOpen: false };
+      }
 
       const wsBase = CHAT_API_BASE.replace(/^http/, 'ws');
       const wsUrl = `${wsBase}/chat/${sessionId}`;
@@ -342,6 +677,35 @@ const Chatbot = () => {
                 }
               ]);
               setIsHumanMode(true);
+              setIsLoading(false);
+              clearLoadingTimeout();
+              playChatSound('receive');
+              return;
+            }
+
+            if (data?.type === 'message' && (data.reply_to || data.attachment)) {
+              const nextId = getNextMessageId();
+              const attachment = normalizeAttachmentPayload(data.attachment);
+              const replyTo = normalizeReplyPayload(data.reply_to);
+              const sender = data.role === 'admin' ? 'admin' : 'bot';
+              const text = String(data.content || data.text || data.caption || '').trim();
+
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: nextId,
+                  text,
+                  sender,
+                  type: attachment ? 'attachment' : 'text',
+                  fileName: attachment?.file_name || null,
+                  fileType: attachment?.mime_type || null,
+                  fileDataUrl: attachment?.data_url || null,
+                  attachment,
+                  replyTo,
+                  timestamp: data.timestamp || new Date().toISOString()
+                }
+              ]);
+              if (sender === 'admin') setIsHumanMode(true);
               setIsLoading(false);
               clearLoadingTimeout();
               playChatSound('receive');
@@ -390,7 +754,17 @@ const Chatbot = () => {
 
             if (pendingReachSupportTriggerRef.current && sender === 'bot') {
               pendingReachSupportTriggerRef.current = false;
-              openHumanSupportForm(); 
+              setShowHumanForm(true);
+              setHumanFormStep(0);
+              setLeadSubmitStatus(null);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: getNextMessageId(),
+                  text: 'Sure — I can connect you to human support. Please enter your details step by step below.',
+                  sender: 'bot'
+                }
+              ]);
             }
           } catch {
             setMessages((prev) => [...prev, { id: getNextMessageId(), text: event.data, sender: 'bot', type: 'text' }]);
@@ -449,7 +823,7 @@ const Chatbot = () => {
         webSocketRef.current = null;
       }
     };
-  }, [isOpen, socketResetNonce]);
+  }, [socketResetNonce]);
 
   // --- ACTIONS & HANDLERS ---
   const sendSocketMessage = (payload) => {
@@ -466,7 +840,7 @@ const Chatbot = () => {
     }
   };
 
-  const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, fullPhone, detailsMessage }) => {
+  const submitHumanSupportLead = async ({ name, email, countryCode, localPhone, phone, fullPhone, detailsMessage }) => {
     if (!hasSession) setHasSession(true);
     let sessionId = sessionIdRef.current;
     
@@ -476,11 +850,16 @@ const Chatbot = () => {
       localStorage.setItem(CHATBOT_SESSION_STORAGE_KEY, sessionId);
     }
 
+    const normalizedLocalPhone = String(localPhone || phone || '').replace(/[^\d]/g, '');
+    const normalizedCountryCode = String(countryCode || '+234').trim();
+    const normalizedFullPhone = (fullPhone || `${normalizedCountryCode}${normalizedLocalPhone}`).trim();
+
     const transferPayload = {
       name,
       email,
-      country_code: countryCode,
-      phone: fullPhone,
+      country_code: normalizedCountryCode,
+      phone_local: normalizedLocalPhone,
+      phone: normalizedFullPhone,
       details: detailsMessage,
       subject: 'Transfer Request',
       type: 'request_human',
@@ -488,7 +867,7 @@ const Chatbot = () => {
       timestamp: new Date().toISOString(),
       user_name: name,
       user_email: email,
-      user_phone: fullPhone
+      user_phone: normalizedFullPhone
     };
 
     if (sessionId) {
@@ -533,35 +912,109 @@ const Chatbot = () => {
       setShowHumanForm(true);
       setHumanFormStep(0);
       setLeadSubmitStatus(null);
+      setIsHumanMode(true);
       setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Sure — I can connect you to human support. Please enter your details step by step below.', sender: 'bot' }]);
       if (!isConnected) {
         setMessages((prev) => [...prev, { id: getNextMessageId(), text: 'Live chat is currently offline, but you can still submit this form and Muyiwa will be notified directly.', sender: 'bot' }]);
       }
+
+      void requestHumanModeActivation({
+        name: contactForm.name.trim() || undefined,
+        email: contactForm.email.trim() || undefined,
+        country_code: contactForm.countryCode || undefined,
+        phone_local: contactForm.phone.replace(/[^\d]/g, '') || undefined
+      });
     }
   };
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
-
     const messageText = input.trim();
-    setMessages((prev) => [...prev, { id: getNextMessageId(), text: messageText, sender: 'user', type: 'text' }]);
-    setInput('');
-    playChatSound('send');
+    if (!messageText && !attachedFile) return;
 
-    const wantsHumanSupport = shouldEnableHumanMode(messageText);
-    if (wantsHumanSupport) {
-      openHumanSupportForm();
-      return;
-    }
+    const replyContext = replyToMessage
+      ? {
+          id: replyToMessage.id,
+          sender: replyToMessage.sender,
+          previewText: replyToMessage.previewText
+        }
+      : null;
 
-    if (isConnected && sendSocketMessage({ type: 'message', content: messageText, role: 'user' })) {
-      // Trigger typing animation ONLY if we expect a bot response
-      if (!isHumanMode) {
-        setIsLoading(true);
-        startLoadingTimeout();
+    const attachmentLabel = attachedFile ? `[Attachment: ${attachedFile.name}]` : '';
+    const composedText = [messageText, attachmentLabel].filter(Boolean).join('\n');
+    const outgoingText = composedText || attachmentLabel;
+
+    const sendMessage = async () => {
+      let attachmentPayload = null;
+      if (attachedFile) {
+        try {
+          const formData = new FormData();
+          formData.append('file', attachedFile);
+          formData.append('caption', messageText);
+
+          const response = await fetch(CHAT_ATTACHMENT_UPLOAD_ENDPOINT(sessionIdRef.current), {
+            method: 'POST',
+            body: formData
+          });
+
+          if (response.ok) {
+            attachmentPayload = await response.json();
+          }
+        } catch {
+          const localDataUrl = await readFileAsDataUrl(attachedFile);
+          if (localDataUrl) {
+            attachmentPayload = {
+              file_name: attachedFile.name,
+              mime_type: attachedFile.type || 'application/octet-stream',
+              size_bytes: attachedFile.size,
+              data_url: localDataUrl,
+              preview_type: attachedFile.type?.startsWith('image/') ? 'image' : 'document'
+            };
+          }
+        }
       }
-    }
+
+      const optimisticMessage = {
+        id: getNextMessageId(),
+        text: messageText || (attachmentPayload?.file_name ? '' : outgoingText),
+        sender: 'user',
+        type: attachmentPayload ? (attachmentPayload.preview_type === 'image' ? 'image' : 'attachment') : 'text',
+        fileName: attachmentPayload?.file_name || attachedFile?.name || null,
+        fileType: attachmentPayload?.mime_type || attachedFile?.type || null,
+        fileDataUrl: attachmentPayload?.data_url || null,
+        attachment: attachmentPayload,
+        replyTo: replyContext,
+        timestamp: new Date().toISOString()
+      };
+
+      setMessages((prev) => [...prev, optimisticMessage]);
+      setInput('');
+      setAttachedFile(null);
+      setReplyToMessage(null);
+      setShowEmojiPicker(false);
+      playChatSound('send');
+
+      const wantsHumanSupport = shouldEnableHumanMode(outgoingText);
+      if (wantsHumanSupport) {
+        openHumanSupportForm();
+        return;
+      }
+
+      if (isConnected && sendSocketMessage({
+        type: 'message',
+        content: messageText,
+        role: 'user',
+        reply_to: replyContext,
+        attachment: attachmentPayload
+      })) {
+        if (!isHumanMode) {
+          setIsLoading(true);
+          startLoadingTimeout();
+        }
+      }
+    };
+
+    void sendMessage();
   };
 
   const handleSuggestedQuestion = (question) => {
@@ -672,7 +1125,7 @@ const Chatbot = () => {
   };
 
   const startVoiceRecording = async () => {
-    if (!isHumanMode || isRecording) return;
+    if (isRecording) return;
     if (!navigator?.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setLeadSubmitStatus({ type: 'error', text: 'Voice recording is not supported in this browser.' });
       return;
@@ -763,7 +1216,7 @@ const Chatbot = () => {
     clearLoadingTimeout();
     clearRecordingTimer();
 
-    if (isOpen) setSocketResetNonce((prev) => prev + 1);
+    setSocketResetNonce((prev) => prev + 1);
   };
 
   // --- UI RENDERERS ---
@@ -834,6 +1287,55 @@ const Chatbot = () => {
     );
   };
 
+  const renderAttachmentPreview = (message) => {
+    const attachment = message?.attachment;
+    const fileName = attachment?.file_name || message?.fileName || '';
+    const fileType = attachment?.mime_type || message?.fileType || '';
+    const dataUrl = attachment?.data_url || message?.fileDataUrl || '';
+    const previewType = attachment?.preview_type || message?.attachment?.previewType || (fileType.startsWith('image/') ? 'image' : 'document');
+    const fileSize = formatFileSize(attachment?.size_bytes || message?.fileSize);
+
+    if (!attachment && !fileName) return null;
+
+    const isImagePreview = previewType === 'image' && Boolean(dataUrl);
+    const isDocumentPreview = !isImagePreview;
+
+    if (isImagePreview) {
+      return (
+        <div className="chatbot-attachment-preview chatbot-attachment-preview--image mb-2">
+          <div className="chatbot-attachment-preview-label">
+            <BiImage size={14} /> Image preview
+          </div>
+          <img
+            src={dataUrl}
+            alt={fileName || 'Attachment preview'}
+            className="chatbot-attachment-image"
+          />
+        </div>
+      );
+    }
+
+    if (isDocumentPreview) {
+      return (
+        <div className="chatbot-attachment-preview chatbot-attachment-preview--document mb-2">
+          <div className="chatbot-attachment-meta">
+            <div className="chatbot-attachment-preview-icon">
+              <BiFile size={16} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-truncate fw-semibold">{fileName || 'Attachment'}</div>
+              <small className="d-block text-truncate opacity-75">
+                {fileType || 'File'}{fileSize ? ` · ${fileSize}` : ''}
+              </small>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <>
       {/* Modern Bouncing Dots Typing Animation */}
@@ -874,6 +1376,12 @@ const Chatbot = () => {
           title={isConnecting ? 'Connecting…' : isConnected ? 'Online' : 'Offline'}
         />
       </div>
+
+      <div
+        className={`chatbot-page-dim ${isOpen ? 'open' : ''}`}
+        onClick={closeChatPanel}
+        aria-hidden={!isOpen}
+      />
 
       <div
         className={`chatbot-window shadow-lg ${isOpen ? 'open' : ''}`}
@@ -965,21 +1473,58 @@ const Chatbot = () => {
 
             <div
               style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
-              onClick={() => isDrawerOpen && setIsDrawerOpen(false)}
+              onClick={() => {
+                if (isDrawerOpen) setIsDrawerOpen(false);
+                if (showEmojiPicker) setShowEmojiPicker(false);
+              }}
             >
               {messages.map((msg) => (
-                <div key={msg.id} className={`d-flex gap-2 ${msg.sender === 'user' ? 'justify-content-end' : ''}`} style={{ width: '100%' }}>
+                <div
+                  key={msg.id}
+                  className={`d-flex gap-2 w-100 ${msg.sender === 'user' ? 'justify-content-end' : 'justify-content-start'}`}
+                  style={{
+                    width: '100%',
+                    justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                    alignItems: 'flex-start'
+                  }}
+                >
                   <div
                     className={`py-2 px-3 rounded-lg ${msg.sender === 'user' ? 'bg-navy text-white' : 'bg-light text-dark'}`}
                     style={{
-                      maxWidth: '90%',
+                      maxWidth: 'min(100%, calc(100% - 1rem))',
+                      width: 'fit-content',
                       minWidth: '30px',
                       borderRadius: 14,
                       fontSize: '1rem',
                       wordBreak: 'break-word',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      minInlineSize: 0,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                      marginLeft: msg.sender === 'user' ? 'auto' : 0,
+                      marginRight: msg.sender === 'user' ? 0 : 'auto',
+                      alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
+                      textAlign: 'left'
                     }}
                   >
+                    <div className="d-flex align-items-start justify-content-between mb-1" style={{ gap: '0.5rem', minWidth: 0 }}>
+                      <small className="fw-semibold" style={{ opacity: 0.9, color: msg.sender === 'user' ? '#f2f8ff' : '#7f1d34', whiteSpace: 'nowrap' }}>
+                        {getMessageSenderLabel(msg.sender)}
+                      </small>
+                      <button
+                        type="button"
+                        onClick={() => handleSetReplyTarget(msg)}
+                        className="btn btn-link p-0"
+                        style={{ color: msg.sender === 'user' ? '#f2f8ff' : '#5f6b73', textDecoration: 'none', lineHeight: 1, flexShrink: 0, marginLeft: 'auto' }}
+                        aria-label="Reply to this message"
+                        title="Reply"
+                      >
+                        <BiReply size={14} />
+                      </button>
+                    </div>
+
+                    {renderReplyQuote(msg.replyTo, msg.sender === 'user')}
+
+                    {renderAttachmentPreview(msg)}
+
                     {msg.type === 'audio' ? (
                       <audio controls preload="metadata" style={{ width: '220px', maxWidth: '100%' }} src={resolveAudioSource(msg)} />
                     ) : (
@@ -1012,7 +1557,9 @@ const Chatbot = () => {
                                       try {
                                         const parsedDetails = JSON.parse(savedDetails);
                                         await submitHumanSupportLead(parsedDetails);
-                                      } catch(err) {}
+                                      } catch {
+                                        // No-op: silently ignore malformed cached lead payload.
+                                      }
                                     }
                                   }} 
                                   className="btn btn-sm btn-success mt-2 mb-1 d-block w-100" 
@@ -1045,6 +1592,7 @@ const Chatbot = () => {
                         {msg.text || ''}
                       </ReactMarkdown>
                     )}
+
                     {msg.timestamp && (
                       <small className="d-block text-end mt-1 text-muted opacity-75" style={{ fontSize: '0.7em' }}>
                         {formatTimestamp(msg.timestamp, false)}
@@ -1070,15 +1618,78 @@ const Chatbot = () => {
             </div>
           </Card.Body>
 
-          <div className="card-footer bg-white p-3 border-top flex-shrink-0 w-100">
+          <div className="card-footer p-3 border-top flex-shrink-0 w-100 chatbot-footer-responsive">
             {renderHumanFormStep()}
 
+            {replyToMessage ? (
+              <div className="d-flex align-items-center justify-content-between mb-2 px-2 py-2 rounded-2" style={{ background: '#f3f5f7', borderLeft: '3px solid #00a884' }}>
+                <div className="text-truncate" style={{ lineHeight: 1.15 }}>
+                  <small className="d-block fw-semibold">Replying to {getMessageSenderLabel(replyToMessage.sender)}</small>
+                  <small className="text-muted d-block text-truncate">{replyToMessage.previewText}</small>
+                </div>
+                <button type="button" className="btn btn-link text-muted p-0" onClick={() => setReplyToMessage(null)} aria-label="Cancel reply">
+                  <BiX size={18} />
+                </button>
+              </div>
+            ) : null}
+
+            {attachedFile ? (
+              <div className="chatbot-composer-attachment mb-2">
+                <div className="chatbot-composer-attachment-main">
+                  <div className="chatbot-composer-attachment-thumb chatbot-composer-attachment-thumb--doc">
+                    <BiPaperclip size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-truncate fw-semibold">{attachedFile.name}</div>
+                    <small className="d-block text-muted text-truncate">
+                      {attachedFile.type || 'File'}{attachedFile.size ? ` · ${formatFileSize(attachedFile.size)}` : ''}
+                    </small>
+                  </div>
+                </div>
+                <button type="button" className="btn btn-link text-danger p-0 flex-shrink-0" onClick={() => setAttachedFile(null)} aria-label="Remove attachment">
+                  <BiX size={18} />
+                </button>
+              </div>
+            ) : null}
+
             <Form onSubmit={handleSend} className="chatbot-input-form w-100 m-0">
-              <div className="d-flex w-100 align-items-center gap-2">
-                
-                <div className="flex-grow-1">
-                  {isRecording ? (
-                    <div className="d-flex align-items-center w-100 text-danger animate__animated animate__fadeIn bg-light rounded-pill px-3" style={{ height: '42px' }}>
+              <div className="chatbot-input-row">
+                <div className="chatbot-input-shell">
+                  <button
+                    type="button"
+                    className="btn btn-link text-secondary p-1 chatbot-input-icon-btn"
+                    onClick={() => setShowEmojiPicker((prev) => !prev)}
+                    aria-label="Open emoji picker"
+                    title="Emoji"
+                  >
+                    <BiSmile size={20} />
+                  </button>
+                  {isHumanMode && !awaitingTransferConfirmation ? (
+                    <label className="btn btn-link text-secondary p-1 mb-0 chatbot-input-icon-btn" style={{ lineHeight: 1 }} title="Attach file">
+                      <BiPaperclip size={20} />
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        hidden
+                        onChange={handleAttachFile}
+                        accept=".doc,.docx,.pdf,image/*,text/plain"
+                      />
+                    </label>
+                  ) : null}
+
+                  {showEmojiPicker && !isRecording ? (
+                    <div className="chatbot-emoji-popover">
+                      <EmojiPicker
+                        onEmojiClick={handleEmojiPick}
+                        width={280}
+                        height={320}
+                        previewConfig={{ showPreview: false }}
+                      />
+                    </div>
+                  ) : null}
+
+                  {isHumanMode && isRecording ? (
+                    <div className="d-flex align-items-center w-100 text-danger animate__animated animate__fadeIn bg-light rounded-pill px-3 chatbot-recording-pill" style={{ height: '42px' }}>
                       <span 
                         className="me-2" 
                         style={{ width: '10px', height: '10px', backgroundColor: '#dc3545', borderRadius: '50%', animation: 'pulse-red 1.5s infinite' }} 
@@ -1107,38 +1718,36 @@ const Chatbot = () => {
                   )}
                 </div>
 
-                <div className="d-flex align-items-center gap-2 flex-shrink-0">
-                  {input.trim() && !isRecording ? (
+                <div className="chatbot-send-slot">
+                  {(input.trim() || attachedFile) && !isRecording ? (
                     <Button 
                       type="submit" 
                       variant="primary"
                       disabled={(!isConnected && !isHumanMode) || awaitingTransferConfirmation}
-                      className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 shadow-sm p-0"
+                      className="rounded-circle d-flex align-items-center justify-content-center bg-navy border-0 shadow-sm p-0 chatbot-send-mic-btn"
                       style={{ width: '42px', height: '42px' }}
                     >
                       <BiSend size={20} />
                     </Button>
-                  ) : (
-                    isHumanMode && (
-                      <Button
-                        type="button"
-                        variant={isRecording ? 'danger' : 'primary'}
-                        disabled={awaitingTransferConfirmation}
-                        className={`rounded-circle d-flex align-items-center justify-content-center border-0 shadow-sm p-0 ${!isRecording ? 'bg-navy' : ''}`}
-                        style={{ width: '42px', height: '42px', transition: 'transform 0.2s', transform: isRecording ? 'scale(1.15)' : 'scale(1)' }}
-                        onTouchStart={(e) => { e.preventDefault(); startVoiceRecording(); }}
-                        onTouchEnd={(e) => { e.preventDefault(); stopVoiceRecording(); }}
-                        onClick={(e) => {
-                          if (e.nativeEvent.pointerType === 'mouse' || !e.nativeEvent.pointerType) {
-                            isRecording ? stopVoiceRecording() : startVoiceRecording();
-                          }
-                        }}
-                        title={isRecording ? 'Stop recording' : 'Record voice message'}
-                      >
-                        {isRecording ? <BiStopCircle size={24} /> : <BiMicrophone size={24} />}
-                      </Button>
-                    )
-                  )}
+                  ) : isHumanMode ? (
+                    <Button
+                      type="button"
+                      variant={isRecording ? 'danger' : 'primary'}
+                      disabled={awaitingTransferConfirmation}
+                      className={`rounded-circle d-flex align-items-center justify-content-center border-0 shadow-sm p-0 chatbot-send-mic-btn ${!isRecording ? 'bg-navy' : ''}`}
+                      style={{ width: '42px', height: '42px', transition: 'transform 0.2s', transform: isRecording ? 'scale(1.15)' : 'scale(1)' }}
+                      onTouchStart={(e) => { e.preventDefault(); startVoiceRecording(); }}
+                      onTouchEnd={(e) => { e.preventDefault(); stopVoiceRecording(); }}
+                      onClick={(e) => {
+                        if (e.nativeEvent.pointerType === 'mouse' || !e.nativeEvent.pointerType) {
+                          isRecording ? stopVoiceRecording() : startVoiceRecording();
+                        }
+                      }}
+                      title={isRecording ? 'Stop recording' : 'Record voice message'}
+                    >
+                      {isRecording ? <BiStopCircle size={24} /> : <BiMicrophone size={24} />}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </Form>
@@ -1165,6 +1774,46 @@ const Chatbot = () => {
             setTimeout(() => openHumanSupportForm(), 500); 
           }}>
             Clear Session
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={showWelcomeModal}
+        onHide={() => {
+          setShowWelcomeModal(false);
+          closeChatPanel();
+        }}
+        centered
+        backdrop="static"
+        keyboard={false}
+        style={{ zIndex: 99999 }}
+      >
+        <Modal.Header>
+          <Modal.Title>Need help before you leave?</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          I can answer project, hiring, and technical questions instantly. Start a quick chat now.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => {
+              setShowWelcomeModal(false);
+              closeChatPanel();
+            }}
+          >
+            Maybe later
+          </Button>
+          <Button
+            variant="primary"
+            className="bg-navy border-0"
+            onClick={() => {
+              setShowWelcomeModal(false);
+              openChatPanel();
+            }}
+          >
+            Start chat
           </Button>
         </Modal.Footer>
       </Modal>

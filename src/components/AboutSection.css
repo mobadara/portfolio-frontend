@@ -68,6 +68,54 @@
   transition: transform 0.6s ease;
 }
 
+.profile-image-placeholder {
+  background: linear-gradient(160deg, #d7dce3 0%, #b7c0cc 48%, #9aa5b4 100%);
+  color: #1f2937;
+}
+
+.profile-image-loading {
+  gap: 0.7rem;
+}
+
+.portrait-loader {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  border-top-color: #475569;
+  animation: portraitSpin 0.85s linear infinite;
+}
+
+.portrait-loader-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.82);
+}
+
+.profile-image-fallback {
+  gap: 0.55rem;
+}
+
+.portrait-fallback-icon {
+  font-size: clamp(3.8rem, 12vw, 5.4rem);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.portrait-fallback-label {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: rgba(15, 23, 42, 0.78);
+}
+
+@keyframes portraitSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .profile-image-wrapper:hover .profile-image {
   transform: scale(1.05);
 }

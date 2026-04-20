@@ -4,6 +4,11 @@
   color: #f8f9fa;
 }
 
+[data-bs-theme='light'] .admin-settings {
+  background: linear-gradient(135deg, #eef3fb 0%, #dfe8f5 100%);
+  color: #172033;
+}
+
 .admin-title {
   color: #fff;
   font-weight: 700;
@@ -18,6 +23,11 @@
   transition: all 0.3s ease;
 }
 
+[data-bs-theme='light'] .settings-card {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
 .settings-card:hover {
   border-color: rgba(0, 119, 182, 0.3);
 }
@@ -28,16 +38,29 @@
   padding: 1.25rem;
 }
 
+[data-bs-theme='light'] .settings-card .card-header {
+  background: rgba(15, 23, 42, 0.03);
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
 .settings-card .card-title {
   color: #fff;
   font-weight: 600;
   font-size: 1.125rem;
 }
 
+[data-bs-theme='light'] .settings-card .card-title {
+  color: #172033;
+}
+
 .form-label {
   color: #e6f1ff;
   font-weight: 500;
   margin-bottom: 0.5rem;
+}
+
+[data-bs-theme='light'] .form-label {
+  color: #172033;
 }
 
 .form-control,
@@ -48,6 +71,13 @@
   transition: all 0.2s ease;
 }
 
+[data-bs-theme='light'] .form-control,
+[data-bs-theme='light'] .form-select {
+  background-color: #ffffff;
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #172033;
+}
+
 .form-control:focus,
 .form-select:focus {
   background-color: #112240;
@@ -56,13 +86,30 @@
   box-shadow: 0 0 0 0.2rem rgba(0, 119, 182, 0.25);
 }
 
+[data-bs-theme='light'] .form-control:focus,
+[data-bs-theme='light'] .form-select:focus {
+  background-color: #ffffff;
+  border-color: #0077be;
+  color: #172033;
+  box-shadow: 0 0 0 0.2rem rgba(0, 119, 182, 0.16);
+}
+
 .form-control::placeholder {
   color: #8892b0;
+}
+
+[data-bs-theme='light'] .form-control::placeholder {
+  color: #7a8699;
 }
 
 .form-check-input {
   background-color: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-bs-theme='light'] .form-check-input {
+  background-color: rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.18);
 }
 
 .form-check-input:checked {
@@ -80,6 +127,10 @@
   margin-bottom: 0;
 }
 
+[data-bs-theme='light'] .form-check-label {
+  color: #172033;
+}
+
 .form-switch .form-check-input {
   width: 3em;
   height: 1.5em;
@@ -87,6 +138,10 @@
 
 small.text-muted {
   color: #8892b0 !important;
+}
+
+[data-bs-theme='light'] small.text-muted {
+  color: #68758c !important;
 }
 
 .btn-primary {
@@ -115,10 +170,21 @@ small.text-muted {
   color: rgba(255, 255, 255, 0.7);
 }
 
+[data-bs-theme='light'] .btn-outline-secondary {
+  border-color: rgba(15, 23, 42, 0.18);
+  color: #172033;
+}
+
 .btn-outline-secondary:hover {
   background-color: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.5);
   color: #fff;
+}
+
+[data-bs-theme='light'] .btn-outline-secondary:hover {
+  background-color: rgba(15, 23, 42, 0.06);
+  border-color: rgba(15, 23, 42, 0.24);
+  color: #172033;
 }
 
 .btn:disabled {

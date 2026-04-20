@@ -13,9 +13,16 @@
   .chatbot-footer-responsive form {
     margin-bottom: 0;
   }
-  .chatbot-footer-responsive .d-flex {
-    flex-wrap: wrap;
-    gap: 0.5rem;
+  .chatbot-footer-responsive .chatbot-input-row {
+    flex-wrap: nowrap !important;
+    gap: 0.42rem !important;
+  }
+  .chatbot-footer-responsive .chatbot-input-shell {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+  .chatbot-footer-responsive .chatbot-send-slot {
+    flex: 0 0 auto !important;
   }
   .chatbot-footer-responsive input,
   .chatbot-footer-responsive .form-control {

@@ -21,6 +21,7 @@ import {
 } from 'react-bootstrap';
 import {
   BiCog,
+  BiBell,
   BiMenu,
   BiChat,
   BiEnvelope,
@@ -49,11 +50,21 @@ import {
   getStoredAdminUser,
   withAuthHeaders
 } from '../utils/adminApi';
+import {
+  buildAdminNotifications,
+  clearAdminNotifications,
+  getStoredAdminNotifications,
+  mergeAdminNotifications,
+  saveAdminNotifications,
+  notifyAdminBridge,
+} from '../utils/adminNotifications';
 import './AdminDashboard.css';
 
 const USERS_ENDPOINT = ADMIN_ROUTES.users;
 const MESSAGES_ENDPOINT = ADMIN_ROUTES.messages;
 const PROJECTS_ENDPOINT = ADMIN_ROUTES.projects;
+const SKILLS_ENDPOINT = ADMIN_ROUTES.skills;
+const OVERVIEW_ENDPOINT = ADMIN_ROUTES.overview;
 const UPLOAD_RESUME_ENDPOINT = ADMIN_ROUTES.uploadResume;
 const UPLOAD_PORTRAIT_ENDPOINT = ADMIN_ROUTES.uploadPortrait;
 const RESUME_ASSET_ENDPOINT = ADMIN_ROUTES.resumeAsset;
@@ -94,10 +105,13 @@ function AdminDashboard() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [notifications, setNotifications] = useState(() => getStoredAdminNotifications());
 
   const [users, setUsers] = useState([]);
   const [messages, setMessages] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [skills, setSkills] = useState([]);
+  const [sessions, setSessions] = useState([]);
 
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState('messages');
@@ -133,6 +147,10 @@ function AdminDashboard() {
   }, [theme]);
 
   useEffect(() => {
+    saveAdminNotifications(notifications);
+  }, [notifications]);
+
+  useEffect(() => {
     if (!token) {
       navigate('/admin');
       return;
@@ -157,11 +175,15 @@ function AdminDashboard() {
     }
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        clearAdminAuth();
+        navigate('/admin/login', { replace: true });
+      }
       throw new Error(data?.message || `${response.status} ${response.statusText}`);
     }
 
     return data;
-  }, [token]);
+  }, [navigate, token]);
 
   const normalizeList = (data, preferredKey) => {
     if (!data) return [];
@@ -175,17 +197,49 @@ function AdminDashboard() {
     setIsLoading(true);
     setError('');
     try {
-      const [usersRes, messagesRes, projectsRes] = await Promise.all([
-        canManageUsersAndProjects ? requestWithAuth(USERS_ENDPOINT) : Promise.resolve([]),
-        requestWithAuth(MESSAGES_ENDPOINT),
-        canManageUsersAndProjects ? requestWithAuth(PROJECTS_ENDPOINT) : Promise.resolve([])
-      ]);
+      const overviewRes = await requestWithAuth(OVERVIEW_ENDPOINT);
 
-      setUsers(normalizeList(usersRes, 'users'));
-      setMessages(normalizeList(messagesRes, 'messages'));
-      setProjects(normalizeList(projectsRes, 'projects'));
+      setUsers(normalizeList(overviewRes, 'users'));
+      setMessages(normalizeList(overviewRes, 'messages'));
+      setProjects(normalizeList(overviewRes, 'projects'));
+      setSkills(normalizeList(overviewRes, 'skills'));
+      setSessions(normalizeList(overviewRes, 'sessions'));
+
+      const nextNotifications = buildAdminNotifications({
+        messages: normalizeList(overviewRes, 'messages'),
+        sessions: normalizeList(overviewRes, 'sessions')
+      });
+      setNotifications((prev) => mergeAdminNotifications(prev, nextNotifications));
+      nextNotifications.forEach((notification) => notifyAdminBridge(notification));
     } catch (err) {
-      setError(err.message || 'Failed to load dashboard data.');
+      if (!getStoredAdminToken()) {
+        return;
+      }
+
+      try {
+        const [usersRes, messagesRes, projectsRes, skillsRes, sessionsRes] = await Promise.all([
+          canManageUsersAndProjects ? requestWithAuth(USERS_ENDPOINT) : Promise.resolve([]),
+          requestWithAuth(MESSAGES_ENDPOINT),
+          canManageUsersAndProjects ? requestWithAuth(PROJECTS_ENDPOINT) : Promise.resolve([]),
+          canManageUsersAndProjects ? requestWithAuth(SKILLS_ENDPOINT) : Promise.resolve([]),
+          requestWithAuth(ADMIN_ROUTES.sessions)
+        ]);
+
+        setUsers(normalizeList(usersRes, 'users'));
+        setMessages(normalizeList(messagesRes, 'messages'));
+        setProjects(normalizeList(projectsRes, 'projects'));
+        setSkills(normalizeList(skillsRes, 'skills'));
+        setSessions(normalizeList(sessionsRes, 'sessions'));
+
+        const nextNotifications = buildAdminNotifications({
+          messages: normalizeList(messagesRes, 'messages'),
+          sessions: normalizeList(sessionsRes, 'sessions')
+        });
+        setNotifications((prev) => mergeAdminNotifications(prev, nextNotifications));
+        nextNotifications.forEach((notification) => notifyAdminBridge(notification));
+      } catch (fallbackErr) {
+        setError(fallbackErr.message || err.message || 'Failed to load dashboard data.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -235,6 +289,23 @@ function AdminDashboard() {
       [item.title, item.description, item.techStack].some((v) => String(v || '').toLowerCase().includes(q))
     );
   }, [projects, query]);
+
+  const filteredSessions = useMemo(() => {
+    const safeSessions = Array.isArray(sessions) ? sessions : [];
+    const q = query.trim().toLowerCase();
+    if (!q) return safeSessions;
+
+    return safeSessions.filter((session) =>
+      [
+        session.session_id,
+        session.user_name,
+        session.user_email,
+        session.user_phone,
+        session.last_message,
+        String(session.message_count)
+      ].some((value) => String(value || '').toLowerCase().includes(q))
+    );
+  }, [query, sessions]);
 
   const openCreateModal = (type) => {
     setModalType(type);
@@ -481,7 +552,23 @@ function AdminDashboard() {
 
   const handleLogout = () => {
     clearAdminAuth();
+    clearAdminNotifications();
     navigate('/admin');
+  };
+
+  const handleThemeToggle = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleOpenNotification = (notification) => {
+    if (notification?.href) {
+      navigate(notification.href);
+    }
+  };
+
+  const handleClearNotifications = () => {
+    setNotifications([]);
+    clearAdminNotifications();
   };
 
   const toAbsoluteAssetUrl = useCallback((url = '') => {
@@ -787,6 +874,11 @@ function AdminDashboard() {
                     <Button variant="primary" size="sm" onClick={() => { navigate('/admin/chat'); closeSidebarOnMobile(); }}>
                       <BiChat className="me-1 admin-sidebar-link-icon" /> <span className="admin-sidebar-link-text">Open Chats</span>
                     </Button>
+                    {canManageUsersAndProjects && (
+                      <Button variant="primary" size="sm" onClick={() => { navigate('/admin/skills'); closeSidebarOnMobile(); }}>
+                        <BiCog className="me-1 admin-sidebar-link-icon" /> <span className="admin-sidebar-link-text">Manage Skills</span>
+                      </Button>
+                    )}
                   </div>
                 </Card.Body>
               </Card>
@@ -798,21 +890,58 @@ function AdminDashboard() {
                   <div className="admin-main-header d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between mb-3">
                     <div>
                       <h4 className="mb-1 fw-bold d-flex align-items-center gap-2 admin-shell-title">
-                        <BiShield /> Admin Console <Badge bg="info" className="text-uppercase">{currentRole}</Badge>
+                        <BiShield /> Corporate Admin Console <Badge bg="info" className="text-uppercase">{currentRole}</Badge>
                       </h4>
                       <p className="mb-0 small admin-shell-subtitle">
-                        Manage messages, users, projects, and assets from one desktop-style panel.
+                        Govern operations, content, skills, and assets from a centralized command center.
                       </p>
                     </div>
-                    <div className="d-flex align-items-center gap-2">
-                      <Button variant="outline-primary" size="sm" onClick={() => navigate('/admin/chat')}>
-                        <BiChat className="me-1" /> Chats
+                    <div className="d-flex align-items-center gap-2 flex-wrap justify-content-md-end admin-header-actions">
+                      <Dropdown align="end" className="admin-notification-dropdown">
+                        <Dropdown.Toggle variant="link" className="admin-notification-bell" aria-label="Notifications">
+                          <BiBell />
+                          {notifications.length > 0 && <Badge bg="danger" pill className="admin-notification-count">{notifications.length}</Badge>}
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu className="admin-notification-menu shadow-lg">
+                          <div className="px-3 py-2 d-flex align-items-center justify-content-between">
+                            <strong>Notifications</strong>
+                            <Button variant="link" size="sm" className="p-0 text-decoration-none" onClick={handleClearNotifications}>
+                              Clear all
+                            </Button>
+                          </div>
+                          <Dropdown.Divider />
+                          {notifications.length === 0 ? (
+                            <div className="px-3 py-3 text-muted small">No new notifications.</div>
+                          ) : (
+                            notifications.map((notification) => (
+                              <Dropdown.Item key={notification.id} className="admin-notification-item" onClick={() => handleOpenNotification(notification)}>
+                                <div className="d-flex flex-column gap-1">
+                                  <strong>{notification.title}</strong>
+                                  <span className="small text-muted">{notification.body}</span>
+                                </div>
+                              </Dropdown.Item>
+                            ))
+                          )}
+                        </Dropdown.Menu>
+                      </Dropdown>
+
+                      <Form.Check
+                        type="switch"
+                        id="admin-dashboard-theme-switch"
+                        className="admin-theme-switch"
+                        checked={theme === 'dark'}
+                        onChange={handleThemeToggle}
+                        label={theme === 'dark' ? 'Dark' : 'Light'}
+                      />
+
+                      <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" className="admin-header-logout-btn" onClick={handleLogout}>
+                        <BiLogOut className="me-1" /> Logout
                       </Button>
                     </div>
                   </div>
 
                   <Row className="g-2 mb-3">
-                    <Col xs={12} sm={6} xl={4}>
+                    <Col xs={12} sm={6} xl={3}>
                       <Card className="metric-card border-0 h-100">
                         <Card.Body className="py-3">
                           <div className="d-flex justify-content-between align-items-start">
@@ -825,7 +954,7 @@ function AdminDashboard() {
                         </Card.Body>
                       </Card>
                     </Col>
-                    <Col xs={12} sm={6} xl={4}>
+                    <Col xs={12} sm={6} xl={3}>
                       <Card className="metric-card border-0 h-100">
                         <Card.Body className="py-3">
                           <div className="d-flex justify-content-between align-items-start">
@@ -838,7 +967,7 @@ function AdminDashboard() {
                         </Card.Body>
                       </Card>
                     </Col>
-                    <Col xs={12} sm={6} xl={4}>
+                    <Col xs={12} sm={6} xl={3}>
                       <Card className="metric-card border-0 h-100">
                         <Card.Body className="py-3">
                           <div className="d-flex justify-content-between align-items-start">
@@ -847,6 +976,32 @@ function AdminDashboard() {
                               <h4 className="mb-0">{projects.length}</h4>
                             </div>
                             <BiFolder className="metric-icon" />
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={6} xl={3}>
+                      <Card className="metric-card border-0 h-100">
+                        <Card.Body className="py-3">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <small className="text-muted">Skills</small>
+                              <h4 className="mb-0">{skills.length}</h4>
+                            </div>
+                            <BiCog className="metric-icon" />
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    <Col xs={12} sm={6} xl={3}>
+                      <Card className="metric-card border-0 h-100">
+                        <Card.Body className="py-3">
+                          <div className="d-flex justify-content-between align-items-start">
+                            <div>
+                              <small className="text-muted">Chat Sessions</small>
+                              <h4 className="mb-0">{sessions.length}</h4>
+                            </div>
+                            <BiChat className="metric-icon" />
                           </div>
                         </Card.Body>
                       </Card>
@@ -1169,6 +1324,51 @@ function AdminDashboard() {
                     </Card.Body>
                   </Card>
 
+                  <Card className="border-0 admin-panel-card mt-3">
+                    <Card.Body className="p-2 p-md-3">
+                      <div className="d-flex align-items-center justify-content-between mb-3">
+                        <h6 className="mb-0 fw-bold">Recent Chat Sessions</h6>
+                        <Button variant="outline-primary" size="sm" onClick={() => navigate('/admin/chat')}>
+                          Open Chats
+                        </Button>
+                      </div>
+
+                      {filteredSessions.length === 0 ? (
+                        <Alert variant="secondary" className="mb-0">No sessions found.</Alert>
+                      ) : (
+                        <Table responsive hover className="align-middle mb-0 admin-table">
+                          <thead>
+                            <tr>
+                              <th>Session</th>
+                              <th>User</th>
+                              <th>Messages</th>
+                              <th>Status</th>
+                              <th>Last Activity</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredSessions.slice(0, 8).map((session) => (
+                              <tr key={session.session_id}>
+                                <td className="fw-semibold">{session.session_id}</td>
+                                <td>
+                                  <div>{session.user_name || 'Anonymous'}</div>
+                                  <div className="small text-muted">{session.user_email || session.user_phone || 'No contact details'}</div>
+                                </td>
+                                <td>{session.message_count || 0}</td>
+                                <td>
+                                  {session.human_mode ? <Badge bg="warning" text="dark">Human</Badge> : <Badge bg="info">AI</Badge>}
+                                </td>
+                                <td className="small text-muted">
+                                  {session.last_activity ? new Date(session.last_activity).toLocaleString() : 'N/A'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </Table>
+                      )}
+                    </Card.Body>
+                  </Card>
+
                   {isAdminRole && (
                     <Accordion className="mt-3 admin-section-accordion admin-danger-accordion">
                       <Accordion.Item eventKey="danger" className="border-danger-subtle bg-danger-subtle">
@@ -1237,26 +1437,6 @@ function AdminDashboard() {
           <Modal.Title>Settings</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div className="mb-3">
-            <Form.Label className="fw-semibold">Theme</Form.Label>
-            <div className="d-flex gap-2">
-              <Button
-                variant={theme === 'light' ? 'primary' : 'outline-secondary'}
-                size="sm"
-                onClick={() => setTheme('light')}
-              >
-                <BiSun className="me-1" /> Light
-              </Button>
-              <Button
-                variant={theme === 'dark' ? 'primary' : 'outline-secondary'}
-                size="sm"
-                onClick={() => setTheme('dark')}
-              >
-                <BiMoon className="me-1" /> Dark
-              </Button>
-            </div>
-          </div>
-          <hr />
           <Button
             variant="outline-primary"
             size="sm"

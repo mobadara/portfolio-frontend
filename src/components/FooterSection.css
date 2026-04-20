@@ -90,6 +90,10 @@
   padding: 0.15rem 0;
 }
 
+.footer-link svg {
+  flex-shrink: 0;
+}
+
 .footer-link-static {
   cursor: default;
 }

@@ -8,8 +8,14 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Alert from 'react-bootstrap/Alert';
 import Spinner from 'react-bootstrap/Spinner';
-import { BiShield, BiUser, BiLockAlt, BiShow, BiHide, BiMoon, BiSun } from 'react-icons/bi';
-import { ADMIN_ROUTES, buildAdminUrl, saveAdminAuth } from '../utils/adminApi';
+import { BiShield, BiUser, BiLockAlt, BiShow, BiHide } from 'react-icons/bi';
+import {
+  ADMIN_ROUTES,
+  buildAdminUrl,
+  clearAdminAuth,
+  getStoredAdminToken,
+  saveAdminAuth,
+} from '../utils/adminApi';
 import './AdminLogin.css';
 
 const AdminLogin = () => {
@@ -22,11 +28,23 @@ const AdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
     localStorage.setItem('adminTheme', theme);
     document.documentElement.setAttribute('data-bs-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const token = getStoredAdminToken();
+
+    if (!token) {
+      setIsCheckingSession(false);
+      return;
+    }
+
+    navigate('/admin/dashboard', { replace: true });
+  }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -78,7 +96,7 @@ const AdminLogin = () => {
         }
 
         if (response.status !== 404) {
-          loginError = data?.message || loginError;
+          loginError = data?.detail || data?.message || loginError;
           break;
         }
       }
@@ -103,21 +121,25 @@ const AdminLogin = () => {
 
       <Container className="admin-login-container">
         <div className="admin-login-theme-toggle-wrap">
-          <Button
-            type="button"
-            variant="link"
-            className="admin-login-theme-toggle"
-            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? <BiSun /> : <BiMoon />}
-            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
-          </Button>
+          <Form.Check
+            type="switch"
+            id="admin-login-theme-switch"
+            className="admin-theme-switch"
+            checked={theme === 'dark'}
+            onChange={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            label={theme === 'dark' ? 'Dark mode' : 'Light mode'}
+          />
         </div>
         <Row className="justify-content-center align-items-center min-vh-100">
           <Col xs={12} sm={10} md={8} lg={5} xl={4}>
             <Card className="admin-login-card shadow-lg border-0">
               <Card.Body className="p-4 p-md-5">
+                {isCheckingSession ? (
+                  <div className="py-5 d-flex justify-content-center">
+                    <Spinner animation="border" role="status" />
+                  </div>
+                ) : (
+                <>
                 <div className="text-center mb-4">
                   <div className="admin-icon-wrapper mb-3">
                     <BiShield className="admin-shield-icon" />
@@ -210,6 +232,8 @@ const AdminLogin = () => {
                     Secure backend authentication is enabled
                   </p>
                 </div>
+                </>
+                )}
               </Card.Body>
             </Card>
 

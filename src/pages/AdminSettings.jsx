@@ -19,7 +19,6 @@ function AdminSettings() {
     notificationsEnabled: true,
     emailNotifications: true,
     chatNotifications: true,
-    darkMode: true,
     businessEmail: 'contact@muyiwaobadara.com',
     phoneNumber: '+234 (555) 123-4567',
     timezone: 'UTC',
@@ -33,6 +32,9 @@ function AdminSettings() {
       navigate('/admin');
       return;
     }
+
+    const theme = localStorage.getItem('adminTheme') || 'dark';
+    document.documentElement.setAttribute('data-bs-theme', theme);
 
     // Fetch settings from backend
     const fetchSettings = async () => {
@@ -190,16 +192,6 @@ function AdminSettings() {
                 <small className="text-muted">
                   Auto-logout after inactivity
                 </small>
-              </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  id="darkMode"
-                  label="Dark Mode"
-                  checked={formData.darkMode}
-                  onChange={(e) => handleInputChange('darkMode', e.target.checked)}
-                />
               </Form.Group>
             </Card.Body>
           </Card>

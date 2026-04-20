@@ -76,6 +76,37 @@ const AdminChatPage = () => {
   }, [theme]);
 
   useEffect(() => {
+    const root = document.documentElement;
+
+    const syncThemeFromRoot = () => {
+      const rootTheme = root.getAttribute('data-bs-theme');
+      if (rootTheme === 'dark' || rootTheme === 'light') {
+        setTheme((prev) => (prev === rootTheme ? prev : rootTheme));
+      }
+    };
+
+    syncThemeFromRoot();
+
+    const observer = new MutationObserver(syncThemeFromRoot);
+    observer.observe(root, { attributes: true, attributeFilter: ['data-bs-theme'] });
+
+    const handleStorage = (event) => {
+      if (event.key !== 'adminTheme') return;
+      const nextTheme = event.newValue;
+      if (nextTheme === 'dark' || nextTheme === 'light') {
+        setTheme(nextTheme);
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 991.98px)');
     const onChange = (event) => {
       setIsMobileView(event.matches);
@@ -475,6 +506,8 @@ const AdminChatPage = () => {
   const activeSessionData = visibleSessions.find((session) => session.session_id === activeSession) || null;
   const chatDisplayName = activeSessionData?.human_mode ? (activeSessionData?.user_name || 'Anonymous') : 'Bot';
   const chatUserName = activeSessionData?.user_name || 'User';
+  const chatUserEmail = activeSessionData?.user_email || '';
+  const chatUserPhone = activeSessionData?.user_phone || '';
   const chatStatusLabel = activeSessionData?.human_mode ? 'Live support' : 'Bot mode';
   const isTransientConnectionIssue = /fetch|network|connect|load sessions|failed to/i.test(error || '');
 
@@ -654,6 +687,8 @@ const AdminChatPage = () => {
                 onClose={handleCloseChat}
                 displayName={chatDisplayName}
                 chatUserName={chatUserName}
+                chatUserEmail={chatUserEmail}
+                chatUserPhone={chatUserPhone}
                 statusLabel={chatStatusLabel}
                 isMobileView={isMobileView}
                 onRefreshSession={fetchActiveSessions}

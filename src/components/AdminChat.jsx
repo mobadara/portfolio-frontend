@@ -1,19 +1,116 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Spinner, Dropdown, Form, Modal, Button, Toast, ToastContainer } from 'react-bootstrap';
+import { Spinner, Dropdown, Modal, Button, Toast, ToastContainer } from 'react-bootstrap';
 import EmojiPicker from 'emoji-picker-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { 
   BiArrowBack, BiSmile, BiPaperclip, BiSend, BiMicrophone, BiPause, BiPlay, BiLockAlt,
-  BiDotsVerticalRounded, BiX, BiCheckDouble, BiChevronDown, BiSearch
+  BiImage, BiFile, BiMoon, BiSun,
+  BiDotsVerticalRounded, BiX, BiCheckDouble, BiChevronDown, BiSearch, BiCopy
 } from 'react-icons/bi';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
 
 const MESSAGE_REACTIONS = ['👍', '❤️', '😂', '😮', '🙏'];
 const VOICE_WAVE_BARS = [5, 8, 6, 11, 7, 10, 6, 12, 8, 9, 5, 11, 7, 10, 6, 12, 8, 9, 5, 8];
+const LONG_MESSAGE_PREVIEW_LIMIT = 320;
 
-const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel, isMobileView, onRefreshSession }) => {
+const normalizeReplyPayload = (replyTo) => {
+  if (!replyTo || typeof replyTo !== 'object') return null;
+
+  const previewText = String(replyTo.previewText || replyTo.preview_text || replyTo.text || replyTo.content || '').trim();
+  const sender = String(replyTo.sender || '').trim();
+  const normalized = {
+    id: replyTo.id ?? null,
+    sender: sender || null,
+    previewText: previewText || null,
+  };
+
+  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== null && value !== '')) || null;
+};
+
+const normalizeAttachmentPayload = (attachment) => {
+  if (!attachment || typeof attachment !== 'object') return null;
+
+  const fileName = String(attachment.file_name || attachment.name || '').trim();
+  const mimeType = String(attachment.mime_type || attachment.type || '').trim();
+  const dataUrl = String(attachment.data_url || attachment.dataUrl || attachment.url || '').trim();
+  const previewType = String(attachment.preview_type || attachment.previewType || '').trim() || (mimeType.startsWith('image/') ? 'image' : mimeType ? 'document' : '');
+  const normalized = {
+    file_name: fileName || null,
+    mime_type: mimeType || null,
+    size_bytes: attachment.size_bytes ?? attachment.sizeBytes ?? null,
+    data_url: dataUrl || null,
+    preview_type: previewType || null,
+  };
+
+  return Object.fromEntries(Object.entries(normalized).filter(([, value]) => value !== null && value !== '')) || null;
+};
+
+const extractStructuredMessage = (messageData) => {
+  if (!messageData || typeof messageData !== 'object') return null;
+
+  const attachment = normalizeAttachmentPayload(messageData.attachment);
+  const replyTo = normalizeReplyPayload(messageData.reply_to);
+  const content = String(messageData.content || messageData.text || messageData.caption || '').trim();
+
+  if (!attachment && !replyTo && !content) return null;
+
+  return {
+    content,
+    attachment,
+    replyTo
+  };
+};
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  if (!file) {
+    resolve('');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+  reader.onerror = () => reject(new Error('Failed to read file'));
+  reader.readAsDataURL(file);
+});
+
+const formatFileSize = (sizeBytes) => {
+  const value = Number(sizeBytes || 0);
+  if (!Number.isFinite(value) || value <= 0) return '';
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+};
+
+const looksLikeMarkdownOrMath = (text = '') => /(^|\n)\s{0,3}(#{1,6}\s|>\s|-\s|\*\s|\d+\.\s)|(`{1,3}|\$\$?[^$\n]+\$\$?|\[.*?\]\(.*?\)|\*\*.+?\*\*|__.+?__|~~.+?~~)/s.test(text);
+
+const isImageAttachment = (attachment, fileName = '', mimeType = '', dataUrl = '') => {
+  if (attachment?.preview_type === 'image') return true;
+  if (mimeType.startsWith('image/')) return true;
+  if (dataUrl.startsWith('data:image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(fileName);
+};
+
+const AdminChat = ({
+  sessionId,
+  onClose,
+  displayName,
+  chatUserName,
+  chatUserEmail,
+  chatUserPhone,
+  statusLabel,
+  isMobileView,
+  onRefreshSession
+}) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
@@ -33,7 +130,10 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
   const [activeAudioId, setActiveAudioId] = useState(null);
   const [audioCurrentById, setAudioCurrentById] = useState({});
   const [audioDurationById, setAudioDurationById] = useState({});
+  const [expandedMessageIds, setExpandedMessageIds] = useState(() => new Set());
   const [showCopyToast, setShowCopyToast] = useState(false);
+  const [copyToastMessage, setCopyToastMessage] = useState('Copied successfully');
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState({
     show: false,
     title: '',
@@ -76,6 +176,11 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
   const onCloseRef = useRef(onClose);
   const onRefreshSessionRef = useRef(onRefreshSession);
   const token = getStoredAdminToken();
+
+  const normalizedUserName = (chatUserName || 'User').trim() || 'User';
+  const normalizedUserEmail = (chatUserEmail || '').trim();
+  const normalizedUserPhone = (chatUserPhone || '').trim();
+  const userFirstInitial = normalizedUserName.charAt(0).toUpperCase() || 'U';
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -159,6 +264,30 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
       return;
     }
 
+    const structured = extractStructuredMessage(messageData);
+    if (structured) {
+      const sender = messageData.role === 'user' ? 'user' : 'admin';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}_${Math.random()}`,
+          sender,
+          text: structured.content,
+          created_at: messageData.timestamp || new Date().toISOString(),
+          type: structured.attachment ? 'attachment' : 'text',
+          file: structured.attachment?.file_name || null,
+          fileType: structured.attachment?.mime_type || null,
+          fileDataUrl: structured.attachment?.data_url || null,
+          attachment: structured.attachment,
+          replyTo: structured.replyTo,
+          reaction: null,
+          deleted: false
+        }
+      ]);
+
+      return;
+    }
+
     if (messageData.type === 'session_deleted') {
       setMessages((prev) => [
         ...prev,
@@ -197,7 +326,9 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
         sender,
         text: content,
         created_at: messageData.timestamp || new Date().toISOString(),
-        type: 'text'
+        type: 'text',
+        replyTo: null,
+        attachment: null
       }
     ]);
   }, []);
@@ -220,6 +351,24 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
               audioBase64: parsed.audio_base64,
               mimeType: parsed.mime_type || 'audio/webm',
               created_at: parsed.timestamp || createdAt
+            };
+          }
+
+          const structured = extractStructuredMessage(parsed);
+          if (structured) {
+            return {
+              id: `${Date.now()}_${index}`,
+              sender: role === 'user' ? 'user' : 'admin',
+              text: structured.content,
+              created_at: parsed.timestamp || createdAt,
+              type: structured.attachment ? 'attachment' : 'text',
+              file: structured.attachment?.file_name || null,
+              fileType: structured.attachment?.mime_type || null,
+              fileDataUrl: structured.attachment?.data_url || null,
+              attachment: structured.attachment,
+              replyTo: structured.replyTo,
+              reaction: null,
+              deleted: false
             };
           }
         } catch {
@@ -609,11 +758,22 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
 
     setSending(true);
     const textToSend = inputText.trim();
-    const outboundText = attachedFile
-      ? `${textToSend}${textToSend ? '\n' : ''}[Attachment selected: ${attachedFile.name}]`
-      : textToSend;
-    const replyHeader = replyToMessage?.previewText ? `↩️ Replying to: ${replyToMessage.previewText}` : '';
-    const payloadText = replyHeader ? `${replyHeader}\n${outboundText}` : outboundText;
+    let attachmentPayload = null;
+
+    if (attachedFile) {
+      const dataUrl = await readFileAsDataUrl(attachedFile);
+      if (dataUrl) {
+        attachmentPayload = {
+          file_name: attachedFile.name,
+          mime_type: attachedFile.type || 'application/octet-stream',
+          size_bytes: attachedFile.size,
+          data_url: dataUrl,
+          preview_type: attachedFile.type?.startsWith('image/') ? 'image' : 'document'
+        };
+      }
+    }
+
+    const payloadText = textToSend || (attachmentPayload?.file_name ? '' : '');
     
     // Optimistic UI update
     const optimisticMsg = {
@@ -621,10 +781,13 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
       sender: 'admin',
       text: payloadText,
       created_at: new Date().toISOString(),
-      file: attachedFile ? attachedFile.name : null,
+      file: attachmentPayload ? attachmentPayload.file_name : null,
+      fileType: attachmentPayload ? attachmentPayload.mime_type : null,
+      fileDataUrl: attachmentPayload ? attachmentPayload.data_url : null,
       isPending: true,
       reaction: null,
       replyTo: replyToMessage,
+      attachment: attachmentPayload,
       deleted: false
     };
     
@@ -640,7 +803,9 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
         type: 'message',
         role: 'admin',
         content: payloadText,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        reply_to: replyToMessage,
+        attachment: attachmentPayload
       });
 
       if (sent) {
@@ -658,16 +823,29 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
   };
 
   const handlePingUser = async () => {
-    const sent = sendSocketPayload({
-      type: 'message',
-      role: 'admin',
-      content: 'Ping 👋',
-      timestamp: new Date().toISOString()
-    });
+    if (!sessionId || !token) return;
 
-    if (sent) {
+    try {
+      const response = await fetch(
+        buildAdminUrl(`${ADMIN_ROUTES.pingUser}/${sessionId}/ping-user`),
+        {
+          method: 'POST',
+          headers: withAuthHeaders(token)
+        }
+      );
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.detail || 'Unable to send resume email');
+      }
+
+      setCopyToastMessage('Resume email sent to user');
+      setShowCopyToast(true);
       if (onRefreshSessionRef.current) onRefreshSessionRef.current();
       setShowActionsMenu(false);
+    } catch (err) {
+      setCopyToastMessage(err?.message || 'Failed to send resume email');
+      setShowCopyToast(true);
     }
   };
 
@@ -695,12 +873,11 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     }
   };
 
-  const handleThemeToggle = () => {
-    const nextDarkState = !isDarkModeEnabled;
-    const nextTheme = nextDarkState ? 'dark' : 'light';
-    setIsDarkModeEnabled(nextDarkState);
-    localStorage.setItem('adminTheme', nextTheme);
-    document.documentElement.setAttribute('data-bs-theme', nextTheme);
+  const handleSetThemeMode = (nextTheme) => {
+    const normalizedTheme = nextTheme === 'dark' ? 'dark' : 'light';
+    setIsDarkModeEnabled(normalizedTheme === 'dark');
+    localStorage.setItem('adminTheme', normalizedTheme);
+    document.documentElement.setAttribute('data-bs-theme', normalizedTheme);
   };
 
   const handleFileAttach = (e) => {
@@ -744,24 +921,32 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     return base.length > 65 ? `${base.slice(0, 65)}...` : base;
   }, []);
 
-  const handleCopyMessage = useCallback(async (msg) => {
-    const text = msg?.type === 'audio' ? 'Voice message' : (msg?.text || '');
-    if (!text) return;
+  const copyTextToClipboard = useCallback(async (text, successMessage = 'Copied successfully') => {
+    const value = (text || '').toString().trim();
+    if (!value) return;
 
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(value);
     } catch {
       const temp = document.createElement('textarea');
-      temp.value = text;
+      temp.value = value;
       document.body.appendChild(temp);
       temp.select();
       document.execCommand('copy');
       document.body.removeChild(temp);
     }
 
+    setCopyToastMessage(successMessage);
     setShowCopyToast(true);
-    setOpenMessageActionsId(null);
   }, []);
+
+  const handleCopyMessage = useCallback(async (msg) => {
+    const text = msg?.type === 'audio' ? 'Voice message' : (msg?.text || '');
+    if (!text) return;
+
+    await copyTextToClipboard(text, 'Message copied successfully');
+    setOpenMessageActionsId(null);
+  }, [copyTextToClipboard]);
 
   const handleReplyToMessage = useCallback((msg) => {
     if (!msg) return;
@@ -773,6 +958,34 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     setOpenMessageActionsId(null);
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [getMessagePreviewText]);
+
+  const renderReplyQuote = useCallback((replyTarget, isOutgoing = false) => {
+    if (!replyTarget?.previewText) return null;
+
+    const quoteBg = isOutgoing ? 'rgba(255,255,255,0.12)' : 'rgba(11,99,246,0.08)';
+    const quoteBorder = isOutgoing ? 'rgba(255,255,255,0.55)' : '#0b63f6';
+    const quoteLabel = replyTarget.sender === 'admin' ? 'you' : replyTarget.sender === 'bot' ? 'bot' : 'user';
+
+    return (
+      <div
+        className="my-replied-context mb-1"
+        style={{
+          background: quoteBg,
+          borderLeft: `3px solid ${quoteBorder}`,
+          borderRadius: '8px',
+          padding: '6px 8px',
+          lineHeight: 1.15
+        }}
+      >
+        <small className="d-block fw-semibold" style={{ opacity: 0.9 }}>
+          Replying to {quoteLabel}
+        </small>
+        <small className="d-block text-truncate" style={{ opacity: 0.95 }}>
+          {replyTarget.previewText}
+        </small>
+      </div>
+    );
+  }, []);
 
   const handleReactToMessage = useCallback((messageId, emoji) => {
     setMessages((prev) => prev.map((msg) => (
@@ -854,6 +1067,39 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     setOpenMessageActionsId(null);
   }, [replyToMessage, sendSocketPayload]);
 
+  const renderAttachmentPreview = useCallback((msg) => {
+    const attachment = msg?.attachment;
+    const fileName = attachment?.file_name || msg?.file || msg?.fileName || '';
+    const mimeType = attachment?.mime_type || msg?.fileType || '';
+    const dataUrl = attachment?.data_url || msg?.fileDataUrl || '';
+    const previewType = isImageAttachment(attachment, fileName, mimeType, dataUrl) ? 'image' : 'document';
+    const fileSize = formatFileSize(attachment?.size_bytes || msg?.fileSize);
+
+    if (!attachment && !fileName) return null;
+
+    if (previewType === 'image' && dataUrl) {
+      return (
+        <div className="my-message-attachment my-message-attachment--image mb-2">
+          <img src={dataUrl} alt={fileName || 'Attachment preview'} className="my-message-attachment-image" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="my-message-attachment my-message-attachment--document mb-2">
+        <div className="my-message-attachment-meta">
+          {previewType === 'image' ? <BiImage size={16} /> : <BiFile size={16} />}
+          <div className="min-w-0">
+            <div className="text-truncate fw-semibold">{fileName || 'Attachment'}</div>
+            <small className="d-block text-truncate opacity-75">
+              {mimeType || 'File'}{fileSize ? ` · ${fileSize}` : ''}
+            </small>
+          </div>
+        </div>
+      </div>
+    );
+  }, []);
+
   const confirmDeleteAction = useCallback(async () => {
     const action = deleteConfirm.onConfirm;
     setDeleteConfirm((prev) => ({ ...prev, show: false }));
@@ -932,6 +1178,30 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
   const formatTime = useCallback((timestamp) => {
     if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }, []);
+
+  const getMessageDayKey = useCallback((timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  }, []);
+
+  const formatMessageDayLabel = useCallback((timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const messageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    if (messageDay.getTime() === today.getTime()) return 'Today';
+    if (messageDay.getTime() === yesterday.getTime()) return 'Yesterday';
+
+    return date.toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' });
   }, []);
 
   const renderHighlightedText = useCallback((text, query) => {
@@ -1024,6 +1294,18 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     setActiveAudioId(null);
   }, []);
 
+  const toggleExpandedMessage = useCallback((messageId) => {
+    setExpandedMessageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) {
+        next.delete(messageId);
+      } else {
+        next.add(messageId);
+      }
+      return next;
+    });
+  }, []);
+
   const renderedMessages = useMemo(() => {
     if (loading) {
       return (
@@ -1044,9 +1326,14 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     }
 
     return messages.map((msg, idx) => {
+      const messageIdKey = String(msg.id || idx);
       const isAdmin = msg.sender === 'admin' || msg.sender === 'bot';
       const isActionsOpen = openMessageActionsId === msg.id;
       const swipeOffset = swipeReplyState.messageId === msg.id ? swipeReplyState.offset : 0;
+      const currentDayKey = getMessageDayKey(msg.created_at);
+      const previousDayKey = idx > 0 ? getMessageDayKey(messages[idx - 1]?.created_at) : '';
+      const shouldRenderDayHeader = Boolean(currentDayKey) && currentDayKey !== previousDayKey;
+      const dayHeaderLabel = shouldRenderDayHeader ? formatMessageDayLabel(msg.created_at) : '';
       const audioId = String(msg.id || idx);
       const currentAudioTime = audioCurrentById[audioId] || 0;
       const totalAudioDuration = audioDurationById[audioId] || 0;
@@ -1056,14 +1343,36 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
         : 0;
       const isAudioPlaying = activeAudioId === audioId;
       const messageOwnerName = isAdmin ? 'Admin' : (chatUserName?.trim() || 'User');
+      const rawMessageText = (msg.text || '').toString();
+      const isLongMessage = rawMessageText.length > LONG_MESSAGE_PREVIEW_LIMIT;
+      const isMessageExpanded = expandedMessageIds.has(messageIdKey);
+      const isMarkdownLikeMessage = looksLikeMarkdownOrMath(rawMessageText);
+      const truncatedMessageText = isLongMessage
+        ? `${rawMessageText.slice(0, LONG_MESSAGE_PREVIEW_LIMIT).trimEnd()}...`
+        : rawMessageText;
       return (
-        <div key={msg.id || idx} className={`mb-2 my-msg-row-shell ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}>
+        <React.Fragment key={msg.id || idx}>
+          {shouldRenderDayHeader && dayHeaderLabel ? (
+            <div className="my-chat-day-separator" aria-label={`Messages from ${dayHeaderLabel}`}>
+              <span>{dayHeaderLabel}</span>
+            </div>
+          ) : null}
+          <div
+            className={`mb-2 my-msg-row-shell ${isAdmin ? 'my-msg-row-admin' : 'my-msg-row-user'}`}
+            style={{
+              justifyContent: isAdmin ? 'flex-end' : 'flex-start',
+              flexDirection: 'row'
+            }}
+          >
           <div className="my-message-avatar" aria-hidden="true">
             {isAdmin ? 'A' : 'U'}
           </div>
           <div
             className={`my-message-bubble p-2 rounded position-relative ${isAdmin ? 'my-message-admin' : 'my-message-user'} ${isActionsOpen ? 'my-message-active' : ''}`}
-            style={{ transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : undefined }}
+            style={{
+              transform: swipeOffset > 0 ? `translateX(${swipeOffset}px)` : undefined,
+              minWidth: 0
+            }}
             onTouchStart={(event) => onMessageTouchStart(msg, event)}
             onTouchMove={(event) => onMessageTouchMove(msg, event)}
             onTouchEnd={() => onMessageTouchEnd(msg)}
@@ -1071,9 +1380,23 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
           >
             <div
               className={`my-message-top-row ${isActionsOpen ? 'my-message-top-row-active' : ''}`}
-              onClick={() => setOpenMessageActionsId((prev) => (prev === msg.id ? null : msg.id))}
+              onClick={() => {
+                if (isMobileView) return;
+                setOpenMessageActionsId((prev) => (prev === msg.id ? null : msg.id));
+              }}
             >
-              <span className="my-message-owner-name">{messageOwnerName}</span>
+              <button
+                type="button"
+                className="my-message-owner-name-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (isAdmin) return;
+                  setShowUserProfileModal(true);
+                }}
+                aria-label={isAdmin ? 'Admin message label' : `View profile for ${messageOwnerName}`}
+              >
+                <span className="my-message-owner-name">{messageOwnerName}</span>
+              </button>
               <Dropdown
                 align="end"
                 className="my-message-actions-dropdown"
@@ -1087,7 +1410,7 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
                   aria-label="Message options"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <BiChevronDown size={11} />
+                  <BiChevronDown size={13} />
                 </Dropdown.Toggle>
                 <Dropdown.Menu className="my-message-actions-menu">
                   <div className="my-reaction-row" role="group" aria-label="React to message">
@@ -1119,11 +1442,9 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
               </Dropdown>
             </div>
 
-            {msg.file && (
-              <div className="bg-dark bg-opacity-10 rounded p-2 mb-1 small d-flex align-items-center gap-2">
-                <BiPaperclip /> {msg.file}
-              </div>
-            )}
+            {renderAttachmentPreview(msg)}
+
+            {renderReplyQuote(msg.replyTo, msg.sender === 'admin')}
 
             {msg.type === 'audio' && msg.audioBase64 ? (
               <div className="my-voice-note-shell">
@@ -1181,18 +1502,32 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
               </div>
             ) : (
               <div style={{ wordBreak: 'break-word' }}>
-                {msg.replyTo && (
-                  <div className="my-replied-context mb-1">
-                    <small>{msg.replyTo.previewText}</small>
+                {renderReplyQuote(msg.replyTo, msg.sender === 'admin')}
+                {messageSearchQuery.trim() ? (
+                  <div className="my-searchable-message-text">{renderHighlightedText(rawMessageText, messageSearchQuery)}</div>
+                ) : isLongMessage && !isMessageExpanded && !isMarkdownLikeMessage ? (
+                  <div className="my-searchable-message-text">{truncatedMessageText}</div>
+                ) : (
+                  <div
+                    className={isLongMessage && !isMessageExpanded ? 'my-message-markdown-preview' : undefined}
+                    style={isLongMessage && !isMessageExpanded ? { maxHeight: '6.4rem', overflow: 'hidden' } : undefined}
+                  >
+                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                      {rawMessageText}
+                    </ReactMarkdown>
                   </div>
                 )}
-                {messageSearchQuery.trim() ? (
-                  <div className="my-searchable-message-text">{renderHighlightedText(msg.text || '', messageSearchQuery)}</div>
-                ) : (
-                  <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                    {msg.text || ''}
-                  </ReactMarkdown>
-                )}
+
+                {!messageSearchQuery.trim() && isLongMessage ? (
+                  <button
+                    type="button"
+                    className="my-message-more-btn"
+                    onClick={() => toggleExpandedMessage(messageIdKey)}
+                    aria-label={isMessageExpanded ? 'Show less text' : 'Show more text'}
+                  >
+                    {isMessageExpanded ? 'less' : 'more'}
+                  </button>
+                ) : null}
               </div>
             )}
 
@@ -1211,6 +1546,7 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
 
           </div>
         </div>
+        </React.Fragment>
       );
     });
   }, [
@@ -1236,9 +1572,15 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
     handleAudioEnded,
     handleAudioPause,
     handleAudioSeek,
+    toggleExpandedMessage,
+    renderAttachmentPreview,
     formatAudioTime,
     formatTime,
+    getMessageDayKey,
+    formatMessageDayLabel,
     chatUserName,
+    isMobileView,
+    expandedMessageIds,
     messageSearchQuery,
     renderHighlightedText
   ]);
@@ -1254,9 +1596,14 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
               <BiArrowBack size={24} />
             </button>
           )}
-          <div className="my-chat-avatar">
+          <button
+            type="button"
+            className="my-chat-avatar my-chat-avatar-button"
+            onClick={() => setShowUserProfileModal(true)}
+            aria-label="Open user profile"
+          >
             {displayName ? displayName.charAt(0).toUpperCase() : 'U'}
-          </div>
+          </button>
           <div className="my-chat-user-meta ms-2">
             <span className="my-chat-title">{displayName}</span>
             <span className="my-connection-text">{statusLabel}</span>
@@ -1313,16 +1660,29 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
                 Ping User
               </Dropdown.Item>
               <Dropdown.Divider />
-              <Dropdown.ItemText className="my-actions-item d-flex align-items-center justify-content-between gap-2">
-                <span>Darkmode</span>
-                <Form.Check
-                  type="switch"
-                  id={`chat-darkmode-switch-${sessionId}`}
-                  checked={isDarkModeEnabled}
-                  onChange={handleThemeToggle}
+              <Dropdown.ItemText className="my-actions-item my-theme-mode-shell">
+                <div className="my-theme-mode-header">Appearance</div>
+                <div
+                  className="my-theme-mode-toggle"
+                  role="group"
+                  aria-label="Chat theme mode"
                   onClick={(event) => event.stopPropagation()}
-                  className="m-0"
-                />
+                >
+                  <button
+                    type="button"
+                    className={`my-theme-mode-btn ${!isDarkModeEnabled ? 'active' : ''}`}
+                    onClick={() => handleSetThemeMode('light')}
+                  >
+                    <BiSun size={14} /> Light
+                  </button>
+                  <button
+                    type="button"
+                    className={`my-theme-mode-btn ${isDarkModeEnabled ? 'active' : ''}`}
+                    onClick={() => handleSetThemeMode('dark')}
+                  >
+                    <BiMoon size={14} /> Dark
+                  </button>
+                </div>
               </Dropdown.ItemText>
             </Dropdown.Menu>
           </Dropdown>
@@ -1337,9 +1697,9 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
 
       {/* --- ATTACHMENT PREVIEW --- */}
       {replyToMessage && (
-        <div className="my-reply-preview d-flex align-items-center justify-content-between px-3 py-2">
-          <div className="my-reply-preview-content">
-            <small className="d-block fw-semibold">Replying to {replyToMessage.sender === 'admin' ? 'you' : 'user'}</small>
+        <div className="my-reply-preview d-flex align-items-center justify-content-between px-3 py-2" style={{ borderLeft: '3px solid #0b63f6' }}>
+          <div className="my-reply-preview-content" style={{ lineHeight: 1.15 }}>
+            <small className="d-block fw-semibold">Replying to {replyToMessage.sender === 'admin' ? 'you' : replyToMessage.sender === 'bot' ? 'bot' : 'user'}</small>
             <small className="d-block text-truncate">{replyToMessage.previewText}</small>
           </div>
           <button
@@ -1534,9 +1894,86 @@ const AdminChat = ({ sessionId, onClose, displayName, chatUserName, statusLabel,
 
       <ToastContainer position="bottom-end" className="p-3">
         <Toast bg="success" show={showCopyToast} autohide delay={2200} onClose={() => setShowCopyToast(false)}>
-          <Toast.Body className="text-white">Copied successfully</Toast.Body>
+          <Toast.Body className="text-white">{copyToastMessage}</Toast.Body>
         </Toast>
       </ToastContainer>
+
+      <Modal show={showUserProfileModal} onHide={() => setShowUserProfileModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>User Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="d-flex align-items-center gap-3 mb-3">
+            <div className="my-profile-avatar" aria-hidden="true">{userFirstInitial}</div>
+            <div className="min-w-0">
+              <div className="fw-semibold">{normalizedUserName}</div>
+              <small className="text-muted">Lead details</small>
+            </div>
+          </div>
+          <div className="mb-2">
+            <small className="text-muted d-block">Name</small>
+            <span>{normalizedUserName}</span>
+          </div>
+          <div className="mb-2 my-profile-row">
+            <small className="text-muted d-block">Email Address</small>
+            <div className="my-profile-value-wrap">
+              {normalizedUserEmail ? (
+                <a className="my-profile-link" href={`mailto:${normalizedUserEmail}`}>
+                  {normalizedUserEmail}
+                </a>
+              ) : (
+                <span>Not provided</span>
+              )}
+              {normalizedUserEmail && (
+                <button
+                  type="button"
+                  className="my-profile-copy-btn"
+                  onClick={() => copyTextToClipboard(normalizedUserEmail, 'Email copied successfully')}
+                  aria-label="Copy email address"
+                >
+                  <BiCopy size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="mb-2 my-profile-row">
+            <small className="text-muted d-block">Phone Number</small>
+            <div className="my-profile-value-wrap">
+              <span>{normalizedUserPhone || 'Not provided'}</span>
+              {normalizedUserPhone && (
+                <button
+                  type="button"
+                  className="my-profile-copy-btn"
+                  onClick={() => copyTextToClipboard(normalizedUserPhone, 'Phone number copied successfully')}
+                  aria-label="Copy phone number"
+                >
+                  <BiCopy size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="my-profile-row">
+            <small className="text-muted d-block">Session ID</small>
+            <div className="my-profile-value-wrap">
+              <span className="text-break">{sessionId}</span>
+              <button
+                type="button"
+                className="my-profile-copy-btn"
+                onClick={() => copyTextToClipboard(sessionId, 'Session ID copied successfully')}
+                aria-label="Copy session ID"
+              >
+                <BiCopy size={16} />
+              </button>
+            </div>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <small className="text-muted me-auto">Profile sourced from captured chat lead details.</small>
+          <Button variant="secondary" onClick={() => setShowUserProfileModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal show={deleteConfirm.show} onHide={() => setDeleteConfirm((prev) => ({ ...prev, show: false }))} centered>
         <Modal.Header closeButton>

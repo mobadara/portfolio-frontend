@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Form, InputGroup, Spinner, Alert, ListGroup, Badge } from 'react-bootstrap';
-import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, InputGroup, Spinner, Alert, ListGroup, Badge, Toast, ToastContainer } from 'react-bootstrap';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { ADMIN_ROUTES, buildAdminUrl, withAuthHeaders } from '../utils/adminApi';
 import './AdminMessages.css';
 
 /**
@@ -9,12 +10,23 @@ import './AdminMessages.css';
  */
 function AdminMessages() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
   // No local detail view, navigation only
+
+  useEffect(() => {
+    if (location.state?.flash) {
+      setToastMessage(location.state.flash);
+      setShowToast(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     // Check authentication
@@ -24,76 +36,30 @@ function AdminMessages() {
       return;
     }
 
-    // Fetch messages from backend
     const fetchMessages = async () => {
       try {
         setLoading(true);
-        // TODO: Replace with actual backend API call
-        // const response = await fetch('/admin/messages', {
-        //   headers: { 'Authorization': `Bearer ${token}` }
-        // });
+        const response = await fetch(buildAdminUrl(ADMIN_ROUTES.messages), {
+          headers: withAuthHeaders(token)
+        });
 
-        // Mock data for development
-        setMessages([
-          {
-            id: 1,
-            sessionId: '1234567890123456',
-            visitorName: 'John Doe',
-            visitorEmail: 'john@example.com',
-            subject: 'Project Inquiry',
-            status: 'responded',
-            timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-            preview: 'Hi Muyiwa, I am interested in your services for a machine learning project...',
-            messages: [
-              { type: 'visitor', text: 'Hi Muyiwa, I am interested in your services for a machine learning project', time: new Date(Date.now() - 2 * 60 * 60 * 1000) },
-              { type: 'admin', text: 'Hello! Thanks for your interest. Let me discuss the details with you.', time: new Date(Date.now() - 1.5 * 60 * 60 * 1000) }
-            ]
-          },
-          {
-            id: 2,
-            sessionId: '1234567890123457',
-            visitorName: 'Jane Smith',
-            visitorEmail: 'jane@example.com',
-            subject: 'Freelance Opportunity',
-            status: 'pending',
-            timestamp: new Date(Date.now() - 30 * 60 * 1000),
-            preview: 'Do you take on freelance projects? I have an interesting AI project...',
-            messages: [
-              { type: 'visitor', text: 'Do you take on freelance projects? I have an interesting AI project...', time: new Date(Date.now() - 30 * 60 * 1000) }
-            ]
-          },
-          {
-            id: 3,
-            sessionId: '1234567890123458',
-            visitorName: 'Mike Johnson',
-            visitorEmail: 'mike@example.com',
-            subject: 'Collaboration Interest',
-            status: 'responded',
-            timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            preview: 'I saw your portfolio and would like to collaborate on a data science project...',
-            messages: [
-              { type: 'visitor', text: 'I saw your portfolio and would like to collaborate on a data science project', time: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-              { type: 'admin', text: 'That sounds great! I am always open to collaboration. Tell me more about your project.', time: new Date(Date.now() - 23.5 * 60 * 60 * 1000) }
-            ]
-          },
-          {
-            id: 4,
-            sessionId: '1234567890123459',
-            visitorName: 'Sarah Williams',
-            visitorEmail: 'sarah@example.com',
-            subject: 'Technical Question',
-            status: 'archived',
-            timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000),
-            preview: 'What technologies did you use for your portfolio website?',
-            messages: [
-              { type: 'visitor', text: 'What technologies did you use for your portfolio website?', time: new Date(Date.now() - 48 * 60 * 60 * 1000) },
-              { type: 'admin', text: 'I built it with React, FastAPI, and other modern technologies. Happy to discuss in detail!', time: new Date(Date.now() - 47.8 * 60 * 60 * 1000) }
-            ]
-          }
-        ]);
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch {
+          payload = null;
+        }
+
+        if (!response.ok) {
+          throw new Error(payload?.detail || payload?.message || 'Failed to load messages');
+        }
+
+        const list = Array.isArray(payload) ? payload : Array.isArray(payload?.messages) ? payload.messages : [];
+        setMessages(list);
+        setError(null);
         setLoading(false);
       } catch (err) {
-        setError('Failed to load messages');
+        setError(err.message || 'Failed to load messages');
         setLoading(false);
       }
     };
@@ -103,9 +69,9 @@ function AdminMessages() {
 
   const filteredMessages = messages.filter(msg => {
     const matchesSearch = 
-      msg.visitorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.visitorEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      msg.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      String(msg.name || msg.visitorName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(msg.email || msg.visitorEmail || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(msg.subject || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterStatus === 'all' || msg.status === filterStatus;
     
@@ -122,7 +88,9 @@ function AdminMessages() {
   };
 
   const formatTime = (date) => {
-    return date.toLocaleString('en-US', {
+    const parsed = typeof date === 'string' ? new Date(date) : date;
+    if (!parsed || Number.isNaN(parsed.getTime?.())) return 'N/A';
+    return parsed.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -142,6 +110,12 @@ function AdminMessages() {
 
   return (
     <Container fluid className="admin-messages py-4">
+      <ToastContainer position="top-end" className="p-3" style={{ zIndex: 2000 }}>
+        <Toast bg="success" show={showToast} onClose={() => setShowToast(false)} delay={3000} autohide>
+          <Toast.Body className="text-white">{toastMessage}</Toast.Body>
+        </Toast>
+      </ToastContainer>
+
       <Row className="mb-4">
         <Col>
           <h1 className="admin-title">Messages</h1>
@@ -200,17 +174,17 @@ function AdminMessages() {
                   >
                     <div className="d-flex justify-content-between align-items-start mb-2">
                       <div>
-                        <h6 className="mb-0">{msg.visitorName}</h6>
-                        <small className="text-muted">{msg.visitorEmail}</small>
+                        <h6 className="mb-0">{msg.name || msg.visitorName || 'Unknown Sender'}</h6>
+                        <small className="text-muted">{msg.email || msg.visitorEmail || 'No email'}</small>
                       </div>
                       <Badge bg={getStatusBadge(msg.status)}>
                         {msg.status}
                       </Badge>
                     </div>
                     <p className="mb-1 small">{msg.subject}</p>
-                    <p className="mb-0 text-muted text-truncate small">{msg.preview}</p>
+                    <p className="mb-0 text-muted text-truncate small">{msg.preview || msg.message || ''}</p>
                     <small className="text-muted mt-2 d-block">
-                      {formatTime(msg.timestamp)}
+                      {formatTime(msg.created_at || msg.timestamp)}
                     </small>
                   </ListGroup.Item>
                 ))

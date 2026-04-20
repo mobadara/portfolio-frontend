@@ -2,17 +2,21 @@ const ADMIN_API_BASE = (import.meta?.env?.VITE_CHAT_API_BASE || 'https://portfol
 
 export const ADMIN_ROUTES = {
   login: import.meta?.env?.VITE_ADMIN_LOGIN_ENDPOINT || '/admin/login',
+  overview: import.meta?.env?.VITE_ADMIN_OVERVIEW_ENDPOINT || '/admin/overview',
   changePassword: import.meta?.env?.VITE_ADMIN_CHANGE_PASSWORD_ENDPOINT || '/admin/change-password',
   users: import.meta?.env?.VITE_ADMIN_USERS_ENDPOINT || '/admin/users',
   messages: import.meta?.env?.VITE_ADMIN_MESSAGES_ENDPOINT || '/admin/contact-messages',
   contactCreate: import.meta?.env?.VITE_CONTACT_CREATE_ENDPOINT || '/contact',
   projects: import.meta?.env?.VITE_ADMIN_PROJECTS_ENDPOINT || '/admin/projects',
+  skills: import.meta?.env?.VITE_ADMIN_SKILLS_ENDPOINT || '/admin/skills',
+  publicSkills: import.meta?.env?.VITE_PUBLIC_SKILLS_ENDPOINT || '/api/skills',
   uploadResume: import.meta?.env?.VITE_ADMIN_UPLOAD_RESUME_ENDPOINT || '/admin/upload/resume',
   uploadPortrait: import.meta?.env?.VITE_ADMIN_UPLOAD_PORTRAIT_ENDPOINT || '/admin/upload/portrait',
   resumeAsset: import.meta?.env?.VITE_RESUME_ASSET_ENDPOINT || '/api/assets/resume',
   portraitAsset: import.meta?.env?.VITE_PORTRAIT_ASSET_ENDPOINT || '/api/assets/portrait',
   sessions: import.meta?.env?.VITE_ADMIN_SESSIONS_ENDPOINT || '/admin/sessions',
   chatSessions: import.meta?.env?.VITE_ADMIN_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions',
+  pingUser: import.meta?.env?.VITE_ADMIN_PING_USER_ENDPOINT || '/admin/chat_sessions',
   deleteAllChatSessions: import.meta?.env?.VITE_ADMIN_DELETE_ALL_CHAT_SESSIONS_ENDPOINT || '/admin/chat_sessions/delete-all',
   deleteAllMessages: import.meta?.env?.VITE_ADMIN_DELETE_ALL_MESSAGES_ENDPOINT || '/admin/contact-messages/delete-all',
   deleteAllProjects: import.meta?.env?.VITE_ADMIN_DELETE_ALL_PROJECTS_ENDPOINT || '/admin/projects/delete-all'

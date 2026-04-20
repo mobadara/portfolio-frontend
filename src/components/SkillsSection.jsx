@@ -1,7 +1,43 @@
 import { useState, useMemo, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
-import skillsData from '../data/skills';
+import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 import './SkillsSection.css';
+
+const PUBLIC_SKILLS_ENDPOINT = ADMIN_ROUTES.publicSkills;
+
+const SKILL_ICON_CLASS_MAP = {
+  python: 'bi-terminal-fill',
+  javascript: 'bi-braces-asterisk',
+  database: 'bi-database-fill',
+  'neural-network': 'bi-diagram-3-fill',
+  'chart-line': 'bi-graph-up-arrow',
+  tensorflow: 'bi-cpu-fill',
+  table: 'bi-table',
+  calculator: 'bi-calculator-fill',
+  'chart-bar': 'bi-bar-chart-fill',
+  brain: 'bi-cpu',
+  robot: 'bi-robot',
+  'hugging-face': 'bi-emoji-smile-fill',
+  'wand-magic-sparkles': 'bi-stars',
+  react: 'bi-code-slash',
+  html5: 'bi-filetype-html',
+  mobile: 'bi-phone-fill',
+  server: 'bi-server',
+  docker: 'bi-box-seam-fill',
+  azure: 'bi-cloud-fill',
+  aws: 'bi-cloud-fill',
+  leaf: 'bi-tree-fill',
+  lightbulb: 'bi-lightbulb-fill',
+  chat: 'bi-chat-dots-fill',
+  users: 'bi-people-fill',
+  diagram: 'bi-diagram-3-fill',
+  star: 'bi-star-fill',
+};
+
+const getSkillIconClass = (iconKey = 'star') => {
+  const normalizedKey = String(iconKey || 'star').trim().toLowerCase();
+  return SKILL_ICON_CLASS_MAP[normalizedKey] || SKILL_ICON_CLASS_MAP.star;
+};
 
 /**
  * SkillsSection - Displays skills as an interactive word cloud
@@ -10,6 +46,7 @@ import './SkillsSection.css';
  * @returns {JSX.Element} Word cloud visualization of skills
  */
 const SkillsSection = () => {
+  const [skills, setSkills] = useState([]);
   const [hoveredSkill, setHoveredSkill] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   // eslint-disable-next-line no-unused-vars
@@ -24,17 +61,58 @@ const SkillsSection = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSkills = async () => {
+      try {
+        const response = await fetch(buildAdminUrl(PUBLIC_SKILLS_ENDPOINT));
+        if (!response.ok) {
+          throw new Error('Unable to fetch skills.');
+        }
+
+        const payload = await response.json();
+        const fetchedSkills = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.skills)
+            ? payload.skills
+            : [];
+
+        if (!isMounted) return;
+
+        setSkills(
+          fetchedSkills.map((skill) => ({
+            name: skill.name,
+            level: Number(skill.level) || 0,
+            category: skill.category || 'General',
+            icon: skill.icon || 'star'
+          }))
+        );
+      } catch {
+        if (isMounted) {
+          setSkills([]);
+        }
+      }
+    };
+
+    fetchSkills();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Get unique categories
   const categories = useMemo(() => {
-    const cats = ['All', ...new Set(skillsData.map(skill => skill.category))];
+    const cats = ['All', ...new Set(skills.map(skill => skill.category))];
     return cats;
-  }, []);
+  }, [skills]);
 
   // Filter skills based on selected category
   const filteredSkills = useMemo(() => {
-    if (selectedCategory === 'All') return skillsData;
-    return skillsData.filter(skill => skill.category === selectedCategory);
-  }, [selectedCategory]);
+    if (selectedCategory === 'All') return skills;
+    return skills.filter(skill => skill.category === selectedCategory);
+  }, [selectedCategory, skills]);
 
   // Calculate font size based on skill level and screen size
   const calculateFontSize = (level) => {
@@ -104,6 +182,9 @@ const SkillsSection = () => {
                 onMouseEnter={() => setHoveredSkill(skill.name)}
                 onMouseLeave={() => setHoveredSkill(null)}
               >
+                <span className="skill-icon" aria-hidden="true">
+                  <i className={`bi ${getSkillIconClass(skill.icon)}`} />
+                </span>
                 {skill.name}
               </span>
             ))}
@@ -115,7 +196,10 @@ const SkillsSection = () => {
               <div className="tooltip-content">
                 <strong>{hoveredSkill}</strong>
                 <div className="skill-level">
-                  {skillsData.find(s => s.name === hoveredSkill)?.level}%
+                  {skills.find(s => s.name === hoveredSkill)?.level}%
+                </div>
+                <div className="skill-tooltip-icon" aria-hidden="true">
+                  <i className={`bi ${getSkillIconClass(skills.find(s => s.name === hoveredSkill)?.icon)}`} />
                 </div>
               </div>
             </div>
@@ -125,7 +209,7 @@ const SkillsSection = () => {
         {/* Statistics */}
         <div className="row text-center mt-5 pt-4 border-top">
           <div className="col-md-3 mb-3">
-            <h5 className="fw-bold text-primary">{skillsData.length}</h5>
+            <h5 className="fw-bold text-primary">{skills.length}</h5>
             <p className="text-secondary">Total Skills</p>
           </div>
           <div className="col-md-3 mb-3">
@@ -135,8 +219,8 @@ const SkillsSection = () => {
           <div className="col-md-3 mb-3">
             <h5 className="fw-bold text-warning">
               {Math.round(
-                skillsData.reduce((sum, skill) => sum + skill.level, 0) /
-                  skillsData.length
+                skills.reduce((sum, skill) => sum + skill.level, 0) /
+                  (skills.length || 1)
               )}
               %
             </h5>
@@ -144,7 +228,7 @@ const SkillsSection = () => {
           </div>
           <div className="col-md-3 mb-3">
             <h5 className="fw-bold text-info">
-              {skillsData.filter(s => s.level >= 90).length}
+              {skills.filter(s => s.level >= 90).length}
             </h5>
             <p className="text-secondary">Expert Level Skills</p>
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Spinner } from 'react-bootstrap';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import axios from 'axios';
 import './App.css';
@@ -13,12 +14,12 @@ import AboutSection from './components/AboutSection';
 import SkillsSection from './components/SkillsSection';
 import PortfolioSection from './components/PortfolioSection';
 import ServicesSection from './components/ServicesSection';
-import BlogSection from './components/BlogSection';
 import ContactSection from './components/ContactSection';
 
 // Pages
 import AllProjects from './pages/AllProjects';
 import ResumePage from './pages/ResumePage';
+import PublicationsPage from './pages/PublicationsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Admin Pages
@@ -28,7 +29,12 @@ import AdminAnalytics from './pages/AdminAnalytics';
 import AdminSettings from './pages/AdminSettings';
 import AdminMessages from './pages/AdminMessages';
 import AdminMessageDetail from './pages/AdminMessageDetail';
+import AdminSkills from './pages/AdminSkills';
 import AdminChatPage from './components/AdminChatPage';
+import {
+  clearAdminAuth,
+  getStoredAdminToken,
+} from './utils/adminApi';
 
 // Live Project Pages
 import FinBERT from './pages/projects/FinBERT';
@@ -38,7 +44,6 @@ const SECTION_PATHS = {
   '/about': 'about',
   '/skills': 'skills',
   '/portfolio': 'portfolio',
-  '/blog': 'blog',
   '/services': 'services',
   '/contact': 'contact'
 };
@@ -136,7 +141,6 @@ function App() {
       <SkillsSection />
       <PortfolioSection projects={projects} setRouteLoading={setRouteLoading} />
       <ServicesSection />
-      <BlogSection />
       <ContactSection />
     </>
   );
@@ -150,7 +154,7 @@ function App() {
         <Route path="/about" element={homeContent} />
         <Route path="/skills" element={homeContent} />
         <Route path="/portfolio" element={homeContent} />
-        <Route path="/blog" element={homeContent} />
+        <Route path="/blog" element={<PublicationsPage />} />
         <Route path="/services" element={homeContent} />
         <Route path="/contact" element={homeContent} />
         
@@ -159,18 +163,21 @@ function App() {
           path="/projects" 
           element={<AllProjects projects={projects} theme={theme} onToggleTheme={toggleTheme} setRouteLoading={setRouteLoading} />} 
         />
+        <Route path="/publications" element={<PublicationsPage />} />
         <Route path="/resume" element={<ResumePage />} />
       </Route>
 
       {/* ADMIN ROUTES (No Public Header/Footer) */}
-      <Route path="/admin" element={<AdminLogin />} />
-      <Route path="/admin/dashboard" element={<AdminDashboard />} />
-      <Route path="/admin/analytics" element={<AdminAnalytics />} />
-      <Route path="/admin/settings" element={<AdminSettings />} />
-      <Route path="/admin/messages" element={<AdminMessages />} />
-      <Route path="/admin/messages/:id" element={<AdminMessageDetail />} />
-      <Route path="/admin/chat" element={<AdminChatPage />} />
-      <Route path="/admin/chat/:sessionId" element={<AdminChatPage />} />
+      <Route path="/admin" element={<AdminEntryRedirect />} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/dashboard" element={<AdminRouteGuard><AdminDashboard /></AdminRouteGuard>} />
+      <Route path="/admin/analytics" element={<AdminRouteGuard><AdminAnalytics /></AdminRouteGuard>} />
+      <Route path="/admin/settings" element={<AdminRouteGuard><AdminSettings /></AdminRouteGuard>} />
+      <Route path="/admin/messages" element={<AdminRouteGuard><AdminMessages /></AdminRouteGuard>} />
+      <Route path="/admin/messages/:id" element={<AdminRouteGuard><AdminMessageDetail /></AdminRouteGuard>} />
+      <Route path="/admin/skills" element={<AdminRouteGuard><AdminSkills /></AdminRouteGuard>} />
+      <Route path="/admin/chat" element={<AdminRouteGuard><AdminChatPage /></AdminRouteGuard>} />
+      <Route path="/admin/chat/:sessionId" element={<AdminRouteGuard><AdminChatPage /></AdminRouteGuard>} />
 
       {/* Live Projects Demos */}
       <Route path="/projects/sentiment-analysis-with-bert" element={<FinBERT />} />
@@ -178,6 +185,53 @@ function App() {
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
+}
+
+function AdminEntryRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = getStoredAdminToken();
+
+    if (!token) {
+      navigate('/admin/login', { replace: true });
+      return;
+    }
+
+    navigate('/admin/dashboard', { replace: true });
+  }, [navigate]);
+
+  return (
+    <div className="admin-route-loading d-flex align-items-center justify-content-center min-vh-100">
+      <Spinner animation="border" />
+    </div>
+  );
+}
+
+function AdminRouteGuard({ children }) {
+  const navigate = useNavigate();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const token = getStoredAdminToken();
+
+    if (!token) {
+      navigate('/admin/login', { replace: true });
+      return;
+    }
+
+    setReady(true);
+  }, [navigate]);
+
+  if (!ready) {
+    return (
+      <div className="admin-route-loading d-flex align-items-center justify-content-center min-vh-100">
+        <Spinner animation="border" />
+      </div>
+    );
+  }
+
+  return children;
 }
 
 export default App;
