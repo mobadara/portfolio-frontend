@@ -68,7 +68,7 @@ const normalizeAttachmentPayload = (attachment) => {
     file_name: fileName || null,
     mime_type: mimeType || null,
     size_bytes: attachment.size_bytes ?? attachment.sizeBytes ?? null,
-    data_url: dataUrl || null,
+    data_url: dataUrl || attachment?.url || null,
     preview_type: previewType || null,
   };
 
@@ -83,11 +83,12 @@ const parseStructuredChatPayload = (rawValue) => {
     const parsed = JSON.parse(rawContent);
     if (!parsed || typeof parsed !== 'object') return null;
 
-    if (parsed.type === 'audio' && parsed.audio_base64) {
+    if (parsed.type === 'audio' && (parsed.audio_base64 || parsed.audio_url || parsed.audioUrl || parsed.url)) {
       return {
         kind: 'audio',
         mimeType: parsed.mime_type || 'audio/webm',
-        audioData: parsed.audio_base64,
+        audioData: parsed.audio_base64 || null,
+        audioUrl: parsed.audio_url || parsed.audioUrl || parsed.url || null,
         timestamp: parsed.timestamp || new Date().toISOString()
       };
     }
@@ -240,6 +241,7 @@ const Chatbot = () => {
   };
 
   const resolveAudioSource = (message) => {
+    if (message?.audioUrl) return message.audioUrl;
     if (message?.audioData) return message.audioData;
     if (!message?.audioStorageKey) return '';
     return localStorage.getItem(message.audioStorageKey) || '';
@@ -606,7 +608,8 @@ const Chatbot = () => {
                   sender: role,
                   type: 'audio',
                   mimeType: structured.mimeType,
-                  audioData: structured.audioData,
+                  audioData: structured.audioData || null,
+                  audioUrl: structured.audioUrl || null,
                   timestamp: structured.timestamp || timestamp
                 };
               }
@@ -718,17 +721,23 @@ const Chatbot = () => {
           if (!isMounted) return;
           try {
             const data = JSON.parse(event.data);
-            if (data?.type === 'audio' && data.audio_base64) {
+            if (data?.type === 'audio' && (data.audio_base64 || data.audio_url || data.audioUrl)) {
               const nextId = getNextMessageId();
               const activeSession = sessionIdRef.current;
-              const audioStorageKey = storeAudioForMessage(activeSession, nextId, data.audio_base64);
+              const audioStorageKey = data.audio_base64 ? storeAudioForMessage(activeSession, nextId, data.audio_base64) : null;
               const sender = data.role === 'admin' ? 'admin' : 'bot';
 
               setMessages((prev) => [
                 ...prev,
                 {
-                  id: nextId, sender, type: 'audio', mimeType: data.mime_type || 'audio/webm',
-                  audioStorageKey, timestamp: data.timestamp || new Date().toISOString()
+                  id: nextId,
+                  sender,
+                  type: 'audio',
+                  mimeType: data.mime_type || 'audio/webm',
+                  audioStorageKey,
+                  audioData: data.audio_base64 || null,
+                  audioUrl: data.audio_url || data.audioUrl || null,
+                  timestamp: data.timestamp || new Date().toISOString()
                 }
               ]);
               setIsHumanMode(true);
@@ -1036,7 +1045,7 @@ const Chatbot = () => {
         type: attachmentPayload ? (attachmentPayload.preview_type === 'image' ? 'image' : 'attachment') : 'text',
         fileName: attachmentPayload?.file_name || attachedFile?.name || null,
         fileType: attachmentPayload?.mime_type || attachedFile?.type || null,
-        fileDataUrl: attachmentPayload?.data_url || null,
+        fileDataUrl: attachmentPayload?.data_url || attachmentPayload?.url || null,
         attachment: attachmentPayload,
         replyTo: replyContext,
         timestamp: new Date().toISOString()
@@ -1204,23 +1213,68 @@ const Chatbot = () => {
 
         if (!blob.size) return;
 
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
-          if (!audioBase64) return;
-
+        const finalizeAudioMessage = (audioSource, payload = {}) => {
           const messageId = getNextMessageId();
           const sessionId = sessionIdRef.current;
-          const audioStorageKey = storeAudioForMessage(sessionId, messageId, audioBase64);
+          const isDataUrl = typeof audioSource === 'string' && audioSource.startsWith('data:');
+          const audioStorageKey = isDataUrl ? storeAudioForMessage(sessionId, messageId, audioSource) : null;
+          const resolvedAudioUrl = payload.audio_url || payload.url || (typeof audioSource === 'string' && audioSource.startsWith('http') ? audioSource : null);
 
           setMessages((prev) => [
             ...prev,
-            { id: messageId, sender: 'user', type: 'audio', mimeType: blob.type || 'audio/webm', audioStorageKey, timestamp: new Date().toISOString() }
+            {
+              id: messageId,
+              sender: 'user',
+              type: 'audio',
+              mimeType: payload.mime_type || blob.type || 'audio/webm',
+              audioStorageKey,
+              audioData: isDataUrl ? audioSource : null,
+              audioUrl: resolvedAudioUrl,
+              timestamp: new Date().toISOString()
+            }
           ]);
 
-          sendSocketMessage({ type: 'audio', audio_base64: audioBase64, mime_type: blob.type || 'audio/webm', duration_seconds: null, timestamp: new Date().toISOString() });
+          sendSocketMessage(
+            resolvedAudioUrl
+              ? { type: 'audio', audio_url: resolvedAudioUrl, mime_type: payload.mime_type || blob.type || 'audio/webm', duration_seconds: null, timestamp: new Date().toISOString() }
+              : { type: 'audio', audio_base64: audioSource, mime_type: payload.mime_type || blob.type || 'audio/webm', duration_seconds: null, timestamp: new Date().toISOString() }
+          );
         };
-        reader.readAsDataURL(blob);
+
+        const uploadVoiceNote = async () => {
+          try {
+            const voiceFile = new File([blob], `voice-note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+            const formData = new FormData();
+            formData.append('file', voiceFile);
+            formData.append('caption', 'Voice message');
+
+            const response = await fetch(CHAT_ATTACHMENT_UPLOAD_ENDPOINT(sessionIdRef.current), {
+              method: 'POST',
+              body: formData
+            });
+
+            if (response.ok) {
+              const attachmentPayload = await response.json();
+              const audioUrl = attachmentPayload?.audio_url || attachmentPayload?.url || '';
+              if (audioUrl) {
+                finalizeAudioMessage(audioUrl, { ...attachmentPayload, audio_url: audioUrl });
+                return;
+              }
+            }
+          } catch {
+            // Fall back to the legacy base64 path below.
+          }
+
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
+            if (!audioBase64) return;
+            finalizeAudioMessage(audioBase64, { audio_base64: audioBase64, mime_type: blob.type || 'audio/webm' });
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        void uploadVoiceNote();
       };
 
       recorder.start();
@@ -1346,7 +1400,7 @@ const Chatbot = () => {
     const attachment = message?.attachment;
     const fileName = attachment?.file_name || message?.fileName || '';
     const fileType = attachment?.mime_type || message?.fileType || '';
-    const dataUrl = attachment?.data_url || message?.fileDataUrl || '';
+    const dataUrl = attachment?.data_url || attachment?.url || message?.fileDataUrl || '';
     const previewType = attachment?.preview_type || message?.attachment?.previewType || (fileType.startsWith('image/') ? 'image' : 'document');
     const fileSize = formatFileSize(attachment?.size_bytes || message?.fileSize);
 

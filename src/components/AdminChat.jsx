@@ -15,6 +15,7 @@ import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withA
 const MESSAGE_REACTIONS = ['👍', '❤️', '😂', '😮', '🙏'];
 const VOICE_WAVE_BARS = [5, 8, 6, 11, 7, 10, 6, 12, 8, 9, 5, 11, 7, 10, 6, 12, 8, 9, 5, 8];
 const LONG_MESSAGE_PREVIEW_LIMIT = 320;
+const CHAT_ATTACHMENT_UPLOAD_ENDPOINT = (sessionId) => buildAdminUrl(`/chat/${sessionId}/attachment`);
 
 const normalizeReplyPayload = (replyTo) => {
   if (!replyTo || typeof replyTo !== 'object') return null;
@@ -245,7 +246,7 @@ const AdminChat = ({
   const appendIncomingMessage = useCallback((messageData) => {
     if (!messageData) return;
 
-    if (messageData.type === 'audio' && messageData.audio_base64) {
+    if (messageData.type === 'audio' && (messageData.audio_base64 || messageData.audio_url || messageData.audioUrl)) {
       const sender = messageData.role === 'user' ? 'user' : 'admin';
       setMessages((prev) => [
         ...prev,
@@ -253,7 +254,8 @@ const AdminChat = ({
           id: `${Date.now()}_${Math.random()}`,
           sender,
           type: 'audio',
-          audioBase64: messageData.audio_base64,
+          audioBase64: messageData.audio_base64 || null,
+          audioUrl: messageData.audio_url || messageData.audioUrl || null,
           mimeType: messageData.mime_type || 'audio/webm',
           created_at: messageData.timestamp || new Date().toISOString(),
           reaction: null,
@@ -342,13 +344,14 @@ const AdminChat = ({
 
         try {
           const parsed = JSON.parse(rawContent);
-          if (parsed?.type === 'audio' && parsed?.audio_base64) {
+          if (parsed?.type === 'audio' && (parsed?.audio_base64 || parsed?.audio_url || parsed?.audioUrl)) {
             const sender = parsed.role === 'user' ? 'user' : 'admin';
             return {
               id: `${Date.now()}_${index}`,
               sender,
               type: 'audio',
-              audioBase64: parsed.audio_base64,
+              audioBase64: parsed.audio_base64 || null,
+              audioUrl: parsed.audio_url || parsed.audioUrl || null,
               mimeType: parsed.mime_type || 'audio/webm',
               created_at: parsed.timestamp || createdAt
             };
@@ -634,12 +637,9 @@ const AdminChat = ({
 
         if (!blob.size || !shouldSendRecordingRef.current) return;
 
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
-          if (!audioBase64) return;
-
+        const finalizeAudioMessage = (audioSource, payload = {}) => {
           const optimisticAudioId = `${Date.now()}_${Math.random()}`;
+          const resolvedAudioUrl = payload.audio_url || payload.url || (typeof audioSource === 'string' && audioSource.startsWith('http') ? audioSource : null);
 
           setMessages((prev) => [
             ...prev,
@@ -647,20 +647,33 @@ const AdminChat = ({
               id: optimisticAudioId,
               sender: 'admin',
               type: 'audio',
-              audioBase64,
-              mimeType: blob.type || 'audio/webm',
+              audioBase64: typeof audioSource === 'string' && audioSource.startsWith('data:') ? audioSource : null,
+              audioUrl: resolvedAudioUrl,
+              mimeType: payload.mime_type || blob.type || 'audio/webm',
               created_at: new Date().toISOString(),
               isPending: true
             }
           ]);
 
-          const sent = sendSocketPayload({
-            type: 'audio',
-            audio_base64: audioBase64,
-            mime_type: blob.type || 'audio/webm',
-            duration_seconds: null,
-            timestamp: new Date().toISOString()
-          });
+          const sent = sendSocketPayload(
+            resolvedAudioUrl
+              ? {
+                  type: 'audio',
+                  role: 'admin',
+                  audio_url: resolvedAudioUrl,
+                  mime_type: payload.mime_type || blob.type || 'audio/webm',
+                  duration_seconds: null,
+                  timestamp: new Date().toISOString()
+                }
+              : {
+                  type: 'audio',
+                  role: 'admin',
+                  audio_base64: audioSource,
+                  mime_type: payload.mime_type || blob.type || 'audio/webm',
+                  duration_seconds: null,
+                  timestamp: new Date().toISOString()
+                }
+          );
 
           if (sent) {
             setMessages((prev) => prev.map((msg) => (msg.id === optimisticAudioId ? { ...msg, isPending: false } : msg)));
@@ -670,7 +683,40 @@ const AdminChat = ({
           }
         };
 
-        reader.readAsDataURL(blob);
+        const uploadVoiceNote = async () => {
+          try {
+            const voiceFile = new File([blob], `voice-note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' });
+            const formData = new FormData();
+            formData.append('file', voiceFile);
+            formData.append('caption', 'Voice message');
+
+            const response = await fetch(CHAT_ATTACHMENT_UPLOAD_ENDPOINT(sessionId), {
+              method: 'POST',
+              body: formData
+            });
+
+            if (response.ok) {
+              const payload = await response.json();
+              const audioUrl = payload?.audio_url || payload?.url || '';
+              if (audioUrl) {
+                finalizeAudioMessage(audioUrl, { ...payload, audio_url: audioUrl });
+                return;
+              }
+            }
+          } catch {
+            // Fall back to the legacy base64 path below.
+          }
+
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const audioBase64 = typeof reader.result === 'string' ? reader.result : '';
+            if (!audioBase64) return;
+            finalizeAudioMessage(audioBase64, { audio_base64: audioBase64, mime_type: blob.type || 'audio/webm' });
+          };
+          reader.readAsDataURL(blob);
+        };
+
+        void uploadVoiceNote();
       };
 
       recorder.start();
@@ -687,7 +733,7 @@ const AdminChat = ({
       setIsRecordingPaused(false);
       clearRecordingTimer();
     }
-  }, [clearRecordingTimer, isRecording, sendSocketPayload, sending, startRecordingTimer]);
+  }, [clearRecordingTimer, isRecording, sendSocketPayload, sending, startRecordingTimer, sessionId]);
 
   const stopVoiceRecordingWithMode = useCallback((shouldSend = true) => {
     shouldSendRecordingRef.current = shouldSend;
@@ -761,15 +807,34 @@ const AdminChat = ({
     let attachmentPayload = null;
 
     if (attachedFile) {
-      const dataUrl = await readFileAsDataUrl(attachedFile);
-      if (dataUrl) {
-        attachmentPayload = {
-          file_name: attachedFile.name,
-          mime_type: attachedFile.type || 'application/octet-stream',
-          size_bytes: attachedFile.size,
-          data_url: dataUrl,
-          preview_type: attachedFile.type?.startsWith('image/') ? 'image' : 'document'
-        };
+      try {
+        const formData = new FormData();
+        formData.append('file', attachedFile);
+        formData.append('caption', textToSend);
+
+        const response = await fetch(CHAT_ATTACHMENT_UPLOAD_ENDPOINT(sessionId), {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          attachmentPayload = await response.json();
+        }
+      } catch {
+        // Fall back to a local data URL if the upload endpoint is unavailable.
+      }
+
+      if (!attachmentPayload) {
+        const dataUrl = await readFileAsDataUrl(attachedFile);
+        if (dataUrl) {
+          attachmentPayload = {
+            file_name: attachedFile.name,
+            mime_type: attachedFile.type || 'application/octet-stream',
+            size_bytes: attachedFile.size,
+            data_url: dataUrl,
+            preview_type: attachedFile.type?.startsWith('image/') ? 'image' : 'document'
+          };
+        }
       }
     }
 
@@ -783,7 +848,7 @@ const AdminChat = ({
       created_at: new Date().toISOString(),
       file: attachmentPayload ? attachmentPayload.file_name : null,
       fileType: attachmentPayload ? attachmentPayload.mime_type : null,
-      fileDataUrl: attachmentPayload ? attachmentPayload.data_url : null,
+      fileDataUrl: attachmentPayload ? (attachmentPayload.data_url || attachmentPayload.url || null) : null,
       isPending: true,
       reaction: null,
       replyTo: replyToMessage,
@@ -1071,7 +1136,7 @@ const AdminChat = ({
     const attachment = msg?.attachment;
     const fileName = attachment?.file_name || msg?.file || msg?.fileName || '';
     const mimeType = attachment?.mime_type || msg?.fileType || '';
-    const dataUrl = attachment?.data_url || msg?.fileDataUrl || '';
+    const dataUrl = attachment?.data_url || attachment?.url || msg?.fileDataUrl || '';
     const previewType = isImageAttachment(attachment, fileName, mimeType, dataUrl) ? 'image' : 'document';
     const fileSize = formatFileSize(attachment?.size_bytes || msg?.fileSize);
 
@@ -1446,7 +1511,7 @@ const AdminChat = ({
 
             {renderReplyQuote(msg.replyTo, msg.sender === 'admin')}
 
-            {msg.type === 'audio' && msg.audioBase64 ? (
+            {msg.type === 'audio' && (msg.audioUrl || msg.audioBase64) ? (
               <div className="my-voice-note-shell">
                 <button
                   type="button"
@@ -1490,7 +1555,7 @@ const AdminChat = ({
 
                 <audio
                   ref={(node) => setAudioElementRef(audioId, node)}
-                  src={msg.audioBase64}
+                  src={msg.audioUrl || msg.audioBase64}
                   preload="metadata"
                   onLoadedMetadata={(event) => handleAudioLoadedMetadata(audioId, event)}
                   onTimeUpdate={(event) => handleAudioTimeUpdate(audioId, event)}
@@ -1560,6 +1625,7 @@ const AdminChat = ({
     handleReactToMessage,
     handleCopyMessage,
     handleReplyToMessage,
+    renderReplyQuote,
     handleDeleteFromMe,
     handleDeleteForEveryone,
     activeAudioId,
