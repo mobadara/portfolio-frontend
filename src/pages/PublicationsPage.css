@@ -332,6 +332,70 @@
   border-color: rgba(255, 255, 255, 0.14);
 }
 
+.publications-loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2.5rem 1rem;
+  min-height: 300px;
+}
+
+.publications-error-container {
+  border: 2px solid rgba(220, 38, 38, 0.3);
+  border-radius: 10px;
+  padding: 2rem 1.5rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  background: rgba(254, 242, 242, 0.5);
+}
+
+[data-bs-theme='dark'] .publications-error-container {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.publications-error-message {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+[data-bs-theme='dark'] .publications-error-message {
+  color: #fca5a5;
+}
+
+.publications-error-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(31, 41, 55, 0.78);
+  line-height: 1.5;
+}
+
+[data-bs-theme='dark'] .publications-error-subtitle {
+  color: rgba(248, 249, 250, 0.78);
+}
+
+.publications-error-link {
+  color: #0f3b68;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.publications-error-link:hover {
+  color: #124a80;
+  text-decoration: underline;
+}
+
+[data-bs-theme='dark'] .publications-error-link {
+  color: #93c5fd;
+}
+
+[data-bs-theme='dark'] .publications-error-link:hover {
+  color: #bfdbfe;
+}
+
 @media (max-width: 992px) {
   .publications-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

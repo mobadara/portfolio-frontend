@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FaExternalLinkAlt, FaGraduationCap, FaBookOpen, FaOrcid } from 'react-icons/fa';
+import LoadingAnimation from '../components/LoadingAnimation';
 import './PublicationsPage.css';
 
 const MEDIUM_RSS_URL = import.meta?.env?.VITE_MEDIUM_RSS_URL || 'https://medium.com/feed/@mobadara';
@@ -8,96 +9,6 @@ const GOOGLE_SCHOLAR_URL = 'https://scholar.google.com/citations?hl=en&user=Jx9f
 const ORCID_URL = 'https://orcid.org/0009-0008-3470-1610';
 const SCHOLAR_USER_ID = new URLSearchParams(GOOGLE_SCHOLAR_URL.split('?')[1] || '').get('user') || '';
 const PREVIEW_ITEMS = 6;
-
-const fallbackScholarPublications = [
-  {
-    title: 'Designing Explainable AI Pipelines for Production Teams',
-    venue: 'AI Engineering Review',
-    year: '2025',
-    summary: 'A practical framework for explainability checkpoints across model development, deployment, and monitoring.',
-    link: '#',
-  },
-  {
-    title: 'From Notebook to API: Operationalizing ML for Real Business Outcomes',
-    venue: 'Data Product Journal',
-    year: '2024',
-    summary: 'Patterns and anti-patterns for shipping machine learning systems that survive beyond proof-of-concept.',
-    link: '#',
-  },
-  {
-    title: 'Human-Centered AI Mentorship in Technical Teams',
-    venue: 'Applied Leadership in Tech',
-    year: '2023',
-    summary: 'How mentorship structures can improve AI adoption, developer confidence, and delivery quality.',
-    link: '#',
-  },
-  {
-    title: 'Responsible AI Evaluation for Product Teams',
-    venue: 'AI Governance Digest',
-    year: '2023',
-    summary: 'A lightweight evaluation rubric for fairness, explainability, and reliability before production release.',
-    link: '#',
-  },
-  {
-    title: 'Design Patterns for Data-Centric Machine Learning',
-    venue: 'Modern ML Systems',
-    year: '2022',
-    summary: 'How data contracts, drift checks, and annotation loops improve long-term model performance.',
-    link: '#',
-  },
-  {
-    title: 'Operational Analytics for AI Product Decisions',
-    venue: 'Engineering Analytics Quarterly',
-    year: '2022',
-    summary: 'Connecting product metrics and model behavior to guide roadmap prioritization and ROI.',
-    link: '#',
-  },
-];
-
-const fallbackMediumPosts = [
-  {
-    title: 'Building Reliable AI Products from Prototype to Production',
-    pubDate: '2025-01-10T00:00:00.000Z',
-    link: MEDIUM_PROFILE_URL,
-    thumbnail: '',
-    content: 'A practical breakdown of moving AI systems from prototype to stable production with testing and observability.',
-  },
-  {
-    title: 'Practical MLOps for Fast-Moving Teams',
-    pubDate: '2024-11-02T00:00:00.000Z',
-    link: MEDIUM_PROFILE_URL,
-    thumbnail: '',
-    content: 'Delivery patterns for teams shipping machine learning models with dependable versioning, CI/CD, and governance.',
-  },
-  {
-    title: 'Mentoring Engineers into AI Builders',
-    pubDate: '2024-09-22T00:00:00.000Z',
-    link: MEDIUM_PROFILE_URL,
-    thumbnail: '',
-    content: 'Frameworks for coaching engineers to think in AI product loops and deliver measurable value.',
-  },
-  {
-    title: 'How to Design Prompts That Survive Production',
-    pubDate: '2024-08-14T00:00:00.000Z',
-    link: MEDIUM_PROFILE_URL,
-    thumbnail: '',
-    content: 'A practical checklist for prompt versioning, safety guardrails, and regression testing in live apps.',
-  },
-  {
-    title: 'Building Dashboards for Model Reliability',
-    pubDate: '2024-07-01T00:00:00.000Z',
-    link: MEDIUM_PROFILE_URL,
-    thumbnail: '',
-    content: 'What to measure after deployment to catch drift early and keep stakeholders confident in AI outputs.',
-  },
-  {
-    title: 'Teaching AI Fundamentals to Non-ML Teams',
-    pubDate: '2024-05-19T00:00:00.000Z',
-    link: MEDIUM_PROFILE_URL,
-    thumbnail: '',
-    content: 'A communication framework that helps cross-functional teams collaborate effectively on AI features.',
-  },
-];
 
 const formatDate = (dateLike) => {
   const date = new Date(dateLike);
@@ -171,18 +82,21 @@ const PublicationsPage = () => {
   const [activeTab, setActiveTab] = useState('publications');
   const [scholarPublications, setScholarPublications] = useState([]);
   const [isLoadingScholar, setIsLoadingScholar] = useState(true);
+  const [scholarError, setScholarError] = useState(false);
   const [mediumPosts, setMediumPosts] = useState([]);
   const [isLoadingMedium, setIsLoadingMedium] = useState(true);
+  const [mediumError, setMediumError] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadScholarPublications = async () => {
       setIsLoadingScholar(true);
+      setScholarError(false);
 
       if (!SCHOLAR_USER_ID) {
         if (isMounted) {
-          setScholarPublications(fallbackScholarPublications.map(normalizeScholarItem));
+          setScholarError(true);
           setIsLoadingScholar(false);
         }
         return;
@@ -219,10 +133,15 @@ const PublicationsPage = () => {
 
         const parsed = parseScholarPublications(html);
         if (!isMounted) return;
-        setScholarPublications(parsed.length ? parsed.slice(0, PREVIEW_ITEMS) : fallbackScholarPublications.map(normalizeScholarItem));
+        
+        if (parsed.length > 0) {
+          setScholarPublications(parsed.slice(0, PREVIEW_ITEMS));
+        } else {
+          setScholarError(true);
+        }
       } catch {
         if (!isMounted) return;
-        setScholarPublications(fallbackScholarPublications.map(normalizeScholarItem));
+        setScholarError(true);
       } finally {
         if (isMounted) setIsLoadingScholar(false);
       }
@@ -230,6 +149,7 @@ const PublicationsPage = () => {
 
     const loadMediumPosts = async () => {
       setIsLoadingMedium(true);
+      setMediumError(false);
       try {
         const endpoint = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(MEDIUM_RSS_URL)}`;
         const response = await fetch(endpoint);
@@ -238,15 +158,20 @@ const PublicationsPage = () => {
           ? data.items
               .slice()
               .sort((a, b) => new Date(b.pubDate || b.published || 0) - new Date(a.pubDate || a.published || 0))
-                .slice(0, PREVIEW_ITEMS)
+              .slice(0, PREVIEW_ITEMS)
               .map(normalizeMediumItem)
           : [];
 
         if (!isMounted) return;
-        setMediumPosts(items.length ? items : fallbackMediumPosts.map(normalizeMediumItem));
+        
+        if (items.length > 0) {
+          setMediumPosts(items);
+        } else {
+          setMediumError(true);
+        }
       } catch {
         if (!isMounted) return;
-        setMediumPosts(fallbackMediumPosts.map(normalizeMediumItem));
+        setMediumError(true);
       } finally {
         if (isMounted) setIsLoadingMedium(false);
       }
@@ -260,17 +185,9 @@ const PublicationsPage = () => {
     };
   }, []);
 
-  const mediumPreviewCards = useMemo(() => {
-    const source = mediumPosts.length ? mediumPosts : fallbackMediumPosts.map(normalizeMediumItem);
-    return source.slice(0, PREVIEW_ITEMS);
-  }, [mediumPosts]);
+  const mediumPreviewCards = useMemo(() => mediumPosts, [mediumPosts]);
 
-  const scholarPreviewCards = useMemo(() => {
-    const source = scholarPublications.length
-      ? scholarPublications
-      : fallbackScholarPublications.map(normalizeScholarItem);
-    return source.slice(0, PREVIEW_ITEMS);
-  }, [scholarPublications]);
+  const scholarPreviewCards = useMemo(() => scholarPublications, [scholarPublications]);
 
   return (
     <section className="publications-page section-padding">
@@ -314,26 +231,38 @@ const PublicationsPage = () => {
               </div>
 
               {isLoadingScholar ? (
-                <div className="technical-writing-loading">Loading latest Google Scholar publications...</div>
-              ) : null}
-
-              <div className="publications-grid">
-                {scholarPreviewCards.map((item) => (
-                  <article key={`${item.title}-${item.year}`} className="publication-card">
-                    <div className="publication-meta">
-                      <span>{item.venue}</span>
-                      <span>{item.year}</span>
-                    </div>
-                    <h2>{item.title}</h2>
-                    <p>{item.summary}</p>
-                    <div className="publication-card-actions">
-                      <a href={item.link || GOOGLE_SCHOLAR_URL} target="_blank" rel="noopener noreferrer" className="publication-card-button" aria-label={`View ${item.title} on Google Scholar`}>
-                        <FaGraduationCap /> View on Google Scholar
-                      </a>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                <div className="publications-loading-container">
+                  <LoadingAnimation isLoading={true} />
+                </div>
+              ) : scholarError || scholarPreviewCards.length === 0 ? (
+                <div className="publications-error-container">
+                  <p className="publications-error-message">Error loading articles</p>
+                  <p className="publications-error-subtitle">
+                    Unable to fetch articles from Google Scholar. 
+                    <a href={GOOGLE_SCHOLAR_URL} target="_blank" rel="noopener noreferrer" className="publications-error-link">
+                      {' '}Visit Google Scholar directly
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <div className="publications-grid">
+                  {scholarPreviewCards.map((item) => (
+                    <article key={`${item.title}-${item.year}`} className="publication-card">
+                      <div className="publication-meta">
+                        <span>{item.venue}</span>
+                        <span>{item.year}</span>
+                      </div>
+                      <h2>{item.title}</h2>
+                      <p>{item.summary}</p>
+                      <div className="publication-card-actions">
+                        <a href={item.link || GOOGLE_SCHOLAR_URL} target="_blank" rel="noopener noreferrer" className="publication-card-button" aria-label={`View ${item.title} on Google Scholar`}>
+                          <FaGraduationCap /> View on Google Scholar
+                        </a>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -344,27 +273,39 @@ const PublicationsPage = () => {
               </div>
 
               {isLoadingMedium ? (
-                <div className="technical-writing-loading">Loading latest Medium posts...</div>
-              ) : null}
-
-              <div className="publications-grid technical-writing-grid">
-                {mediumPreviewCards.map((post, idx) => (
-                  <article key={`${post.link}-${idx}`} className="publication-card technical-card">
-                    {post.thumbnail ? <img src={post.thumbnail} alt="Medium article" className="technical-thumbnail" loading="lazy" /> : null}
-                    <div className="publication-meta">
-                      <span>Medium</span>
-                      <span>{formatDate(post.pubDate)}</span>
-                    </div>
-                    <h2>{post.title}</h2>
-                    <p>{post.content || 'Read this latest technical writing piece on Medium.'}</p>
-                    <div className="publication-card-actions">
-                      <a href={post.link || MEDIUM_PROFILE_URL} target="_blank" rel="noopener noreferrer" className="publication-card-button">
-                        <FaExternalLinkAlt /> Read on Medium
-                      </a>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                <div className="publications-loading-container">
+                  <LoadingAnimation isLoading={true} />
+                </div>
+              ) : mediumError || mediumPreviewCards.length === 0 ? (
+                <div className="publications-error-container">
+                  <p className="publications-error-message">Error loading articles</p>
+                  <p className="publications-error-subtitle">
+                    Unable to fetch posts from Medium. 
+                    <a href={MEDIUM_PROFILE_URL} target="_blank" rel="noopener noreferrer" className="publications-error-link">
+                      {' '}Visit Medium profile directly
+                    </a>
+                  </p>
+                </div>
+              ) : (
+                <div className="publications-grid technical-writing-grid">
+                  {mediumPreviewCards.map((post, idx) => (
+                    <article key={`${post.link}-${idx}`} className="publication-card technical-card">
+                      {post.thumbnail ? <img src={post.thumbnail} alt="Medium article" className="technical-thumbnail" loading="lazy" /> : null}
+                      <div className="publication-meta">
+                        <span>Medium</span>
+                        <span>{formatDate(post.pubDate)}</span>
+                      </div>
+                      <h2>{post.title}</h2>
+                      <p>{post.content || 'Read this latest technical writing piece on Medium.'}</p>
+                      <div className="publication-card-actions">
+                        <a href={post.link || MEDIUM_PROFILE_URL} target="_blank" rel="noopener noreferrer" className="publication-card-button">
+                          <FaExternalLinkAlt /> Read on Medium
+                        </a>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
