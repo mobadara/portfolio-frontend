@@ -553,11 +553,6 @@ const Chatbot = () => {
 
       shouldResetModeOnConnectRef.current = Boolean(shouldResetForIdle);
       localStorage.removeItem(CHATBOT_LAST_PAGE_EXIT_AT_KEY);
-
-      if (shouldResetForIdle) {
-        localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
-        localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
-      }
       
       try {
         const response = await fetch(CHAT_SESSION_STATUS_ENDPOINT(storedSessionId));
@@ -709,8 +704,6 @@ const Chatbot = () => {
               setIsHumanMode(false);
               setAwaitingTransferConfirmation(false);
               setShowHumanForm(false);
-              localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);
-              localStorage.removeItem(CHATBOT_LEAD_DETAILS_KEY);
             } catch {
               // If this fails, session status fetch already forced local AI mode.
             }
