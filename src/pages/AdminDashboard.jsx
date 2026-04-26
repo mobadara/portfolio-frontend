@@ -589,22 +589,15 @@ function AdminDashboard() {
       const endpoint = kind === 'resume' ? RESUME_ASSET_ENDPOINT : PORTRAIT_ASSET_ENDPOINT;
       const response = await fetch(buildAdminUrl(endpoint));
 
-      let data = null;
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
       if (response.status === 404) {
         return { kind, url: '', missing: true };
       }
 
       if (!response.ok) {
-        throw new Error(data?.detail || data?.message || `Unable to load ${kind} asset.`);
+        throw new Error(`Unable to load ${kind} asset.`);
       }
 
-      const resolvedUrl = toAbsoluteAssetUrl(data?.url);
+      const resolvedUrl = toAbsoluteAssetUrl(buildAdminUrl(endpoint));
       return {
         kind,
         url: withVersion(resolvedUrl, assetVersion[kind]),
@@ -675,26 +668,27 @@ function AdminDashboard() {
       // Handle completion
       xhr.addEventListener('load', async () => {
         try {
-          let data = null;
+          let errorPayload = null;
           try {
-            data = JSON.parse(xhr.responseText);
+            errorPayload = JSON.parse(xhr.responseText);
           } catch {
-            data = null;
+            errorPayload = null;
           }
 
           if (xhr.status >= 400) {
-            throw new Error(data?.detail || data?.message || `Failed to upload ${kind}.`);
+            throw new Error(errorPayload?.detail || errorPayload?.message || `Failed to upload ${kind}.`);
           }
 
+          const uploadedTextUrl = String(xhr.responseText || '').trim();
           const now = Date.now();
           setAssetVersion((prev) => ({ ...prev, [kind]: now }));
-          const uploadedUrl = toAbsoluteAssetUrl(data?.url);
+          const uploadedUrl = toAbsoluteAssetUrl(uploadedTextUrl || buildAdminUrl(kind === 'resume' ? RESUME_ASSET_ENDPOINT : PORTRAIT_ASSET_ENDPOINT));
           if (uploadedUrl) {
             setAssetLinks((prev) => ({ ...prev, [kind]: withVersion(uploadedUrl, now) }));
             setAssetMissing((prev) => ({ ...prev, [kind]: false }));
           }
           setAssetFiles((prev) => ({ ...prev, [kind]: null }));
-          setSuccess(data?.message || `${kind[0].toUpperCase()}${kind.slice(1)} uploaded successfully.`);
+          setSuccess(`${kind[0].toUpperCase()}${kind.slice(1)} uploaded successfully.`);
           setShowToast(true);
           setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
         } catch (err) {

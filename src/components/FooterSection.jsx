@@ -52,13 +52,6 @@ const FooterSection = () => {
           return;
         }
 
-        let data = null;
-        try {
-          data = await response.json();
-        } catch {
-          data = null;
-        }
-
         if (!response.ok) {
           if (!isMounted) return;
           setResumeUrl('');
@@ -66,7 +59,7 @@ const FooterSection = () => {
           return;
         }
 
-        const resolvedUrl = resolveAssetUrl(data?.url);
+        const resolvedUrl = resolveAssetUrl(buildAdminUrl(ADMIN_ROUTES.resumeAsset));
         if (!isMounted) return;
         setResumeUrl(resolvedUrl);
         setIsResumeAvailable(Boolean(resolvedUrl));

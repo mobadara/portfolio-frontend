@@ -7,7 +7,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { 
   BiArrowBack, BiSmile, BiPaperclip, BiSend, BiMicrophone, BiPause, BiPlay, BiLockAlt,
-  BiImage, BiFile, BiMoon, BiSun,
+  BiImage, BiFile, BiMoon, BiSun, BiDownload, BiChevronLeft, BiChevronRight,
   BiDotsVerticalRounded, BiX, BiCheckDouble, BiChevronDown, BiSearch, BiCopy
 } from 'react-icons/bi';
 import { ADMIN_ROUTES, buildAdminUrl, getStoredAdminToken, toWebSocketUrl, withAuthHeaders } from '../utils/adminApi';
@@ -92,6 +92,19 @@ const formatFileSize = (sizeBytes) => {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 };
 
+const toAbsoluteMediaUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('//')) {
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
+    return `${protocol}${raw}`;
+  }
+  if (raw.startsWith('/')) return buildAdminUrl(raw);
+  return buildAdminUrl(`/${raw.replace(/^\/+/, '')}`);
+};
+
 const looksLikeMarkdownOrMath = (text = '') => /(^|\n)\s{0,3}(#{1,6}\s|>\s|-\s|\*\s|\d+\.\s)|(`{1,3}|\$\$?[^$\n]+\$\$?|\[.*?\]\(.*?\)|\*\*.+?\*\*|__.+?__|~~.+?~~)/s.test(text);
 
 const isImageAttachment = (attachment, fileName = '', mimeType = '', dataUrl = '') => {
@@ -135,6 +148,7 @@ const AdminChat = ({
   const [showCopyToast, setShowCopyToast] = useState(false);
   const [copyToastMessage, setCopyToastMessage] = useState('Copied successfully');
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [mediaViewer, setMediaViewer] = useState({ show: false, index: 0 });
   const [deleteConfirm, setDeleteConfirm] = useState({
     show: false,
     title: '',
@@ -161,6 +175,7 @@ const AdminChat = ({
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const lightboxTouchStartXRef = useRef(null);
   const audioElementsRef = useRef({});
   const swipeReplyRef = useRef({ messageId: null, offset: 0 });
   const messageTouchRef = useRef({
@@ -634,7 +649,7 @@ const AdminChat = ({
         isMicPressingRef.current = false;
         micStartYRef.current = null;
         clearRecordingTimer();
-
+                                                                                                                                                                                                                                      
         if (!blob.size || !shouldSendRecordingRef.current) return;
 
         const finalizeAudioMessage = (audioSource, payload = {}) => {
@@ -1052,6 +1067,99 @@ const AdminChat = ({
     );
   }, []);
 
+  const imageGalleryItems = useMemo(() => {
+    const mapped = messages
+      .map((msg) => {
+        const attachment = msg?.attachment;
+        const fileName = attachment?.file_name || msg?.file || msg?.fileName || 'image';
+        const mimeType = attachment?.mime_type || msg?.fileType || '';
+        const dataUrl = toAbsoluteMediaUrl(attachment?.data_url || attachment?.url || msg?.fileDataUrl || '');
+        const previewType = isImageAttachment(attachment, fileName, mimeType, dataUrl) ? 'image' : 'document';
+        if (previewType !== 'image' || !dataUrl) return null;
+        return { src: dataUrl, fileName };
+      })
+      .filter(Boolean);
+
+    const unique = [];
+    const seen = new Set();
+    mapped.forEach((item) => {
+      const key = `${item.src}|${item.fileName}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      unique.push(item);
+    });
+
+    return unique;
+  }, [messages]);
+
+  const currentViewedImage = imageGalleryItems[mediaViewer.index] || null;
+
+  const openImageViewer = useCallback((src) => {
+    const index = imageGalleryItems.findIndex((item) => item.src === src);
+    setMediaViewer({ show: true, index: index >= 0 ? index : 0 });
+  }, [imageGalleryItems]);
+
+  const closeImageViewer = useCallback(() => {
+    setMediaViewer({ show: false, index: 0 });
+  }, []);
+
+  const viewPreviousImage = useCallback(() => {
+    if (!imageGalleryItems.length) return;
+    setMediaViewer((prev) => ({
+      ...prev,
+      index: (prev.index - 1 + imageGalleryItems.length) % imageGalleryItems.length
+    }));
+  }, [imageGalleryItems.length]);
+
+  const viewNextImage = useCallback(() => {
+    if (!imageGalleryItems.length) return;
+    setMediaViewer((prev) => ({
+      ...prev,
+      index: (prev.index + 1) % imageGalleryItems.length
+    }));
+  }, [imageGalleryItems.length]);
+
+  const handleLightboxTouchStart = useCallback((event) => {
+    lightboxTouchStartXRef.current = event.touches?.[0]?.clientX ?? null;
+  }, []);
+
+  const handleLightboxTouchEnd = useCallback((event) => {
+    if (imageGalleryItems.length <= 1) return;
+
+    const startX = lightboxTouchStartXRef.current;
+    const endX = event.changedTouches?.[0]?.clientX ?? null;
+    lightboxTouchStartXRef.current = null;
+
+    if (!Number.isFinite(startX) || !Number.isFinite(endX)) return;
+
+    const deltaX = endX - startX;
+    if (Math.abs(deltaX) < 40) return;
+
+    if (deltaX > 0) {
+      viewPreviousImage();
+      return;
+    }
+
+    viewNextImage();
+  }, [imageGalleryItems.length, viewNextImage, viewPreviousImage]);
+
+  useEffect(() => {
+    if (!mediaViewer.show) return undefined;
+
+    const handleKeydown = (event) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        viewPreviousImage();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        viewNextImage();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeydown);
+    return () => document.removeEventListener('keydown', handleKeydown);
+  }, [mediaViewer.show, viewPreviousImage, viewNextImage]);
+
   const handleReactToMessage = useCallback((messageId, emoji) => {
     setMessages((prev) => prev.map((msg) => (
       msg.id === messageId ? { ...msg, reaction: emoji } : msg
@@ -1136,7 +1244,7 @@ const AdminChat = ({
     const attachment = msg?.attachment;
     const fileName = attachment?.file_name || msg?.file || msg?.fileName || '';
     const mimeType = attachment?.mime_type || msg?.fileType || '';
-    const dataUrl = attachment?.data_url || attachment?.url || msg?.fileDataUrl || '';
+    const dataUrl = toAbsoluteMediaUrl(attachment?.data_url || attachment?.url || msg?.fileDataUrl || '');
     const previewType = isImageAttachment(attachment, fileName, mimeType, dataUrl) ? 'image' : 'document';
     const fileSize = formatFileSize(attachment?.size_bytes || msg?.fileSize);
 
@@ -1145,7 +1253,18 @@ const AdminChat = ({
     if (previewType === 'image' && dataUrl) {
       return (
         <div className="my-message-attachment my-message-attachment--image mb-2">
-          <img src={dataUrl} alt={fileName || 'Attachment preview'} className="my-message-attachment-image" />
+          <img
+            src={dataUrl}
+            alt={fileName || 'Attachment preview'}
+            className="my-message-attachment-image"
+            role="button"
+            onClick={() => openImageViewer(dataUrl)}
+          />
+          <div className="mt-2">
+            <a href={dataUrl} download={fileName || 'image'} className="btn btn-sm btn-outline-primary">
+              <BiDownload size={14} /> Download
+            </a>
+          </div>
         </div>
       );
     }
@@ -1161,9 +1280,17 @@ const AdminChat = ({
             </small>
           </div>
         </div>
+        {dataUrl ? (
+          <div className="mt-2 d-flex gap-2">
+            <a href={dataUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary">View</a>
+            <a href={dataUrl} download={fileName || 'attachment'} className="btn btn-sm btn-outline-primary">
+              <BiDownload size={14} /> Download
+            </a>
+          </div>
+        ) : null}
       </div>
     );
-  }, []);
+  }, [openImageViewer]);
 
   const confirmDeleteAction = useCallback(async () => {
     const action = deleteConfirm.onConfirm;
@@ -1555,7 +1682,7 @@ const AdminChat = ({
 
                 <audio
                   ref={(node) => setAudioElementRef(audioId, node)}
-                  src={msg.audioUrl || msg.audioBase64}
+                  src={toAbsoluteMediaUrl(msg.audioUrl || msg.audioBase64)}
                   preload="metadata"
                   onLoadedMetadata={(event) => handleAudioLoadedMetadata(audioId, event)}
                   onTimeUpdate={(event) => handleAudioTimeUpdate(audioId, event)}
@@ -1564,10 +1691,18 @@ const AdminChat = ({
                   onPlay={() => setActiveAudioId(audioId)}
                   className="my-voice-note-native"
                 />
+                {toAbsoluteMediaUrl(msg.audioUrl || msg.audioBase64) ? (
+                  <a
+                    href={toAbsoluteMediaUrl(msg.audioUrl || msg.audioBase64)}
+                    download={`voice-message-${msg.id || Date.now()}.webm`}
+                    className="btn btn-sm btn-outline-primary ms-2"
+                  >
+                    <BiDownload size={14} />
+                  </a>
+                ) : null}
               </div>
             ) : (
               <div style={{ wordBreak: 'break-word' }}>
-                {renderReplyQuote(msg.replyTo, msg.sender === 'admin')}
                 {messageSearchQuery.trim() ? (
                   <div className="my-searchable-message-text">{renderHighlightedText(rawMessageText, messageSearchQuery)}</div>
                 ) : isLongMessage && !isMessageExpanded && !isMarkdownLikeMessage ? (
@@ -2053,6 +2188,48 @@ const AdminChat = ({
           <Button variant={deleteConfirm.variant || 'danger'} onClick={confirmDeleteAction}>
             {deleteConfirm.confirmLabel || 'Delete'}
           </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={mediaViewer.show}
+        onHide={closeImageViewer}
+        centered
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {currentViewedImage?.fileName || 'Image preview'}
+            {imageGalleryItems.length > 1 ? ` (${mediaViewer.index + 1}/${imageGalleryItems.length})` : ''}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center" onTouchStart={handleLightboxTouchStart} onTouchEnd={handleLightboxTouchEnd}>
+          {currentViewedImage?.src ? (
+            <img
+              src={currentViewedImage.src}
+              alt={currentViewedImage.fileName || 'Image preview'}
+              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+            />
+          ) : null}
+        </Modal.Body>
+        <Modal.Footer>
+          {imageGalleryItems.length > 1 ? (
+            <>
+              <Button variant="outline-secondary" onClick={viewPreviousImage}>
+                <BiChevronLeft size={14} /> Prev
+              </Button>
+              <Button variant="outline-secondary" onClick={viewNextImage}>
+                Next <BiChevronRight size={14} />
+              </Button>
+            </>
+          ) : null}
+          <a
+            href={currentViewedImage?.src || '#'}
+            download={currentViewedImage?.fileName || 'image'}
+            className="btn btn-outline-primary"
+          >
+            <BiDownload size={14} /> Download
+          </a>
         </Modal.Footer>
       </Modal>
     </div>

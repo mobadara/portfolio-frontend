@@ -27,13 +27,6 @@ const AboutSection = ({ theme }) => {
     const fetchAsset = async (endpoint) => {
       const response = await fetch(buildAdminUrl(endpoint));
 
-      let data = null;
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
       if (response.status === 404) {
         return { missing: true, url: '' };
       }
@@ -42,7 +35,7 @@ const AboutSection = ({ theme }) => {
         return { missing: true, url: '' };
       }
 
-      const resolvedUrl = toAbsoluteAssetUrl(data?.url);
+      const resolvedUrl = toAbsoluteAssetUrl(buildAdminUrl(endpoint));
       return { missing: !resolvedUrl, url: resolvedUrl };
     };
 

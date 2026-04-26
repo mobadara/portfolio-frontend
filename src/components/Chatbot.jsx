@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/bootstrap.css';
 import { formatTimestamp } from '../utils/adminChatUtils';
@@ -7,7 +7,7 @@ import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Card from 'react-bootstrap/Card';
 import Modal from 'react-bootstrap/Modal';
-import { BiMicrophone, BiSend, BiStopCircle, BiX, BiSmile, BiPaperclip, BiReply, BiImage, BiFile } from 'react-icons/bi';
+import { BiMicrophone, BiSend, BiStopCircle, BiX, BiSmile, BiPaperclip, BiReply, BiImage, BiFile, BiDownload, BiChevronLeft, BiChevronRight } from 'react-icons/bi';
 import { BsChatFill } from 'react-icons/bs';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -149,6 +149,19 @@ const formatFileSize = (sizeBytes) => {
   return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
 };
 
+const toAbsoluteMediaUrl = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:') || raw.startsWith('blob:')) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('//')) {
+    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
+    return `${protocol}${raw}`;
+  }
+  if (raw.startsWith('/')) return `${CHAT_API_BASE}${raw}`;
+  return `${CHAT_API_BASE}/${raw.replace(/^\/+/, '')}`;
+};
+
 const Chatbot = () => {
   // --- STATE & REFS ---
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -179,6 +192,7 @@ const Chatbot = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null);
+  const [mediaViewer, setMediaViewer] = useState({ show: false, index: 0 });
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -190,6 +204,7 @@ const Chatbot = () => {
   const mediaRecorderRef = useRef(null);
   const recordingChunksRef = useRef([]);
   const recordingTimerRef = useRef(null);
+  const lightboxTouchStartXRef = useRef(null);
   const pendingReachSupportTriggerRef = useRef(false);
   const resumeSessionRef = useRef(parseResumeSessionFromUrl());
   const shouldResetModeOnConnectRef = useRef(false);
@@ -241,11 +256,115 @@ const Chatbot = () => {
   };
 
   const resolveAudioSource = (message) => {
-    if (message?.audioUrl) return message.audioUrl;
+    if (message?.audioUrl) return toAbsoluteMediaUrl(message.audioUrl);
     if (message?.audioData) return message.audioData;
     if (!message?.audioStorageKey) return '';
-    return localStorage.getItem(message.audioStorageKey) || '';
+    return toAbsoluteMediaUrl(localStorage.getItem(message.audioStorageKey) || '');
   };
+
+  const triggerFileDownload = (url, fileName = 'download') => {
+    const resolved = toAbsoluteMediaUrl(url);
+    if (!resolved) return;
+
+    const link = document.createElement('a');
+    link.href = resolved;
+    link.download = fileName;
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const imageGalleryItems = useMemo(() => {
+    const mapped = messages
+      .map((message) => {
+        const attachment = message?.attachment;
+        const fileName = attachment?.file_name || message?.fileName || 'image';
+        const fileType = attachment?.mime_type || message?.fileType || '';
+        const previewType = attachment?.preview_type || message?.attachment?.previewType || (fileType.startsWith('image/') ? 'image' : 'document');
+        const src = toAbsoluteMediaUrl(attachment?.data_url || attachment?.url || message?.fileDataUrl || '');
+        if (previewType !== 'image' || !src) return null;
+        return { src, fileName };
+      })
+      .filter(Boolean);
+
+    const unique = [];
+    const seen = new Set();
+    mapped.forEach((item) => {
+      const key = `${item.src}|${item.fileName}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      unique.push(item);
+    });
+
+    return unique;
+  }, [messages]);
+
+  const currentViewedImage = imageGalleryItems[mediaViewer.index] || null;
+
+  const openImageViewer = useCallback((src) => {
+    const matchIndex = imageGalleryItems.findIndex((item) => item.src === src);
+    setMediaViewer({ show: true, index: matchIndex >= 0 ? matchIndex : 0 });
+  }, [imageGalleryItems]);
+
+  const closeImageViewer = useCallback(() => setMediaViewer({ show: false, index: 0 }), []);
+
+  const viewPreviousImage = useCallback(() => {
+    if (!imageGalleryItems.length) return;
+    setMediaViewer((prev) => ({
+      ...prev,
+      index: (prev.index - 1 + imageGalleryItems.length) % imageGalleryItems.length
+    }));
+  }, [imageGalleryItems.length]);
+
+  const viewNextImage = useCallback(() => {
+    if (!imageGalleryItems.length) return;
+    setMediaViewer((prev) => ({
+      ...prev,
+      index: (prev.index + 1) % imageGalleryItems.length
+    }));
+  }, [imageGalleryItems.length]);
+
+  const handleLightboxTouchStart = useCallback((event) => {
+    lightboxTouchStartXRef.current = event.touches?.[0]?.clientX ?? null;
+  }, []);
+
+  const handleLightboxTouchEnd = useCallback((event) => {
+    if (imageGalleryItems.length <= 1) return;
+
+    const startX = lightboxTouchStartXRef.current;
+    const endX = event.changedTouches?.[0]?.clientX ?? null;
+    lightboxTouchStartXRef.current = null;
+
+    if (!Number.isFinite(startX) || !Number.isFinite(endX)) return;
+
+    const deltaX = endX - startX;
+    if (Math.abs(deltaX) < 40) return;
+
+    if (deltaX > 0) {
+      viewPreviousImage();
+      return;
+    }
+
+    viewNextImage();
+  }, [imageGalleryItems.length, viewNextImage, viewPreviousImage]);
+
+  useEffect(() => {
+    if (!mediaViewer.show) return undefined;
+
+    const handleKeydown = (event) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        viewPreviousImage();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        viewNextImage();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeydown);
+    return () => document.removeEventListener('keydown', handleKeydown);
+  }, [mediaViewer.show, viewPreviousImage, viewNextImage]);
 
   const storeAudioForMessage = (sessionId, messageId, audioData) => {
     if (!sessionId || !messageId || !audioData) return null;
@@ -1393,7 +1512,7 @@ const Chatbot = () => {
     const attachment = message?.attachment;
     const fileName = attachment?.file_name || message?.fileName || '';
     const fileType = attachment?.mime_type || message?.fileType || '';
-    const dataUrl = attachment?.data_url || attachment?.url || message?.fileDataUrl || '';
+    const dataUrl = toAbsoluteMediaUrl(attachment?.data_url || attachment?.url || message?.fileDataUrl || '');
     const previewType = attachment?.preview_type || message?.attachment?.previewType || (fileType.startsWith('image/') ? 'image' : 'document');
     const fileSize = formatFileSize(attachment?.size_bytes || message?.fileSize);
 
@@ -1412,7 +1531,18 @@ const Chatbot = () => {
             src={dataUrl}
             alt={fileName || 'Attachment preview'}
             className="chatbot-attachment-image"
+            role="button"
+            onClick={() => openImageViewer(dataUrl, fileName || 'image')}
           />
+          <div className="mt-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => triggerFileDownload(dataUrl, fileName || 'image')}
+            >
+              <BiDownload size={14} /> Download
+            </button>
+          </div>
         </div>
       );
     }
@@ -1431,6 +1561,25 @@ const Chatbot = () => {
               </small>
             </div>
           </div>
+          {dataUrl ? (
+            <div className="mt-2 d-flex gap-2">
+              <a
+                href={dataUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-sm btn-outline-secondary"
+              >
+                View
+              </a>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary"
+                onClick={() => triggerFileDownload(dataUrl, fileName || 'attachment')}
+              >
+                <BiDownload size={14} /> Download
+              </button>
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -1628,7 +1777,20 @@ const Chatbot = () => {
                     {renderAttachmentPreview(msg)}
 
                     {msg.type === 'audio' ? (
-                      <audio controls preload="metadata" style={{ width: '220px', maxWidth: '100%' }} src={resolveAudioSource(msg)} />
+                      <div>
+                        <audio controls preload="metadata" style={{ width: '220px', maxWidth: '100%' }} src={resolveAudioSource(msg)} />
+                        {resolveAudioSource(msg) ? (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => triggerFileDownload(resolveAudioSource(msg), `voice-message-${msg.id || Date.now()}.webm`)}
+                            >
+                              <BiDownload size={14} /> Download audio
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     ) : (
                       <ReactMarkdown
                         remarkPlugins={[remarkMath]}
@@ -1943,6 +2105,47 @@ const Chatbot = () => {
             }}
           >
             Start chat
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        show={mediaViewer.show}
+        onHide={closeImageViewer}
+        centered
+        size="lg"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {currentViewedImage?.fileName || 'Image preview'}
+            {imageGalleryItems.length > 1 ? ` (${mediaViewer.index + 1}/${imageGalleryItems.length})` : ''}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center" onTouchStart={handleLightboxTouchStart} onTouchEnd={handleLightboxTouchEnd}>
+          {currentViewedImage?.src ? (
+            <img
+              src={currentViewedImage.src}
+              alt={currentViewedImage.fileName || 'Image preview'}
+              style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }}
+            />
+          ) : null}
+        </Modal.Body>
+        <Modal.Footer>
+          {imageGalleryItems.length > 1 ? (
+            <>
+              <Button variant="outline-secondary" onClick={viewPreviousImage}>
+                <BiChevronLeft size={14} /> Prev
+              </Button>
+              <Button variant="outline-secondary" onClick={viewNextImage}>
+                Next <BiChevronRight size={14} />
+              </Button>
+            </>
+          ) : null}
+          <Button
+            variant="outline-primary"
+            onClick={() => triggerFileDownload(currentViewedImage?.src || '', currentViewedImage?.fileName || 'image')}
+          >
+            <BiDownload size={14} /> Download
           </Button>
         </Modal.Footer>
       </Modal>
