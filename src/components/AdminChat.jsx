@@ -197,6 +197,7 @@ const AdminChat = ({
   const normalizedUserEmail = (chatUserEmail || '').trim();
   const normalizedUserPhone = (chatUserPhone || '').trim();
   const userFirstInitial = normalizedUserName.charAt(0).toUpperCase() || 'U';
+  const isHumanConversation = /human/i.test(String(statusLabel || ''));
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -928,6 +929,19 @@ const AdminChat = ({
       setShowCopyToast(true);
     }
   };
+
+  const handleReturnToAIMode = useCallback(() => {
+    const sent = sendSocketPayload({
+      type: 'leave_human_mode',
+      reason: 'admin_completed',
+      timestamp: new Date().toISOString()
+    });
+
+    if (sent) {
+      if (onRefreshSessionRef.current) onRefreshSessionRef.current();
+      setShowActionsMenu(false);
+    }
+  }, [sendSocketPayload]);
 
   const handleDeleteSession = async () => {
     if (!sessionId) return;
@@ -1854,6 +1868,11 @@ const AdminChat = ({
               <BiDotsVerticalRounded size={24} color={isMobileView ? "white" : undefined} />
             </Dropdown.Toggle>
             <Dropdown.Menu className="my-chat-actions-menu border-0 shadow-sm">
+              {isHumanConversation ? (
+                <Dropdown.Item className="my-actions-item" onClick={handleReturnToAIMode}>
+                  Return to AI Mode
+                </Dropdown.Item>
+              ) : null}
               <Dropdown.Item className="my-actions-item text-danger" onClick={handleDeleteSession}>
                 Delete Session
               </Dropdown.Item>

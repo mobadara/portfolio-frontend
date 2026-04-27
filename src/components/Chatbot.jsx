@@ -897,6 +897,25 @@ const Chatbot = () => {
               return;
             }
 
+            if (data?.type === 'session_returned_to_ai') {
+              setIsHumanMode(false);
+              setAwaitingTransferConfirmation(false);
+              setShowHumanForm(false);
+              setIsLoading(false);
+              clearLoadingTimeout();
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: getNextMessageId(),
+                  text: 'Human support ended. You can chat with the AI again now.',
+                  sender: 'bot',
+                  type: 'text',
+                  timestamp: data.timestamp || new Date().toISOString()
+                }
+              ]);
+              return;
+            }
+
             if (data?.type === 'session_deleted') {
               localStorage.removeItem(CHATBOT_SESSION_STORAGE_KEY);
               localStorage.removeItem(CHATBOT_LEAD_SUBMITTED_KEY);

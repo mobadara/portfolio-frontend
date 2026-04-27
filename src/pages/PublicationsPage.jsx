@@ -9,6 +9,7 @@ const GOOGLE_SCHOLAR_URL = 'https://scholar.google.com/citations?hl=en&user=Jx9f
 const ORCID_URL = 'https://orcid.org/0009-0008-3470-1610';
 const SCHOLAR_USER_ID = new URLSearchParams(GOOGLE_SCHOLAR_URL.split('?')[1] || '').get('user') || '';
 const PREVIEW_ITEMS = 6;
+const SCHOLAR_MIN_LOADING_MS = 4500;
 
 const formatDate = (dateLike) => {
   const date = new Date(dateLike);
@@ -90,12 +91,22 @@ const PublicationsPage = () => {
   useEffect(() => {
     let isMounted = true;
 
+    const waitForMinimumLoading = async (startedAt) => {
+      const elapsed = Date.now() - startedAt;
+      const remaining = Math.max(0, SCHOLAR_MIN_LOADING_MS - elapsed);
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
+    };
+
     const loadScholarPublications = async () => {
+      const startedAt = Date.now();
       setIsLoadingScholar(true);
       setScholarError(false);
 
       if (!SCHOLAR_USER_ID) {
         if (isMounted) {
+          await waitForMinimumLoading(startedAt);
           setScholarError(true);
           setIsLoadingScholar(false);
         }
@@ -136,14 +147,22 @@ const PublicationsPage = () => {
         
         if (parsed.length > 0) {
           setScholarPublications(parsed.slice(0, PREVIEW_ITEMS));
+          await waitForMinimumLoading(startedAt);
+          if (isMounted) setIsLoadingScholar(false);
         } else {
-          setScholarError(true);
+          await waitForMinimumLoading(startedAt);
+          if (isMounted) {
+            setScholarError(true);
+            setIsLoadingScholar(false);
+          }
         }
       } catch {
         if (!isMounted) return;
-        setScholarError(true);
-      } finally {
-        if (isMounted) setIsLoadingScholar(false);
+        await waitForMinimumLoading(startedAt);
+        if (isMounted) {
+          setScholarError(true);
+          setIsLoadingScholar(false);
+        }
       }
     };
 
