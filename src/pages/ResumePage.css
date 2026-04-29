@@ -2,6 +2,18 @@
   padding: 2rem;
 }
 
+.resume-page-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 1rem;
+}
+
+.resume-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .resume-page-header {
   margin-bottom: 1.5rem;
 }
@@ -92,6 +104,10 @@
 @media (max-width: 768px) {
   .resume-shell {
     padding: 1.25rem;
+  }
+
+  .resume-page-actions {
+    justify-content: center;
   }
 
   .resume-page-title {

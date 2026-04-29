@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import Container from 'react-bootstrap/Container';
+import Button from 'react-bootstrap/Button';
 import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 import './SkillsSection.css';
 
 const PUBLIC_SKILLS_ENDPOINT = ADMIN_ROUTES.publicSkills;
+const COLLAPSED_SKILL_COUNT = 8;
 
 const SKILL_ICON_CLASS_MAP = {
   python: 'bi-terminal-fill',
@@ -49,6 +51,7 @@ const SkillsSection = () => {
   const [skills, setSkills] = useState([]);
   const [hoveredSkill, setHoveredSkill] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isExpanded, setIsExpanded] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -114,6 +117,16 @@ const SkillsSection = () => {
     return skills.filter(skill => skill.category === selectedCategory);
   }, [selectedCategory, skills]);
 
+  const visibleSkills = useMemo(() => {
+    if (isExpanded) return filteredSkills;
+
+    return [...filteredSkills]
+      .sort((firstSkill, secondSkill) => secondSkill.level - firstSkill.level)
+      .slice(0, COLLAPSED_SKILL_COUNT);
+  }, [filteredSkills, isExpanded]);
+
+  const canShowMoreSkills = filteredSkills.length > COLLAPSED_SKILL_COUNT;
+
   // Calculate font size based on skill level and screen size
   const calculateFontSize = (level) => {
     const windowWidth = window.innerWidth;
@@ -143,96 +156,109 @@ const SkillsSection = () => {
     <section id="skills" className="section-padding bg-light position-relative">
       <Container className="pt-3 pb-3">
         <div className="section-shell">
-        <div className="text-center mb-5">
-          <h2 className="fw-bold display-6 text-dark">Skills & Expertise</h2>
-          <p className="text-secondary fs-5">
-            My proficiency in various technologies and soft skills
-          </p>
-        </div>
-
-        {/* Category Filter */}
-        <div className="category-filter mb-4 text-center">
-          <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
-            {categories.map(category => (
-              <button
-                key={category}
-                className={`btn btn-sm transition-all ${
-                  selectedCategory === category
-                    ? 'btn-primary'
-                    : 'btn-outline-primary'
-                }`}
-                onClick={() => setSelectedCategory(category)}
-              >
-                {category}
-              </button>
-            ))}
+          <div className="text-center mb-5">
+            <h2 className="fw-bold display-6 text-dark">Skills & Expertise</h2>
+            <p className="text-secondary fs-5">
+              My proficiency in various technologies and soft skills
+            </p>
           </div>
-        </div>
+          {/* Category Filter */}
+          <div className="category-filter mb-4 text-center">
+            <div className="d-flex flex-wrap justify-content-center gap-2 mb-4">
+              {categories.map(category => (
+                <button
+                  key={category}
+                  className={`btn btn-sm transition-all ${
+                    selectedCategory === category
+                      ? 'btn-primary'
+                      : 'btn-outline-primary'
+                  }`}
+                  onClick={() => setSelectedCategory(category)}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        {/* Word Cloud Container */}
-        <div className="wordcloud-container">
-          <div className="wordcloud-content">
-            {filteredSkills.map((skill, index) => (
-              <span
-                key={index}
-                className={`skill-word ${getSkillColor(skill.level)}`}
-                style={{
-                  fontSize: `${calculateFontSize(skill.level)}rem`,
-                }}
-                onMouseEnter={() => setHoveredSkill(skill.name)}
-                onMouseLeave={() => setHoveredSkill(null)}
-              >
-                <span className="skill-icon" aria-hidden="true">
-                  <i className={`bi ${getSkillIconClass(skill.icon)}`} />
+          {/* Word Cloud Container */}
+          <div className={`wordcloud-container ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}>
+            <div className="wordcloud-content">
+              {visibleSkills.map((skill, index) => (
+                <span
+                  key={`${skill.name}-${index}`}
+                  className={`skill-word ${getSkillColor(skill.level)}`}
+                  style={{
+                    fontSize: `${calculateFontSize(skill.level)}rem`,
+                  }}
+                  onMouseEnter={() => setHoveredSkill(skill.name)}
+                  onMouseLeave={() => setHoveredSkill(null)}
+                >
+                  <span className="skill-icon" aria-hidden="true">
+                    <i className={`bi ${getSkillIconClass(skill.icon)}`} />
+                  </span>
+                  {skill.name}
                 </span>
-                {skill.name}
-              </span>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Skill Info Tooltip */}
-          {hoveredSkill && (
-            <div className="skill-tooltip">
-              <div className="tooltip-content">
-                <strong>{hoveredSkill}</strong>
-                <div className="skill-level">
-                  {skills.find(s => s.name === hoveredSkill)?.level}%
-                </div>
-                <div className="skill-tooltip-icon" aria-hidden="true">
-                  <i className={`bi ${getSkillIconClass(skills.find(s => s.name === hoveredSkill)?.icon)}`} />
+            {canShowMoreSkills && (
+              <div className="skill-expansion-actions">
+                <Button
+                  type="button"
+                  variant="outline-primary"
+                  className="see-more-skills-btn"
+                  onClick={() => setIsExpanded((currentValue) => !currentValue)}
+                  aria-expanded={isExpanded}
+                >
+                  {isExpanded ? 'Show fewer skills' : 'See more skills'}
+                </Button>
+              </div>
+            )}
+
+            {/* Skill Info Tooltip */}
+            {hoveredSkill && (
+              <div className="skill-tooltip">
+                <div className="tooltip-content">
+                  <strong>{hoveredSkill}</strong>
+                  <div className="skill-level">
+                    {skills.find(s => s.name === hoveredSkill)?.level}%
+                  </div>
+                  <div className="skill-tooltip-icon" aria-hidden="true">
+                    <i className={`bi ${getSkillIconClass(skills.find(s => s.name === hoveredSkill)?.icon)}`} />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Statistics */}
-        <div className="row text-center mt-5 pt-4 border-top">
-          <div className="col-md-3 mb-3">
-            <h5 className="fw-bold text-primary">{skills.length}</h5>
-            <p className="text-secondary">Total Skills</p>
+          {/* Statistics */}
+          <div className="row text-center mt-5 pt-4 border-top">
+            <div className="col-md-3 mb-3">
+              <h5 className="fw-bold text-primary">{skills.length}</h5>
+              <p className="text-secondary">Total Skills</p>
+            </div>
+            <div className="col-md-3 mb-3">
+              <h5 className="fw-bold text-success">{categories.length - 1}</h5>
+              <p className="text-secondary">Categories</p>
+            </div>
+            <div className="col-md-3 mb-3">
+              <h5 className="fw-bold text-warning">
+                {Math.round(
+                  skills.reduce((sum, skill) => sum + skill.level, 0) /
+                    (skills.length || 1)
+                )}
+                %
+              </h5>
+              <p className="text-secondary">Avg Proficiency</p>
+            </div>
+            <div className="col-md-3 mb-3">
+              <h5 className="fw-bold text-info">
+                {skills.filter(s => s.level >= 90).length}
+              </h5>
+              <p className="text-secondary">Expert Level Skills</p>
+            </div>
           </div>
-          <div className="col-md-3 mb-3">
-            <h5 className="fw-bold text-success">{categories.length - 1}</h5>
-            <p className="text-secondary">Categories</p>
-          </div>
-          <div className="col-md-3 mb-3">
-            <h5 className="fw-bold text-warning">
-              {Math.round(
-                skills.reduce((sum, skill) => sum + skill.level, 0) /
-                  (skills.length || 1)
-              )}
-              %
-            </h5>
-            <p className="text-secondary">Avg Proficiency</p>
-          </div>
-          <div className="col-md-3 mb-3">
-            <h5 className="fw-bold text-info">
-              {skills.filter(s => s.level >= 90).length}
-            </h5>
-            <p className="text-secondary">Expert Level Skills</p>
-          </div>
-        </div>
         </div>
       </Container>
     </section>

@@ -12,6 +12,14 @@
   box-sizing: border-box;
 }
 
+.wordcloud-container.is-collapsed {
+  min-height: 380px;
+}
+
+.wordcloud-container.is-expanded {
+  min-height: 500px;
+}
+
 .wordcloud-content {
   display: flex;
   flex-wrap: wrap;
@@ -24,6 +32,16 @@
   margin: 0 auto;
   align-content: center;
   box-sizing: border-box;
+}
+
+.skill-expansion-actions {
+  margin-top: 0.75rem;
+}
+
+.see-more-skills-btn {
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 0.6rem 1.35rem;
 }
 
 .skill-word {
@@ -167,6 +185,10 @@
     min-height: 400px;
   }
 
+  .wordcloud-container.is-collapsed {
+    min-height: 320px;
+  }
+
   .wordcloud-content {
     gap: 1rem;
     padding: 1.5rem;
@@ -192,6 +214,10 @@
   .wordcloud-container {
     min-height: 350px;
     padding: 0 0.5rem;
+  }
+
+  .wordcloud-container.is-collapsed {
+    min-height: 280px;
   }
 
   .wordcloud-content {

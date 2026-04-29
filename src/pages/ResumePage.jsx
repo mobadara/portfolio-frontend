@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import Container from 'react-bootstrap/Container';
+import Button from 'react-bootstrap/Button';
+import { Link } from 'react-router-dom';
 import './ResumePage.css';
 import { ADMIN_ROUTES, buildAdminUrl } from '../utils/adminApi';
 
@@ -62,6 +64,13 @@ const ResumePage = () => {
     <section className="resume-page section-padding" style={{ backgroundColor: 'var(--navy-blue)' }}>
       <Container>
         <div className="section-shell resume-shell text-center">
+          <div className="resume-page-actions">
+            <Button as={Link} to="/about" variant="outline-light" className="resume-back-btn">
+              <i className="bi bi-arrow-left me-2"></i>
+              Back to About
+            </Button>
+          </div>
+
           <div className="resume-page-header">
             <h1 className="badge-label">RESUME</h1>
             <p className="resume-page-copy">
