@@ -5,6 +5,7 @@ import './HeroSection.css';
 const TITLES = ['Data Scientist', 'AI Engineer', 'Software Developer', 'Mentor'];
 const HIRE_TYPES = ['Contract', 'Full-Time', 'Part-Time', 'Freelance', 'Remote', 'On-site'];
 const FOCUS_AREAS = ['Applied AI', 'MLOps', 'Data Products', 'Technical Mentorship'];
+const YEARS_OF_EXPERIENCE = new Date().getFullYear() - 2023;
 const AI_PLANETS = [
   { key: 'ml', label: 'Machine Learning', orbit: 'outer', position: 'top' },
   { key: 'se', label: 'Software Engineering', orbit: 'outer', position: 'bottom' },
@@ -104,11 +105,11 @@ const HeroSection = () => {
 
             <div className="hero-stats centered-stats">
               <div className="stat-item">
-                <div className="stat-number">5+</div>
+                <div className="stat-number">{YEARS_OF_EXPERIENCE}+</div>
                 <div className="stat-label">Years Experience</div>
               </div>
               <div className="stat-item">
-                <div className="stat-number">20+</div>
+                <div className="stat-number">10+</div>
                 <div className="stat-label">Projects Delivered</div>
               </div>
               <div className="stat-item">
