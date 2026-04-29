@@ -71,9 +71,7 @@ const HeroSection = () => {
                   </span>
                 ))}
               </div>
-              <span className="node node-a" />
-              <span className="node node-b" />
-              <span className="node node-c" />
+              {/* simplified visual: removed static decorative nodes */}
               <div className="hero-core">AI</div>
             </div>
 

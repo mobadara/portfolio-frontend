@@ -243,18 +243,7 @@
   transform: translate(-50%, 50%);
 }
 
-.node {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #facc15;
-  box-shadow: 0 0 14px rgba(250, 204, 21, 0.55);
-}
-
-.node-a { top: 16px; left: 50%; transform: translateX(-50%); }
-.node-b { right: 26px; bottom: 52px; }
-.node-c { left: 24px; bottom: 56px; }
+/* static decorative nodes removed to simplify the hero visual */
 
 .hero-core {
   width: 84px;
